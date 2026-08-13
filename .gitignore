@@ -1,0 +1,33 @@
+# Ambientes Virtuais e Python
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Variáveis de Ambiente e Segredos
+.env
+!.env.example
+
+# Testes e Cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Graphify (Grafo de contexto local e caches)
+graphify-out/
+
+# Logs e Arquivos Temporários
+*.log
+logs/
+tmp/
+uploads/
+*.ogg
+*.mp3
+*.wav
+
+# IDEs e Editores
+.vscode/
+.idea/
+.DS_Store
