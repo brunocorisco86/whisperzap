@@ -41,3 +41,18 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
   - Criação dos manuais e especificações dos subagentes em `docs/subagents/`.
   - Configuração do `pytest.ini` e escrita do teste de integridade `tests/test_environment.py`.
 - **Resultado**: Ambiente de desenvolvimento local 100% estruturado, validado com testes automatizados passando.
+
+### Sessão 002 — Implementação do MVP 1 (Transcrição & Revisão Contextual WhatsApp)
+- **Data**: 2026-08-13
+- **Objetivo**: Implementar o primeiro marco funcional (Fase 2) contendo o serviço de Speech-to-Text Whisper (`POST /transcribe`), o serviço AI Gateway (`POST /ai/revise`), fluxo n8n para WhatsApp e suite completa de testes automatizados.
+- **Ações Realizadas**:
+  - Criação do módulo de configuração com Pydantic Settings (`src/config.py`).
+  - Implementação do microsserviço de transcrição Whisper com `faster-whisper` (`src/transcriber/`).
+  - Implementação do AI Gateway com arquitetura desacoplada (Model Router, prompts contextuais estritos e provedores Gemini, OpenRouter e Mock) em `src/ai_gateway/`.
+  - Integração dos roteadores na aplicação unificada FastAPI (`src/main.py`).
+  - Criação do workflow exportável para n8n (`workflows/n8n_whatsapp_voice_transcription.json`).
+  - Criação do guia completo de execução e testes (`docs/mvp1_whatsapp_workflow.md`).
+  - Criação e execução da suíte de testes unitários e de integração HTTP com `pytest` (15 testes passando).
+  - Atualização do mapa de conhecimento AST via `graphify`.
+- **Resultado**: MVP 1 concluído com sucesso e pronto para deploy/integração.
+

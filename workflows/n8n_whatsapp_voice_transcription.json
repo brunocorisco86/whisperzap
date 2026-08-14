@@ -1,0 +1,158 @@
+{
+  "name": "Hermes Voice Memory - MVP 1 Transcrição e Revisão WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-voice-received",
+        "options": {}
+      },
+      "name": "Webhook WhatsApp (Evolution API / Z-API)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "id": "1e112d7c-a7a2-4bb0-80a1-000000000001"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body?.messageType || $json.body?.data?.messageType || $json.body?.type || '' }}",
+              "operation": "contains",
+              "value2": "audio"
+            }
+          ]
+        }
+      },
+      "name": "Filtro: É Mensagem de Áudio?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "id": "1e112d7c-a7a2-4bb0-80a1-000000000002"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.HERMES_API_URL || 'http://localhost:8000' }}/transcribe",
+        "sendBinaryData": true,
+        "binaryPropertyName": "data",
+        "options": {}
+      },
+      "name": "Speech-to-Text (POST /transcribe)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [680, 200],
+      "id": "1e112d7c-a7a2-4bb0-80a1-000000000003"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.HERMES_API_URL || 'http://localhost:8000' }}/ai/revise",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $json.text }}"
+            },
+            {
+              "name": "context",
+              "value": "Mensagem de voz via WhatsApp do usuário."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "AI Gateway (POST /ai/revise)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [900, 200],
+      "id": "1e112d7c-a7a2-4bb0-80a1-000000000004"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WHATSAPP_API_ENDPOINT || 'http://localhost:8080/message/sendText/default' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.WHATSAPP_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Webhook WhatsApp (Evolution API / Z-API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API / Z-API)').item.json.body?.sender?.phone || '' }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.text_revised }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Envia Texto Revisado (WhatsApp)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 200],
+      "id": "1e112d7c-a7a2-4bb0-80a1-000000000005"
+    }
+  ],
+  "connections": {
+    "Webhook WhatsApp (Evolution API / Z-API)": {
+      "main": [
+        [
+          {
+            "node": "Filtro: É Mensagem de Áudio?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtro: É Mensagem de Áudio?": {
+      "main": [
+        [
+          {
+            "node": "Speech-to-Text (POST /transcribe)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Speech-to-Text (POST /transcribe)": {
+      "main": [
+        [
+          {
+            "node": "AI Gateway (POST /ai/revise)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Gateway (POST /ai/revise)": {
+      "main": [
+        [
+          {
+            "node": "Envia Texto Revisado (WhatsApp)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

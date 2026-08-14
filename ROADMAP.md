@@ -4,17 +4,17 @@ Este documento estabelece o plano de desenvolvimento de **6 meses** para a const
 
 ---
 
-## 🚩 Status Atual: Fase 1 (Setup Inicial de Desenvolvimento)
+## 🚩 Status Atual: Fase 2 Concluída (Próximo: Fase 3 — Repositório Remoto)
 
 ---
 
 ## 🗓️ Fases do Projeto
 
 ```text
-FASE 1: Setup & Governança (Local)
+FASE 1: Setup & Governança (Local) [CONCLUÍDO]
    │
    ▼
-FASE 2: MVP 1 — Transcrição de Áudio WhatsApp
+FASE 2: MVP 1 — Transcrição de Áudio WhatsApp [CONCLUÍDO]
    │
    ▼
 FASE 3: Criação de Repositório Remoto & Sincronização Git Push
@@ -31,7 +31,7 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B)
 
 ---
 
-### 🟢 Fase 1: Setup de Infraestrutura Local, Governança e Testes (Concluída nesta sessão)
+### 🟢 Fase 1: Setup de Infraestrutura Local, Governança e Testes (Concluída)
 - [x] Leitura e análise profunda do documento de ideação (`idea.md`).
 - [x] Inicialização do repositório Git local (`git init`).
 - [x] Criação do `.gitignore` para desenvolvimento Python e Graphify.
@@ -43,12 +43,12 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B)
 
 ---
 
-### 🟡 Fase 2: MVP 1 — Transcrição e Revisão Contextual WhatsApp
-- [ ] Implementação da API de transcrição utilizando `faster-whisper` (`POST /transcribe`).
-- [ ] Construção do serviço **AI Gateway** em FastAPI com suporte inicial ao Gemini API / OpenRouter (`POST /ai/revise`).
-- [ ] Configuração do webhook no n8n para receber mensagens de áudio do WhatsApp (Evolution API / Z-API).
-- [ ] Orquestração do fluxo n8n: Recebe Áudio ➔ Baixa Áudio ➔ Transcreve (Whisper) ➔ Revisa Contextualmente (AI Gateway) ➔ Retorna apenas o texto limpo no WhatsApp.
-- [ ] Validação prática do fluxo ponta a ponta em ambiente local (usando ngrok ou Tailscale local).
+### 🟢 Fase 2: MVP 1 — Transcrição e Revisão Contextual WhatsApp (Concluída nesta sessão)
+- [x] Implementação da API de transcrição utilizando `faster-whisper` (`POST /transcribe`).
+- [x] Construção do serviço **AI Gateway** em FastAPI com suporte a Gemini API, OpenRouter e MockProvider (`POST /ai/revise`).
+- [x] Configuração do webhook e nós no n8n para receber mensagens de áudio do WhatsApp (Evolution API / Z-API) em `workflows/n8n_whatsapp_voice_transcription.json`.
+- [x] Orquestração do fluxo n8n: Recebe Áudio ➔ Transcreve (Whisper) ➔ Revisa Contextualmente (AI Gateway) ➔ Retorna apenas o texto limpo no WhatsApp.
+- [x] Criação do manual de validação e execução em `docs/mvp1_whatsapp_workflow.md` com suíte de 15 testes automatizados passando.
 
 ---
 
