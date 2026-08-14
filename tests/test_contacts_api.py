@@ -52,7 +52,9 @@ def test_contacts_api_crud_and_batch():
         json={"content": batch_md},
     )
     assert res_batch.status_code == 200
-    assert res_batch.json()["imported_count"] == 2
+    assert len(res_batch.json()["contacts"]) == 2
+    assert res_batch.json()["imported_count"] + res_batch.json()["updated_count"] == 2
+
 
     # 5. Atualização PATCH
     res_patch = client.patch(

@@ -56,7 +56,12 @@ VOICE ──► TRANSCRIPTION ──► CONTEXT ──► REVISION ──► MEM
   └───────────────────────────────────────────────────────────────┘
 ```
 
+### 📡 Ambientes Verificados e Aliases SSH:
+- **`ssh peixe` (Raspberry Pi 3B na LAN)**: Alpine Linux aarch64 (`piscicultura`), Docker ativo, PostgreSQL 15 rodando, Tailscale instalado, 382 MB de RAM livres.
+- **`ssh hostinger` (VPS Hostinger na Nuvem)**: Alpine Linux x86_64 (`srv1828523`), Docker ativo, 2.4 GB de RAM livres, Caddy HTTPS.
+
 ---
+
 
 ## 🚪 AI Gateway & Model Router
 
