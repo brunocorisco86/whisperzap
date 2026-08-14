@@ -77,14 +77,13 @@ O projeto é construído sob **três pilares fundamentais**:
 ## 💻 Ambiente de Desenvolvimento vs Produção
 
 - **Ambiente de Desenvolvimento (Local)**:
-  - Desenvolvimento e testes locais em Python 3.10+.
+  - Desenvolvimento e testes locais em Python 3.12+ com 46 testes automatizados (`pytest`).
   - Utilização do **Graphify** para mapeamento do código/documentação e economia de tokens dos agentes IA.
-  - Execução de testes automatizados com `pytest`.
-- **Ambiente de Produção (VPS / Alpine Linux)**:
-  - Deploy conteinerizado (Docker em Alpine Linux).
-  - Reverse Proxy via Caddy com suporte a HTTPS automático.
-  - Comunicação privada via Tailscale VPN.
-  - n8n rodando no Raspberry Pi 3B (Alpine Linux).
+  - Testes com banco SQLite embutido e modelos Mock para execução offline rápida.
+- **Ambiente de Produção (Topologia Homelab)**:
+  - **VPS Hostinger (`ssh hostinger`)**: Docker Alpine Linux (FastAPI + Whisper `int8` + Caddy HTTPS + PostgreSQL `pgvector`).
+  - **Raspberry Pi 3B+ (`ssh peixe`)**: Docker Alpine Linux (n8n + Evolution API WhatsApp).
+  - **Rede Privada**: Túnel WireGuard via Tailscale conectando ambos os nós.
 
 ---
 
@@ -92,7 +91,7 @@ O projeto é construído sob **três pilares fundamentais**:
 
 ### 1. Clonar e configurar o ambiente
 ```bash
-git clone <repository_url> # (Após criação do remoto pós-MVP 1)
+git clone git@github.com:brunocorisco86/whisperzap.git
 cd 9_Voice_Assistant
 
 # Criar e ativar ambiente virtual Python
@@ -106,10 +105,10 @@ pip install -r requirements.txt
 ### 2. Configurar Variáveis de Ambiente
 ```bash
 cp .env.example .env
-# Edite o arquivo .env com suas chaves de API locais/desenvolvimento
+# Edite o arquivo .env com suas chaves de API (Gemini / OpenRouter)
 ```
 
-### 3. Executar a Suite de Testes
+### 3. Executar a Suite de Testes (46 testes)
 ```bash
 pytest -v
 ```
@@ -118,7 +117,17 @@ pytest -v
 ```bash
 uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-Acesse a documentação Swagger em: [http://localhost:8000/docs](http://localhost:8000/docs).
+Acesse a documentação Swagger interativa em: [http://localhost:8000/docs](http://localhost:8000/docs).
+
+---
+
+## 🔌 Endpoints Principais da API
+
+- **Transcrição**: `POST /transcribe` (Áudio ➔ Transcrição Whisper)
+- **AI Gateway**: `POST /ai/revise` (Revisão Contextual) e `POST /ai/extract` (Extração Semântica estruturada)
+- **Memória & Grafo**: `POST /api/v1/memory/messages`, `GET /api/v1/memory/tasks`, `POST /api/v1/memory/search`, `GET /api/v1/memory/graph/*`, `GET /api/v1/memory/stats`
+- **Dicionário Léxico**: `GET /api/v1/dictionary`, `POST /api/v1/dictionary`, `GET /api/v1/dictionary/hints`
+- **Contatos & Roles**: `GET /api/v1/contacts`, `GET /api/v1/contacts/markdown-table`, `POST /api/v1/contacts/batch-import`
 
 ---
 
@@ -140,10 +149,11 @@ Consulte o documento [`docs/graphify_guide.md`](file:///home/brunoconter/Documen
 
 ## 📚 Documentação do Projeto
 
-- 🗺️ [`ROADMAP.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/ROADMAP.md): Planejamento e fases de desenvolvimento (inclui Sidequests).
-- 📜 [`LOGS.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/LOGS.md): Histórico de decisões de arquitetura (ADRs 001 a 005) e sessões.
-- 📐 [`docs/architecture.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/architecture.md): Detalhamento da arquitetura técnica e dimensionamento de hardware.
+- 🗺️ [`ROADMAP.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/ROADMAP.md): Planejamento, fases e status das Sidequests 1 e 2.
+- 📜 [`LOGS.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/LOGS.md): Histórico de decisões de arquitetura (ADRs 001 a 007) e logs das Sessões 001 a 006.
+- 📐 [`docs/architecture.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/architecture.md): Detalhamento da arquitetura técnica, dimensionamento e topologia de servidores (`ssh peixe` e `ssh hostinger`).
 - 🎙️ [`docs/tutorial_teste_audio.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/tutorial_teste_audio.md): Tutorial passo a passo para envio e teste de áudio WhatsApp.
 - 🔄 [`docs/mvp1_whatsapp_workflow.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/mvp1_whatsapp_workflow.md): Guia de importação e configuração do fluxo n8n.
-- 🤖 [`docs/subagents/`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/subagents/): Definição dos subagentes especialistas.
+- 🤖 [`docs/subagents/`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/subagents/): Manuais dos subagentes especialistas.
+
 

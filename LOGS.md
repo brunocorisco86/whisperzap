@@ -36,14 +36,31 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
 ### ADR 005 — Dimensionamento de Hardware e Recursos para VPS de Entrada (Hostinger)
 - **Data**: 2026-08-13
 - **Status**: Aprovado
-- **Contexto**: O deploy em produção utilizará uma VPS Hostinger de baixo custo (4 GB de RAM, 1-2 vCPUs) compartilhada com outros serviços do homelab (atualmente com 1,6 GB de RAM livres e 3% de CPU).
+- **Contexto**: O deploy em produção utilizará uma VPS Hostinger de baixo custo (4 GB de RAM, 1-2 vCPUs) compartilhada com outros serviços do homelab (atualmente com 2,4 GB de RAM livres e baixa carga).
 - **Decisão**:
   1. Manter o modelo Whisper `base` com quantização `int8` (`compute_type=int8`), limitando o consumo de RAM no pico de inferência a ~350-450 MB e tempo de CPU a ~1-4s por áudio (RTF ~0.12x).
   2. Manter a execução de LLMs via APIs externas (Gemini/OpenRouter), evitando carga de modelos locais pesados na VPS.
-  3. Descarregar o motor de automação (n8n) no Raspberry Pi 3B conectado via Tailscale, economizando 300-500 MB de RAM na VPS.
-  4. Configurar 2 GB de Swap no disco NVMe da VPS para prevenção de OOM Killer em picos de concorrência.
+  3. Descarregar o motor de automação (n8n) no Raspberry Pi 3B+ conectado via Tailscale, economizando 300-500 MB de RAM na VPS.
+
+### ADR 006 — Seleção de Nó de Borda LAN (Raspberry Pi 3B+ `peixe` vs `alpine-dns`)
+- **Data**: 2026-08-14
+- **Status**: Aprovado
+- **Contexto**: O homelab possui dois nós Raspberry Pi: `ssh peixe` (Raspberry Pi 3B+ Rev 1.3 @ 1.4 GHz) e `ssh alpine` (Raspberry Pi 3B Rev 1.2 @ 1.2 GHz, rodando Pi-hole DNS, Unbound e Mosquitto MQTT).
+- **Decisão**: 
+  1. Selecionar o nó `ssh peixe` (3B+) para hospedar a automação de borda (n8n + WhatsApp Evolution API), devido à sua CPU 16.7% mais veloz e conexão Gigabit Ethernet.
+  2. Preservar o nó `ssh alpine` estritamente dedicado à infraestrutura crítica de rede (DNS/Pi-hole), evitando que picos de automação afetem a latência de resolução de nomes da casa.
+
+### ADR 007 — Gestão de Contatos, Roles e Parser Polimórfico de Tabela Markdown/JSON
+- **Data**: 2026-08-14
+- **Status**: Aprovado
+- **Contexto**: O sistema precisa classificar mensagens e tarefas com prioridades diferenciadas dependendo de quem fala (gestores, diretoria, cônjuge, família, colegas, fornecedores), além de permitir edição rápida e em lote direto no celular via WhatsApp.
+- **Decisão**:
+  1. Criar o módulo de Contatos com papéis hierárquicos (`EXECUTIVE` 1.0, `FAMILY_CORE` 0.95, `STAKEHOLDER` 0.85, `COLLEAGUE` 0.70, `FAMILY_EXTENDED` 0.60, `SERVICE_VENDOR` 0.50, `UNKNOWN` 0.40).
+  2. Implementar o Parser Polimórfico com suporte a Tabela Markdown (`.md`) e JSON (`.json`) para exportação e importação em lote (`POST /api/v1/contacts/batch-import`).
+  3. Ponderar dinamicamente a urgência das tarefas no momento do salvamento na memória e enriquecer o Grafo NetworkX com conexões `(Pessoa) -[ROLE]-> (Empresa)` e `(Pessoa) -[WORKS_ON]-> (Projeto)`.
 
 ---
+
 
 ## 📝 Histórico de Sessões de Desenvolvimento
 
