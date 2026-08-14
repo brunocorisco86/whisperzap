@@ -26,8 +26,12 @@ uploads/
 *.ogg
 *.mp3
 *.wav
+*.db
+*.sqlite
+*.sqlite3
 
 # IDEs e Editores
 .vscode/
 .idea/
 .DS_Store
+

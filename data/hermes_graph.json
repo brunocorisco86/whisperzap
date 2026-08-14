@@ -1,0 +1,98 @@
+{
+  "directed": true,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "category": "PERSON",
+      "mentions": 11,
+      "id": "Bruno"
+    },
+    {
+      "category": "PERSON",
+      "mentions": 10,
+      "details": "Contato de trabalho",
+      "id": "João"
+    },
+    {
+      "category": "EQUIPMENT",
+      "mentions": 11,
+      "details": "Armazenamento de ração",
+      "id": "Silo 3"
+    },
+    {
+      "category": "LOCATION",
+      "mentions": 11,
+      "details": "Cooperativa",
+      "id": "C.Vale"
+    },
+    {
+      "category": "SYSTEM",
+      "mentions": 11,
+      "details": "Ficha de Acompanhamento de Lote",
+      "id": "FAL"
+    }
+  ],
+  "links": [
+    {
+      "relation": "DELEGATED_TO",
+      "weight": 10.0,
+      "source": "Bruno",
+      "target": "João"
+    },
+    {
+      "relation": "MENTIONED",
+      "weight": 11.0,
+      "source": "Bruno",
+      "target": "Silo 3"
+    },
+    {
+      "relation": "MENTIONED",
+      "weight": 11.0,
+      "source": "Bruno",
+      "target": "C.Vale"
+    },
+    {
+      "relation": "MENTIONED",
+      "weight": 11.0,
+      "source": "Bruno",
+      "target": "FAL"
+    },
+    {
+      "relation": "ASSIGNED_WITH",
+      "weight": 10.0,
+      "source": "João",
+      "target": "Silo 3"
+    },
+    {
+      "relation": "ASSIGNED_WITH",
+      "weight": 10.0,
+      "source": "João",
+      "target": "C.Vale"
+    },
+    {
+      "relation": "ASSIGNED_WITH",
+      "weight": 10.0,
+      "source": "João",
+      "target": "FAL"
+    },
+    {
+      "relation": "CO_OCCURRED",
+      "weight": 11.0,
+      "source": "Silo 3",
+      "target": "C.Vale"
+    },
+    {
+      "relation": "CO_OCCURRED",
+      "weight": 11.0,
+      "source": "Silo 3",
+      "target": "FAL"
+    },
+    {
+      "relation": "CO_OCCURRED",
+      "weight": 11.0,
+      "source": "C.Vale",
+      "target": "FAL"
+    }
+  ]
+}

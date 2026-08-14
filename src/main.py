@@ -1,10 +1,20 @@
-"""Aplicação Principal FastAPI — Hermes Voice Memory."""
-
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 from src.config import settings
 from src.ai_gateway.router import router as ai_router
 from src.transcriber.router import router as transcriber_router
+from src.dictionary.router import router as dictionary_router
+from src.memory.router import router as memory_router
+from src.memory.database import init_db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Executa a inicialização do banco de dados na partida."""
+    init_db()
+    yield
+
 
 app = FastAPI(
     title=settings.API_TITLE,
@@ -12,7 +22,9 @@ app = FastAPI(
     description="Hermes Voice Memory — Transformando comunicação não estruturada em memória e inteligência.",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
+
 
 # Configuração de CORS para requisições do n8n / frontend / webhooks
 app.add_middleware(
@@ -26,6 +38,9 @@ app.add_middleware(
 # Inclusão dos roteadores de microsserviços
 app.include_router(transcriber_router)
 app.include_router(ai_router)
+app.include_router(dictionary_router)
+app.include_router(memory_router)
+
 
 
 @app.get(

@@ -24,3 +24,27 @@ class BaseLLMProvider(ABC):
     ) -> str:
         """Gera texto assincronamente a partir do prompt."""
         pass
+
+    async def generate_embedding(self, text: str) -> list[float]:
+        """Gera vetor de embedding para o texto fornecido (padrão 768 dimensões)."""
+        import hashlib
+        import math
+
+        dim = 768
+        vec = [0.0] * dim
+        words = text.lower().split()
+        if not words:
+            return vec
+
+        for word in words:
+            h = int(hashlib.md5(word.encode("utf-8")).hexdigest(), 16)
+            idx = h % dim
+            val = ((h >> 8) % 100) / 100.0 + 0.5
+            vec[idx] += val
+
+        norm = math.sqrt(sum(x * x for x in vec))
+        if norm > 0:
+            vec = [x / norm for x in vec]
+        return vec
+
+

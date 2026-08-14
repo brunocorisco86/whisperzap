@@ -1,0 +1,114 @@
+[
+  {
+    "term": "FAL",
+    "phonetic_variations": [
+      "FAU",
+      "fau",
+      "fao",
+      "fal",
+      "folha de lote"
+    ],
+    "expansion": "Ficha de Acompanhamento de Lote",
+    "category": "ZOOTECNIA",
+    "description": "Documento e registro diário com mortalidade, consumo de ração e peso das aves.",
+    "id": "21d8730a",
+    "created_at": "2026-08-14T22:47:18.174119"
+  },
+  {
+    "term": "eProdutor",
+    "phonetic_variations": [
+      "e-produtor",
+      "eprodutor",
+      "e produtor",
+      "aplicativo do produtor"
+    ],
+    "expansion": "Aplicativo eProdutor",
+    "category": "SISTEMAS",
+    "description": "Aplicativo mobile utilizado pelos cooperados e integrados para lançamento de dados de campo.",
+    "id": "3dd119a9",
+    "created_at": "2026-08-14T22:47:18.174150"
+  },
+  {
+    "term": "C.Vale",
+    "phonetic_variations": [
+      "Sevale",
+      "cvale",
+      "c vale",
+      "cevale",
+      "se vale",
+      "sivale"
+    ],
+    "expansion": "Cooperativa Agroindustrial C.Vale",
+    "category": "AGRONEGOCIO",
+    "description": "Cooperativa agroindustrial de integração avícola e grãos.",
+    "id": "2ae3ba5f",
+    "created_at": "2026-08-14T22:47:18.174163"
+  },
+  {
+    "term": "Mortalidade",
+    "phonetic_variations": [
+      "mhotilidade",
+      "hotelidade",
+      "motilidade",
+      "mortalidade das aves"
+    ],
+    "expansion": "Mortalidade Diária do Aviário",
+    "category": "ZOOTECNIA",
+    "description": "Contagem de perdas diárias no lote avícola.",
+    "id": "c2b9e1ac",
+    "created_at": "2026-08-14T22:47:18.174173"
+  },
+  {
+    "term": "Vazio Sanitário",
+    "phonetic_variations": [
+      "vazio sanitario",
+      "intervalo sanitário",
+      "vazio de lote"
+    ],
+    "expansion": "Período de Vazio Sanitário",
+    "category": "ZOOTECNIA",
+    "description": "Período de desinfecção, descanso e preparação do aviário entre lotes sucessivos.",
+    "id": "58a103bf",
+    "created_at": "2026-08-14T22:47:18.174181"
+  },
+  {
+    "term": "Silos e Ração",
+    "phonetic_variations": [
+      "sensor de racao",
+      "sensor do silo",
+      "nivel de racao",
+      "silo de racao"
+    ],
+    "expansion": "Monitoramento de Nível de Silos de Ração",
+    "category": "EQUIPAMENTOS",
+    "description": "Sensores IoT de pesagem e nível nos silos de armazenagem de ração.",
+    "id": "7e72e302",
+    "created_at": "2026-08-14T22:47:18.174189"
+  },
+  {
+    "term": "IEP",
+    "phonetic_variations": [
+      "iep",
+      "i e p",
+      "indice de eficiencia produtiva"
+    ],
+    "expansion": "Índice de Eficiência Produtiva",
+    "category": "ZOOTECNIA",
+    "description": "Métrica zootécnica de desempenho global do lote avícola.",
+    "id": "e2a27761",
+    "created_at": "2026-08-14T22:47:18.174196"
+  },
+  {
+    "term": "Conversão Alimentar",
+    "phonetic_variations": [
+      "conversao alimentar",
+      "ca",
+      "c a"
+    ],
+    "expansion": "Taxa de Conversão Alimentar (CA)",
+    "category": "ZOOTECNIA",
+    "description": "Quilogramas de ração consumida por quilograma de peso vivo produzido.",
+    "id": "9b8cbe88",
+    "created_at": "2026-08-14T22:47:18.174203"
+  }
+]

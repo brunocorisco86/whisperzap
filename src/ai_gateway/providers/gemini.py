@@ -61,3 +61,30 @@ class GeminiProvider(BaseLLMProvider):
             except (KeyError, IndexError) as exc:
                 logger.error(f"Formato inesperado na resposta do Gemini: {data}")
                 raise ValueError("Resposta vazia ou inválida retornada pelo Gemini.") from exc
+
+    async def generate_embedding(self, text: str) -> list[float]:
+        """Gera embedding vetorial usando a API do Gemini text-embedding-004."""
+        if not self.api_key or self.api_key.startswith("sua_chave"):
+            return await super().generate_embedding(text)
+
+        url = f"{self.BASE_URL}/text-embedding-004:embedContent?key={self.api_key}"
+        payload = {
+            "model": "models/text-embedding-004",
+            "content": {
+                "parts": [{"text": text}]
+            }
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(url, json=payload)
+                if response.status_code == 200:
+                    data = response.json()
+                    return data["embedding"]["values"]
+                logger.warning(f"Erro ao gerar embedding no Gemini ({response.status_code}): {response.text}")
+        except Exception as e:
+            logger.error(f"Exceção ao chamar embedding Gemini: {e}")
+
+        # Fallback determinístico
+        return await super().generate_embedding(text)
+

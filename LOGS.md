@@ -103,6 +103,22 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
   - Atualização do status do projeto para a Fase 4 (Memória em Camadas & Extração Semântica).
 - **Resultado**: Fase 3 concluída com repositório remoto 100% sincronizado.
 
+### Sessão 005 — Implementação da Fase 4 (Memória em Camadas & Grafo NetworkX) e Sidequest 1 (Dicionário Léxico)
+- **Data**: 2026-08-14
+- **Objetivo**: Desenvolver e validar o pipeline de extração semântica estruturada (`POST /ai/extract`), o repositório de memória relacional e vetorial (`src/memory/`), o grafo de relações em NetworkX (`KnowledgeGraph`) e o módulo de Dicionário Léxico de Domínio (`src/dictionary/`).
+- **Ações Realizadas**:
+  - Implementação do módulo de Dicionário Léxico (`src/dictionary/`) com persistência, variações fonéticas e geração de hints para Whisper e LLMs.
+  - Implementação do Extrator Semântico (`SemanticExtractor`) com classificação de intenções (`TASK`, `IDEA`, `DECISION`, `EVENT`, `PROBLEM`, `NOTE`, `QUESTION`), extração de entidades e tarefas com prazo/responsável.
+  - Adição do endpoint `POST /ai/extract` no AI Gateway.
+  - Implementação da camada de banco de dados SQLAlchemy (`src/memory/models.py`, `src/memory/database.py`) com modelos `MessageRecord`, `TaskRecord`, `EntityRecord`, `EmbeddingRecord`.
+  - Implementação do Grafo de Conhecimento relacional com NetworkX (`src/memory/graph.py`) e consulta de vizinhança relacional.
+  - Implementação do repositório unificado `MemoryRepository` com cálculo de similaridade de cosseno para busca vetorial (`POST /api/v1/memory/search`).
+  - Criação dos endpoints FastAPI da Memória (`/api/v1/memory/messages`, `/api/v1/memory/tasks`, `/api/v1/memory/graph/*`, `/api/v1/memory/stats`).
+  - Criação de suíte de testes com 35 testes automatizados (`pytest`), cobrindo 100% dos novos módulos.
+  - Atualização do `ROADMAP.md` e do `main.py` com modern lifespan context manager.
+- **Resultado**: Fase 4 e Sidequest 1 concluídas com 100% de sucesso e 35 testes passando.
+
+
 
 
 

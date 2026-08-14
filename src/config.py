@@ -39,12 +39,22 @@ class Settings(BaseSettings):
     WHISPER_DEVICE: str = "cpu"
     WHISPER_COMPUTE_TYPE: str = "int8"
 
-    # Banco de dados
+    # Banco de dados e Persistência
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "hermes_voice_memory"
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres_dev_password"
+    DATABASE_URL: str = ""
+
+    # Embeddings & Busca Vetorial
+    EMBEDDING_PROVIDER: Literal["gemini", "openrouter", "mock"] = "gemini"
+    EMBEDDING_MODEL: str = "text-embedding-004"
+
+    # Grafo de Conhecimento e Dicionário Léxico
+    DATA_DIR: str = "data"
+    GRAPH_PERSISTENCE_PATH: str = "data/hermes_graph.json"
+    DICTIONARY_PERSISTENCE_PATH: str = "data/lexical_dictionary.json"
 
     # WhatsApp / n8n
     N8N_WEBHOOK_URL: str = "http://localhost:5678/webhook/voice-received"

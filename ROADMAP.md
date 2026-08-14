@@ -4,7 +4,7 @@ Este documento estabelece o plano de desenvolvimento de **6 meses** para a const
 
 ---
 
-## 🚩 Status Atual: Fase 3 Concluída (Próximo: Fase 4 — Memória em Camadas)
+## 🚩 Status Atual: Fase 4 Concluída (Próximo: Fase 5 — API da Memória & Agente Hermes)
 
 ---
 
@@ -20,10 +20,10 @@ FASE 2: MVP 1 — Transcrição de Áudio WhatsApp [CONCLUÍDO]
 FASE 3: Criação de Repositório Remoto & Sincronização Git Push [CONCLUÍDO]
    │
    ▼
-FASE 4: Memória em Camadas (Postgres + pgvector + NetworkX) [EM ANDAMENTO]
+FASE 4: Memória em Camadas (Postgres + pgvector + NetworkX) [CONCLUÍDO]
    │
    ▼
-FASE 5: API da Memória & Agente Hermes (Resumos Diários/Semanais)
+FASE 5: API da Memória & Agente Hermes (Resumos Diários/Semanais) [PRÓXIMO]
    │
    ▼
 FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B)
@@ -43,12 +43,12 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B)
 
 ---
 
-### 🟢 Fase 2: MVP 1 — Transcrição e Revisão Contextual WhatsApp (Concluída nesta sessão)
+### 🟢 Fase 2: MVP 1 — Transcrição e Revisão Contextual WhatsApp (Concluída)
 - [x] Implementação da API de transcrição utilizando `faster-whisper` (`POST /transcribe`).
 - [x] Construção do serviço **AI Gateway** em FastAPI com suporte a Gemini API, OpenRouter e MockProvider (`POST /ai/revise`).
 - [x] Configuração do webhook e nós no n8n para receber mensagens de áudio do WhatsApp (Evolution API / Z-API) em `workflows/n8n_whatsapp_voice_transcription.json`.
 - [x] Orquestração do fluxo n8n: Recebe Áudio ➔ Transcreve (Whisper) ➔ Revisa Contextualmente (AI Gateway) ➔ Retorna apenas o texto limpo no WhatsApp.
-- [x] Criação do manual de validação e execução em `docs/mvp1_whatsapp_workflow.md` com suíte de 15 testes automatizados passando.
+- [x] Criação do manual de validação e execução em `docs/mvp1_whatsapp_workflow.md` com suíte de testes automatizados passando.
 
 ---
 
@@ -60,17 +60,17 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B)
 
 ---
 
-### 🟣 Fase 4: Memória em Camadas & Extração Semântica
-- [ ] Configuração do banco de dados PostgreSQL com a extensão `pgvector`.
-- [ ] Modelagem das tabelas de dados (`messages`, `audio_files`, `transcriptions`, `entities`, `tasks`, `projects`, `topics`, `events`, `decisions`, `ideas`).
-- [ ] Construção do pipeline de Extração Semântica silenciosa no AI Gateway (`POST /ai/extract`).
-- [ ] Implementação da camada de Grafo com NetworkX para mapear relacionamentos entre entidades (Pessoas ➔ Projetos ➔ Equipamentos ➔ Prazos).
-- [ ] Geração e armazenamento de embeddings para busca semântica em memórias.
+### 🟢 Fase 4: Memória em Camadas & Extração Semântica (Concluída nesta sessão)
+- [x] Configuração do banco de dados relacional e vetorial (SQLAlchemy com suporte a PostgreSQL/pgvector e fallback SQLite local).
+- [x] Modelagem das tabelas de dados (`messages`, `tasks`, `entities`, `embeddings`).
+- [x] Construção do pipeline de Extração Semântica silenciosa no AI Gateway (`POST /ai/extract`).
+- [x] Implementação da camada de Grafo com NetworkX para mapear relacionamentos entre entidades (Pessoas ➔ Projetos ➔ Equipamentos ➔ Prazos).
+- [x] Geração e armazenamento de embeddings para busca semântica em memórias (`POST /api/v1/memory/search`).
+- [x] Criação dos endpoints da API de Memória (`/api/v1/memory/messages`, `/api/v1/memory/tasks`, `/api/v1/memory/graph/*`, `/api/v1/memory/stats`).
 
 ---
 
-### 🟠 Fase 5: API Memory, Agente Hermes & Automação de Relatórios
-- [ ] Desenvolvimento da API REST da Memória (`/api/v1/messages`, `/api/v1/tasks`, `/api/v1/memory/search`, `/api/v1/graph/{entity}`).
+### 🟠 Fase 5: API Memory, Agente Hermes & Automação de Relatórios (Próxima)
 - [ ] Integração da API de Memória com o agente **Hermes** para consulta contextual semântica.
 - [ ] Automação n8n para envio do **Resumo Diário** (18:00) com acontecimentos do dia e plano para o dia seguinte no WhatsApp.
 - [ ] Automação n8n para consolidação e envio do **Relatório Semanal** e planejamento estratégico no domingo à noite.
@@ -88,15 +88,17 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B)
 
 ## 🌟 Itens Bônus & Sidequests
 
-### 🎯 Sidequest 1: Dicionário Léxico & Fine-Tuning de Termos de Negócio (Glossário Hermes)
-- [ ] **Mapeamento de Jargões & Fonética de Áudio**:
+### 🟢 Sidequest 1: Dicionário Léxico & Fine-Tuning de Termos de Negócio (Glossário Hermes) [CONCLUÍDO]
+- [x] **Mapeamento de Jargões & Fonética de Áudio**:
   - `FAU` ➔ `FAL` (Ficha de Acompanhamento de Lote).
   - `produtor` (contextual) ➔ aplicativo `eProdutor` ou cooperado agropecuário.
   - `Sevale` / `Cvale` ➔ `C.Vale`.
   - `mhotilidade` / `hotelidade` ➔ `mortalidade`.
   - `vazio sanitário`, `água medicada`, `rações e silos`.
-- [ ] **Estratégia de Implementação**:
-  - **Opção A (API & Memória Hermes)**: Endpoint `/api/v1/dictionary` para injeção dinâmica no prompt de contexto do AI Gateway (`POST /ai/revise` e `POST /ai/extract`).
-  - **Opção B (Interface Web / Front-End Leve)**: Interface administrativa simples (ex: Vanilla HTML/CSS/JS ou Vite) para cadastro, edição de sinônimos e termos frequentes pelo usuário.
-  - **Opção C (Initial Prompt / Whisper Vocabulary)**: Passar o vocabulário no parâmetro `initial_prompt` do `faster-whisper` para guiar a desambiguação fonética diretamente no Speech-to-Text.
+- [x] **Implementação Entregue**:
+  - Endpoint `/api/v1/dictionary` para cadastro e consulta de termos.
+  - Injeção dinâmica no prompt de contexto do AI Gateway (`POST /ai/revise` e `POST /ai/extract`).
+  - Formatação para vocabulário inicial do Whisper (`initial_prompt`).
+  - Suíte de testes unitários e de integração com 100% de sucesso.
+
 
