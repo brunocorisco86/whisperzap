@@ -114,6 +114,12 @@ cp .env.example .env
 pytest -v
 ```
 
+### 4. Executar o Servidor FastAPI
+```bash
+uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+```
+Acesse a documentação Swagger em: [http://localhost:8000/docs](http://localhost:8000/docs).
+
 ---
 
 ## 🕸️ Uso do Graphify no Desenvolvimento
@@ -121,11 +127,11 @@ pytest -v
 Para garantir que os agentes de IA tenham acesso a contexto profundo do código sem desperdício de tokens, utilizamos o **Graphify**:
 
 ```bash
-# Gerar/atualizar o grafo do projeto
-graphify .
+# Gerar/atualizar o grafo de conhecimento AST
+graphify extract . --code-only
 
-# Consultar o grafo localmente
-graphify query "Como funciona o fluxo do AI Gateway?"
+# Listar os principais nós arquiteturais (god nodes)
+graphify god-nodes
 ```
 
 Consulte o documento [`docs/graphify_guide.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/graphify_guide.md) para detalhes.
@@ -134,7 +140,10 @@ Consulte o documento [`docs/graphify_guide.md`](file:///home/brunoconter/Documen
 
 ## 📚 Documentação do Projeto
 
-- 🗺️ [`ROADMAP.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/ROADMAP.md): Planejamento e fases de desenvolvimento até o deploy VPS.
-- 📜 [`LOGS.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/LOGS.md): Histórico de decisões de arquitetura e progresso das sessões.
-- 📐 [`docs/architecture.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/architecture.md): Detalhamento da arquitetura técnica.
-- 🤖 [`docs/subagents/`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/subagents/): Definição das especialidades dos subagentes IA do projeto.
+- 🗺️ [`ROADMAP.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/ROADMAP.md): Planejamento e fases de desenvolvimento (inclui Sidequests).
+- 📜 [`LOGS.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/LOGS.md): Histórico de decisões de arquitetura (ADRs 001 a 005) e sessões.
+- 📐 [`docs/architecture.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/architecture.md): Detalhamento da arquitetura técnica e dimensionamento de hardware.
+- 🎙️ [`docs/tutorial_teste_audio.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/tutorial_teste_audio.md): Tutorial passo a passo para envio e teste de áudio WhatsApp.
+- 🔄 [`docs/mvp1_whatsapp_workflow.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/mvp1_whatsapp_workflow.md): Guia de importação e configuração do fluxo n8n.
+- 🤖 [`docs/subagents/`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/subagents/): Definição dos subagentes especialistas.
+

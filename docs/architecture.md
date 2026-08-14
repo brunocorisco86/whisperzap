@@ -95,3 +95,26 @@ A informação evolui em 5 níveis de maturidade:
 - **Tailscale**: Todo o tráfego entre o Raspberry Pi 3B (n8n) e a VPS ocorre dentro de uma VPN WireGuard criptografada.
 - **Variáveis de Ambiente**: Chaves de API de LLMs e credenciais de banco permanecem isoladas no `.env`.
 - **Silêncio de Erros no WhatsApp**: Caso ocorra falha de extração semântica, o usuário continua recebendo a transcrição revisada, enquanto o erro é registrado no log interno para reprocessamento.
+
+---
+
+## 📊 Dimensionamento de Recursos & Benchmarks de Produção
+
+A arquitetura foi planejada para operar de forma ultra-eficiente em VPS de entrada (Hostinger Alpine Linux com 4 GB RAM, 1-2 vCPUs) em coabitação com o homelab.
+
+### ⏱️ Benchmarks Observados em CPU (modelo `base`, `int8`):
+- **Áudio de 10s**: Transcrito em `~1.7s` (RTF ~0.17x) — Confiança: 100%.
+- **Áudio de 37s (Jargões complexos)**: Transcrito em `~4.48s` (RTF ~0.12x) — Confiança: 100%.
+- **Áudio de 14s**: Transcrito em `~3.48s` (RTF ~0.24x) — Confiança: 100%.
+
+### 💾 Pegada de Memória (RAM):
+| Microsserviço | Estado Ocioso (Idle) | Pico de Execução |
+| :--- | :--- | :--- |
+| **FastAPI Core + Routers** | ~50 MB | ~70 MB |
+| **faster-whisper (CTranslate2)** | ~150 MB | ~350 MB a 450 MB |
+| **PostgreSQL + pgvector** | ~60 MB | ~100 MB |
+| **Caddy Reverse Proxy** | ~15 MB | ~25 MB |
+| **Total Stack Hermes** | **~275 MB** | **~550 MB a 650 MB** |
+
+> **Margem Operacional**: Em uma VPS com 1.600 MB livres, a stack opera com mais de 1.000 MB de margem de segurança.
+

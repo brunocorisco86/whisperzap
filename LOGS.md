@@ -33,6 +33,16 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
 - **Contexto**: Em áudios com ruído ou falas rápidas de campo, termos técnicos e siglas zootécnicas/corporativas (ex: FAU/FAL, eProdutor, C.Vale, mortalidade, vazio sanitário) podem sofrer pequenas variações fonéticas no Speech-to-Text.
 - **Decisão**: Criar um módulo de Dicionário Léxico (Sidequest) que permita cadastrar e mapear sinônimos e jargões para injeção no prompt de contexto da IA (`POST /ai/revise`), no vocabulário inicial do Whisper (`initial_prompt`) e persistência na API de Memória do Hermes.
 
+### ADR 005 — Dimensionamento de Hardware e Recursos para VPS de Entrada (Hostinger)
+- **Data**: 2026-08-13
+- **Status**: Aprovado
+- **Contexto**: O deploy em produção utilizará uma VPS Hostinger de baixo custo (4 GB de RAM, 1-2 vCPUs) compartilhada com outros serviços do homelab (atualmente com 1,6 GB de RAM livres e 3% de CPU).
+- **Decisão**:
+  1. Manter o modelo Whisper `base` com quantização `int8` (`compute_type=int8`), limitando o consumo de RAM no pico de inferência a ~350-450 MB e tempo de CPU a ~1-4s por áudio (RTF ~0.12x).
+  2. Manter a execução de LLMs via APIs externas (Gemini/OpenRouter), evitando carga de modelos locais pesados na VPS.
+  3. Descarregar o motor de automação (n8n) no Raspberry Pi 3B conectado via Tailscale, economizando 300-500 MB de RAM na VPS.
+  4. Configurar 2 GB de Swap no disco NVMe da VPS para prevenção de OOM Killer em picos de concorrência.
+
 ---
 
 ## 📝 Histórico de Sessões de Desenvolvimento
@@ -48,17 +58,25 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
   - Configuração do `pytest.ini` e escrita do teste de integridade `tests/test_environment.py`.
 - **Resultado**: Ambiente de desenvolvimento local 100% estruturado, validado com testes automatizados passando.
 
-### Sessão 002 — Implementação do MVP 1 (Transcrição & Revisão Contextual WhatsApp)
+### Sessão 002 — Implementação e Validação do MVP 1 (Transcrição & Revisão Contextual WhatsApp)
 - **Data**: 2026-08-13
-- **Objetivo**: Implementar o primeiro marco funcional (Fase 2) contendo o serviço de Speech-to-Text Whisper (`POST /transcribe`), o serviço AI Gateway (`POST /ai/revise`), fluxo n8n para WhatsApp e suite completa de testes automatizados.
+- **Objetivo**: Implementar o primeiro marco funcional (Fase 2) contendo o serviço de Speech-to-Text Whisper (`POST /transcribe`), o serviço AI Gateway (`POST /ai/revise`), fluxo n8n para WhatsApp, tutorial de testes e validação com áudios reais.
 - **Ações Realizadas**:
   - Criação do módulo de configuração com Pydantic Settings (`src/config.py`).
   - Implementação do microsserviço de transcrição Whisper com `faster-whisper` (`src/transcriber/`).
   - Implementação do AI Gateway com arquitetura desacoplada (Model Router, prompts contextuais estritos e provedores Gemini, OpenRouter e Mock) em `src/ai_gateway/`.
   - Integração dos roteadores na aplicação unificada FastAPI (`src/main.py`).
   - Criação do workflow exportável para n8n (`workflows/n8n_whatsapp_voice_transcription.json`).
-  - Criação do guia completo de execução e testes (`docs/mvp1_whatsapp_workflow.md`).
-  - Criação e execução da suíte de testes unitários e de integração HTTP com `pytest` (15 testes passando).
-  - Atualização do mapa de conhecimento AST via `graphify`.
-- **Resultado**: MVP 1 concluído com sucesso e pronto para deploy/integração.
+  - Criação do tutorial prático e passo a passo em `docs/tutorial_teste_audio.md` e guia em `docs/mvp1_whatsapp_workflow.md`.
+  - Criação e execução da suíte de testes automatizados com `pytest` (15 testes passando com 100% de cobertura nos componentes chave).
+  - Validação ponta a ponta com 3 arquivos de áudio reais do WhatsApp em `assets/AudioSample/` (`teste1.ogg`, áudio de 37s e áudio de 14s).
+  - Inclusão da Sidequest 1 (Dicionário Léxico & Fine-Tuning de Termos de Negócio) e ADR 004 no Roadmap.
+  - Mapeamento e estimativa de consumo de hardware para VPS Hostinger de entrada (ADR 005).
+  - Atualização do grafo de conhecimento AST via `graphify`.
+- **Aprendizados Chave**:
+  - **Eficiência do `faster-whisper` em CPU**: O modelo `base` com `int8` transcreveu um áudio real de 37s em 4.48s (fator de tempo real ~0.12x), com confiança de idioma em 100% e baixíssimo impacto de CPU.
+  - **Léxico de Domínio**: Identificada a necessidade de mapeamento fonético para jargões agropecuários e siglas (ex: FAL/FAU, eProdutor, C.Vale, mortalidade, vazio sanitário) registrado na Sidequest 1.
+  - **Footprint Leve**: A stack completa do Hermes na VPS consome em torno de 275 MB em repouso e pico de 550-650 MB durante transcrição, perfeitamente compatível com os 1.6 GB disponíveis na VPS.
+- **Resultado**: MVP 1 concluído, testado, validado e documentado.
+
 
