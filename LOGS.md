@@ -79,4 +79,20 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
   - **Footprint Leve**: A stack completa do Hermes na VPS consome em torno de 275 MB em repouso e pico de 550-650 MB durante transcrição, perfeitamente compatível com os 1.6 GB disponíveis na VPS.
 - **Resultado**: MVP 1 concluído, testado, validado e documentado.
 
+### Sessão 003 — Automação de Benchmarks e Persistência de Resultados de Áudio (`test_results/`)
+- **Data**: 2026-08-13
+- **Objetivo**: Inicializar o backend FastAPI, executar a suíte de testes com todos os áudios reais de `assets/AudioSample/` contra a API ao vivo, e persistir os resultados estruturados em uma pasta dedicada (`test_results/`).
+- **Ações Realizadas**:
+  - Criação da pasta [`test_results/`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/test_results) com README explicativo.
+  - Criação do script automatizado de benchmark [`scripts/run_audio_tests.py`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/scripts/run_audio_tests.py).
+  - Inicialização do backend FastAPI em segundo plano (`src.main:app`).
+  - Execução dos testes ponta a ponta (`GET /health`, `POST /transcribe`, `POST /ai/revise`) nos 3 arquivos de áudio do WhatsApp.
+  - Geração dos relatórios [`test_results/audio_test_report.json`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/test_results/audio_test_report.json) e [`test_results/audio_test_report.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/test_results/audio_test_report.md).
+- **Métricas Registradas**:
+  - Duração total de áudio testada: **61.4s**
+  - Tempo total de transcrição Whisper: **7.05s**
+  - Real-Time Factor (RTF) médio: **0.1148x** (~8.7x mais rápido que tempo real).
+- **Resultado**: Resultados de teste salvos e versionados no repositório com script reprodutível.
+
+
 

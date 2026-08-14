@@ -1,0 +1,136 @@
+{
+  "timestamp": "2026-08-14T01:56:26.767218+00:00",
+  "api_health": {
+    "status": "healthy",
+    "version": "0.2.0",
+    "environment": "development",
+    "ai_provider": "mock",
+    "whisper_model": "base",
+    "whisper_device": "cpu"
+  },
+  "summary": {
+    "total_files_tested": 3,
+    "total_audio_duration_seconds": 61.4,
+    "total_whisper_processing_time_ms": 7047.16,
+    "average_rtf": 0.1148
+  },
+  "results": [
+    {
+      "filename": "WhatsApp Ptt 2026-08-13 at 16.01.07.ogg",
+      "filesize_kb": 90.17,
+      "audio_id": "audio_3ff1d3f0ee",
+      "audio_duration_seconds": 36.87,
+      "detected_language": "pt",
+      "language_probability": 1.0,
+      "raw_transcription": "O que a gente vai combinar ali com o pessoal do produtor é assim, hoje, ali na fichia do lote, tu tem a parte do controle de peso, uma hotelidade, tem a parte da coração, o controle de vozes sanitário, tratamento, água médicado, consumo de água, eu uso dados ali que a gente acaba conseguindo fazer o lançamento via ocorrência. Esses lançamentos que a gente tem uma correspondência de ocorrência no produtor, por debaixo dos planos, quando o usuário lançar na falo, a gente vai popular as ocorrências do produtor. Então, quanto isso, não te preocupa que a ideia é mesmo, tá?",
+      "revised_text": "O que a gente vai combinar ali com o pessoal do produtor é assim, hoje, ali na fichia do lote, tu tem a parte do controle de peso, uma hotelidade, tem a parte da coração, o controle de vozes sanitário, tratamento, água médicado, consumo de água, eu uso dados ali que a gente acaba conseguindo fazer o lançamento via ocorrência. esses lançamentos que a gente tem uma correspondência de ocorrência no produtor, por debaixo dos planos, quando o usuário lançar na falo, a gente vai popular as ocorrências do produtor. então, quanto isso, não te preocupa que a ideia é mesmo, tá?",
+      "segments": [
+        {
+          "id": 1,
+          "start": 0.66,
+          "end": 7.12,
+          "text": "O que a gente vai combinar ali com o pessoal do produtor é assim, hoje, ali na fichia do lote,"
+        },
+        {
+          "id": 2,
+          "start": 7.12,
+          "end": 13.64,
+          "text": "tu tem a parte do controle de peso, uma hotelidade, tem a parte da coração, o controle de"
+        },
+        {
+          "id": 3,
+          "start": 13.64,
+          "end": 18.56,
+          "text": "vozes sanitário, tratamento, água médicado, consumo de água, eu uso dados ali que a gente acaba"
+        },
+        {
+          "id": 4,
+          "start": 18.56,
+          "end": 25.72,
+          "text": "conseguindo fazer o lançamento via ocorrência. Esses lançamentos que a gente tem uma correspondência"
+        },
+        {
+          "id": 5,
+          "start": 25.72,
+          "end": 31.16,
+          "text": "de ocorrência no produtor, por debaixo dos planos, quando o usuário lançar na falo, a gente vai"
+        },
+        {
+          "id": 6,
+          "start": 31.16,
+          "end": 36.28,
+          "text": "popular as ocorrências do produtor. Então, quanto isso, não te preocupa que a ideia é mesmo, tá?"
+        }
+      ],
+      "whisper_processing_time_ms": 3494.27,
+      "http_transcribe_time_ms": 3497.04,
+      "real_time_factor": 0.0948,
+      "ai_provider": "mock",
+      "ai_model": "gemini-2.5-flash-lite",
+      "ai_processing_time_ms": 0.03,
+      "http_revise_time_ms": 1.95
+    },
+    {
+      "filename": "WhatsApp Ptt 2026-08-13 at 17.48.06.ogg",
+      "filesize_kb": 33.07,
+      "audio_id": "audio_de085c43c4",
+      "audio_duration_seconds": 13.65,
+      "detected_language": "pt",
+      "language_probability": 1.0,
+      "raw_transcription": "certo então Bruno, sava meu contato quando você se organizar, colocar isso ali como a prioridade ali para os planas futuros porque não estão no momento mesmo, aí você fala com minuitão com verão.",
+      "revised_text": "Certo então bruno, sava meu contato quando você se organizar, colocar isso ali como a prioridade ali para os planas futuros porque não estão no momento mesmo, aí você fala com minuitão com verão.",
+      "segments": [
+        {
+          "id": 1,
+          "start": 0.78,
+          "end": 7.3,
+          "text": "certo então Bruno, sava meu contato quando você se organizar, colocar isso ali como"
+        },
+        {
+          "id": 2,
+          "start": 7.3,
+          "end": 11.9,
+          "text": "a prioridade ali para os planas futuros porque não estão no momento mesmo, aí você fala com"
+        },
+        {
+          "id": 3,
+          "start": 11.9,
+          "end": 13.9,
+          "text": "minuitão com verão."
+        }
+      ],
+      "whisper_processing_time_ms": 2801.42,
+      "http_transcribe_time_ms": 2803.27,
+      "real_time_factor": 0.2052,
+      "ai_provider": "mock",
+      "ai_model": "gemini-2.5-flash-lite",
+      "ai_processing_time_ms": 0.02,
+      "http_revise_time_ms": 0.98
+    },
+    {
+      "filename": "teste1.ogg",
+      "filesize_kb": 100.02,
+      "audio_id": "audio_8d36d33cb1",
+      "audio_duration_seconds": 10.88,
+      "detected_language": "pt",
+      "language_probability": 1.0,
+      "raw_transcription": "Alô, testando o microfone, testando a plataforma, testando a ferramenta, testando o microfone.",
+      "revised_text": "Alô, testando o microfone, testando a plataforma, testando a ferramenta, testando o microfone.",
+      "segments": [
+        {
+          "id": 1,
+          "start": 0.4,
+          "end": 10.06,
+          "text": "Alô, testando o microfone, testando a plataforma, testando a ferramenta, testando o microfone."
+        }
+      ],
+      "whisper_processing_time_ms": 751.47,
+      "http_transcribe_time_ms": 753.04,
+      "real_time_factor": 0.0691,
+      "ai_provider": "mock",
+      "ai_model": "gemini-2.5-flash-lite",
+      "ai_processing_time_ms": 0.02,
+      "http_revise_time_ms": 0.98
+    }
+  ]
+}
