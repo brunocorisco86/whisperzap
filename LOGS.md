@@ -27,6 +27,12 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
 - **Contexto**: Evitar dependência direta de um único provedor de LLM (ex: Gemini ou OpenAI) na camada de orquestração do n8n.
 - **Decisão**: Construir o serviço **AI Gateway** em FastAPI, permitindo roteamento por tarefa (ex: Gemini Flash-Lite para revisão, modelos mais robustos para análise semanal) e fallback automático.
 
+### ADR 004 — Dicionário Léxico & Fine-Tuning de Termos de Negócio (Glossário Hermes)
+- **Data**: 2026-08-13
+- **Status**: Aprovado
+- **Contexto**: Em áudios com ruído ou falas rápidas de campo, termos técnicos e siglas zootécnicas/corporativas (ex: FAU/FAL, eProdutor, C.Vale, mortalidade, vazio sanitário) podem sofrer pequenas variações fonéticas no Speech-to-Text.
+- **Decisão**: Criar um módulo de Dicionário Léxico (Sidequest) que permita cadastrar e mapear sinônimos e jargões para injeção no prompt de contexto da IA (`POST /ai/revise`), no vocabulário inicial do Whisper (`initial_prompt`) e persistência na API de Memória do Hermes.
+
 ---
 
 ## 📝 Histórico de Sessões de Desenvolvimento

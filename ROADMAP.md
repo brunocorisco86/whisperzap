@@ -83,3 +83,20 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B)
 - [ ] Ajuste da rede privada Tailscale conectando o Raspberry Pi 3B (n8n local) e a VPS Alpine Linux.
 - [ ] Otimização de recursos computacionais para execução leve em Alpine Linux.
 - [ ] Execução da suite de testes completa no ambiente de produção VPS.
+
+---
+
+## 🌟 Itens Bônus & Sidequests
+
+### 🎯 Sidequest 1: Dicionário Léxico & Fine-Tuning de Termos de Negócio (Glossário Hermes)
+- [ ] **Mapeamento de Jargões & Fonética de Áudio**:
+  - `FAU` ➔ `FAL` (Ficha de Acompanhamento de Lote).
+  - `produtor` (contextual) ➔ aplicativo `eProdutor` ou cooperado agropecuário.
+  - `Sevale` / `Cvale` ➔ `C.Vale`.
+  - `mhotilidade` / `hotelidade` ➔ `mortalidade`.
+  - `vazio sanitário`, `água medicada`, `rações e silos`.
+- [ ] **Estratégia de Implementação**:
+  - **Opção A (API & Memória Hermes)**: Endpoint `/api/v1/dictionary` para injeção dinâmica no prompt de contexto do AI Gateway (`POST /ai/revise` e `POST /ai/extract`).
+  - **Opção B (Interface Web / Front-End Leve)**: Interface administrativa simples (ex: Vanilla HTML/CSS/JS ou Vite) para cadastro, edição de sinônimos e termos frequentes pelo usuário.
+  - **Opção C (Initial Prompt / Whisper Vocabulary)**: Passar o vocabulário no parâmetro `initial_prompt` do `faster-whisper` para guiar a desambiguação fonética diretamente no Speech-to-Text.
+
