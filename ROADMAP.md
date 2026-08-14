@@ -4,7 +4,7 @@ Este documento estabelece o plano de desenvolvimento de **6 meses** para a const
 
 ---
 
-## 🚩 Status Atual: Fase 2 Concluída (Próximo: Fase 3 — Repositório Remoto)
+## 🚩 Status Atual: Fase 3 Concluída (Próximo: Fase 4 — Memória em Camadas)
 
 ---
 
@@ -17,10 +17,10 @@ FASE 1: Setup & Governança (Local) [CONCLUÍDO]
 FASE 2: MVP 1 — Transcrição de Áudio WhatsApp [CONCLUÍDO]
    │
    ▼
-FASE 3: Criação de Repositório Remoto & Sincronização Git Push
+FASE 3: Criação de Repositório Remoto & Sincronização Git Push [CONCLUÍDO]
    │
    ▼
-FASE 4: Memória em Camadas (Postgres + pgvector + NetworkX)
+FASE 4: Memória em Camadas (Postgres + pgvector + NetworkX) [EM ANDAMENTO]
    │
    ▼
 FASE 5: API da Memória & Agente Hermes (Resumos Diários/Semanais)
@@ -52,11 +52,11 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B)
 
 ---
 
-### 🔵 Fase 3: Criação do Repositório Remoto & Sincronização Git
-- [ ] Criação do repositório remoto no provedor Git (GitHub / GitLab).
-- [ ] Configuração do remoto local (`git remote add origin <URL>`).
-- [ ] Realização do primeiro `git push` com a versão madura do MVP 1.
-- [ ] Ativação da regra de sincronização contínua remota (`git push` obrigatório após cada funcionalidade).
+### 🟢 Fase 3: Criação do Repositório Remoto & Sincronização Git (Concluída)
+- [x] Criação do repositório remoto no provedor Git (`git@github.com:brunocorisco86/whisperzap.git`).
+- [x] Configuração do remoto local (`git remote add origin <URL>`).
+- [x] Realização do primeiro `git push` com a versão madura do MVP 1.
+- [x] Ativação da regra de sincronização contínua remota (`git push` obrigatório após cada funcionalidade).
 
 ---
 

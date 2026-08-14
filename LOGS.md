@@ -94,5 +94,15 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
   - Real-Time Factor (RTF) médio: **0.1148x** (~8.7x mais rápido que tempo real).
 - **Resultado**: Resultados de teste salvos e versionados no repositório com script reprodutível.
 
+### Sessão 004 — Configuração e Sincronização do Repositório Remoto GitHub (Fase 3)
+- **Data**: 2026-08-14
+- **Objetivo**: Conectar o repositório local ao repositório remoto criado no GitHub (`git@github.com:brunocorisco86/whisperzap.git`) e realizar o primeiro push completo de sincronização.
+- **Ações Realizadas**:
+  - Configuração do remoto `origin` apontando para `git@github.com:brunocorisco86/whisperzap.git`.
+  - Execução bem-sucedida de `git push -u origin main` enviando todo o histórico, código do MVP 1, testes e documentação.
+  - Atualização do status do projeto para a Fase 4 (Memória em Camadas & Extração Semântica).
+- **Resultado**: Fase 3 concluída com repositório remoto 100% sincronizado.
+
+
 
 
