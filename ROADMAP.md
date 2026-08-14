@@ -101,4 +101,23 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B)
   - Formatação para vocabulário inicial do Whisper (`initial_prompt`).
   - Suíte de testes unitários e de integração com 100% de sucesso.
 
+### 🟢 Sidequest 2: Gestão de Contatos, Papéis (Roles) & Ponderação de Prioridade [CONCLUÍDO]
+- [x] **Modelagem & Classificação de Papéis**:
+  - `EXECUTIVE` (Gestores, Diretores — peso 1.0)
+  - `FAMILY_CORE` (Cônjuge, Mãe, Pai, Filhos — peso 0.95)
+  - `STAKEHOLDER` (Clientes, Sponsors de projetos — peso 0.85)
+  - `COLLEAGUE` (Pares, Colegas de squad — peso 0.70)
+  - `FAMILY_EXTENDED` (Sogros, Parentes — peso 0.60)
+  - `SERVICE_VENDOR` (Fornecedores — peso 0.50)
+  - `UNKNOWN` (Não Mapeado — peso 0.40)
+- [x] **Parser Polimórfico de Templates**:
+  - Exportação e importação em lote via **Tabela Markdown (`.md`)** e **Array JSON (`.json`)**.
+  - Reconhecimento de sinônimos em português (ex: `GESTOR`, `ESPOSA`, `FORNECEDOR`).
+- [x] **Motor de Prioridade Dinâmica & Grafo**:
+  - Ponderação automática de tarefas e mensagens no salvamento (`src/memory/repository.py`).
+  - Enriquecimento de nós no Grafo NetworkX com conexões `(Pessoa) -[ROLE]-> (Empresa)` e `(Pessoa) -[WORKS_ON]-> (Projeto)`.
+  - Endpoints REST em `/api/v1/contacts/*` com 11 novos testes automatizados passando.
+
+
+
 

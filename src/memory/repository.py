@@ -80,6 +80,15 @@ class MemoryRepository:
             )
             extracted = await semantic_extractor.extract(extraction_req)
 
+            # Importa dinamicamente contact_service para evitar circular import
+            from src.contacts.service import contact_service
+
+            weighted_message_urgency = contact_service.calculate_priority_for_message(
+                sender_phone_or_name=data.speaker,
+                raw_urgency=extracted.urgency,
+                db=db,
+            )
+
             # 2. Cria registro da mensagem
             message = MessageRecord(
                 id=msg_id,
@@ -91,15 +100,20 @@ class MemoryRepository:
                 audio_filename=data.audio_filename,
                 intent=extracted.intent,
                 summary=extracted.summary,
-                urgency=extracted.urgency,
+                urgency=weighted_message_urgency,
                 meta_info=data.meta_info or {},
             )
             db.add(message)
 
-            # 3. Salva Tarefas extraídas
+            # 3. Salva Tarefas extraídas com prioridade ponderada
             extracted_tasks_dicts = []
             for t in extracted.tasks:
                 task_id = str(uuid4())
+                weighted_task_priority = contact_service.calculate_priority_for_message(
+                    sender_phone_or_name=data.speaker,
+                    raw_urgency=t.priority,
+                    db=db,
+                )
                 task_rec = TaskRecord(
                     id=task_id,
                     message_id=msg_id,
@@ -107,11 +121,14 @@ class MemoryRepository:
                     title=t.title,
                     assignee=t.assignee,
                     due_date=t.due_date,
-                    priority=t.priority,
+                    priority=weighted_task_priority,
                     status="PENDING",
                 )
                 db.add(task_rec)
-                extracted_tasks_dicts.append(t.model_dump())
+                t_dict = t.model_dump()
+                t_dict["priority"] = weighted_task_priority
+                extracted_tasks_dicts.append(t_dict)
+
 
             # 4. Salva Entidades extraídas
             extracted_entities_dicts = []

@@ -118,6 +118,19 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
   - Atualização do `ROADMAP.md` e do `main.py` com modern lifespan context manager.
 - **Resultado**: Fase 4 e Sidequest 1 concluídas com 100% de sucesso e 35 testes passando.
 
+### Sessão 006 — Implementação da Sidequest 2 (Contatos, Roles, Parser Markdown/JSON & Priorização Dinâmica)
+- **Data**: 2026-08-14
+- **Objetivo**: Criar o sistema de contatos e papéis (*roles*), permitindo importação e exportação em lote via Tabela Markdown (`.md`) e JSON (`.json`), e integrando o motor de prioridade com o repositório de memória e o Grafo NetworkX.
+- **Ações Realizadas**:
+  - Modelagem da tabela `ContactRecord` em SQLAlchemy e schemas Pydantic com enum `ContactRole` e mapeamento de pesos (`EXECUTIVE` 1.0, `FAMILY_CORE` 0.95, `STAKEHOLDER` 0.85, `COLLEAGUE` 0.70, `FAMILY_EXTENDED` 0.60, `SERVICE_VENDOR` 0.50, `UNKNOWN` 0.40).
+  - Implementação do `Parser Polimórfico` (`src/contacts/parser.py`) com suporte bidirecional para Tabela Markdown (`| Telefone | Nome | Papel | Empresa | Projetos |`) e Arrays JSON.
+  - Implementação do `ContactService` (`src/contacts/service.py`) com cálculo de peso efetivo, ponderação de prioridade em mensagens/tarefas e sincronização de conexões no Grafo NetworkX (`AFFILIATED_AS` e `WORKS_ON`).
+  - Criação dos endpoints REST FastAPI em `src/contacts/router.py` (`GET /api/v1/contacts`, `GET /api/v1/contacts/markdown-table`, `POST /api/v1/contacts/batch-import`, etc.).
+  - Integração no `src/memory/repository.py` para enriquecimento automático de prioridade nas mensagens recebidas.
+  - Criação de 11 novos testes automatizados (`tests/test_contact_parser.py`, `tests/test_contacts_service.py`, `tests/test_contacts_api.py`), totalizando 46 testes com 100% de aprovação.
+- **Resultado**: Sidequest 2 concluída com sucesso total.
+
+
 
 
 

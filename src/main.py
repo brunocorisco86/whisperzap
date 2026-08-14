@@ -6,6 +6,7 @@ from src.ai_gateway.router import router as ai_router
 from src.transcriber.router import router as transcriber_router
 from src.dictionary.router import router as dictionary_router
 from src.memory.router import router as memory_router
+from src.contacts.router import router as contacts_router
 from src.memory.database import init_db
 
 
@@ -40,6 +41,8 @@ app.include_router(transcriber_router)
 app.include_router(ai_router)
 app.include_router(dictionary_router)
 app.include_router(memory_router)
+app.include_router(contacts_router)
+
 
 
 
