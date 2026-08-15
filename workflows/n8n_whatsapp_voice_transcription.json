@@ -106,8 +106,23 @@
       "name": "Envia Transcrição James (WhatsApp)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [1260, 200],
+      "position": [1260, 140],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000005"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.HERMES_API_URL || 'http://host.docker.internal:8000' }}/api/v1/memory/messages",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  speaker: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.pushName || $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid?.split('@')[0] || 'Desconhecido',\n  raw_text: $('Speech-to-Text (POST /transcribe)').item.json.text || '',\n  revised_text: $('AI Gateway (POST /ai/revise)').item.json.text_revised || $('Speech-to-Text (POST /transcribe)').item.json.text || '',\n  audio_duration_s: $('Speech-to-Text (POST /transcribe)').item.json.duration || 0,\n  audio_filename: $('Speech-to-Text (POST /transcribe)').item.json.audio_id || 'audio.ogg',\n  meta_info: {\n    source: 'whatsapp',\n    message_type: 'audio',\n    remoteJid: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid,\n    pushName: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.pushName\n  }\n}) }}",
+        "options": {}
+      },
+      "name": "Salvar Memória de Áudio (POST /messages)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1260, 280],
+      "id": "1e112d7c-a7a2-4bb0-80a1-000000000007"
     },
     {
       "parameters": {
@@ -124,7 +139,7 @@
       "name": "É Pergunta para o Hermes?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [600, 420],
+      "position": [600, 440],
       "id": "4e112d7c-a7a2-4bb0-80a1-000000000002"
     },
     {
@@ -139,7 +154,7 @@
       "name": "Agente Hermes (POST /api/v1/memory/query)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [820, 420],
+      "position": [820, 400],
       "id": "4e112d7c-a7a2-4bb0-80a1-000000000003"
     },
     {
@@ -163,8 +178,23 @@
       "name": "Envia Resposta Hermes (WhatsApp)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [1040, 420],
+      "position": [1040, 400],
       "id": "4e112d7c-a7a2-4bb0-80a1-000000000004"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.HERMES_API_URL || 'http://host.docker.internal:8000' }}/api/v1/memory/messages",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  speaker: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.pushName || $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid?.split('@')[0] || 'Desconhecido',\n  raw_text: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.message?.conversation || $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.message?.extendedTextMessage?.text || $('Webhook WhatsApp (Evolution API)').item.json.body?.text || '',\n  revised_text: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.message?.conversation || $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.message?.extendedTextMessage?.text || $('Webhook WhatsApp (Evolution API)').item.json.body?.text || '',\n  meta_info: {\n    source: 'whatsapp',\n    message_type: 'text',\n    remoteJid: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid,\n    pushName: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.pushName\n  }\n}) }}",
+        "options": {}
+      },
+      "name": "Salvar Mensagem de Texto (POST /messages)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [820, 560],
+      "id": "4e112d7c-a7a2-4bb0-80a1-000000000008"
     }
   ],
   "connections": {
@@ -226,6 +256,11 @@
             "node": "Envia Transcrição James (WhatsApp)",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Salvar Memória de Áudio (POST /messages)",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -235,6 +270,13 @@
         [
           {
             "node": "Agente Hermes (POST /api/v1/memory/query)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Salvar Mensagem de Texto (POST /messages)",
             "type": "main",
             "index": 0
           }

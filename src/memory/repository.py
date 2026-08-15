@@ -162,7 +162,81 @@ class MemoryRepository:
             db.commit()
             db.refresh(message)
 
-            # 6. Atualiza o Grafo Relacional de Conhecimento e Triplas Semânticas
+            # 6. Auto-criação / Sincronização de Contatos no Banco SQL e Grafo
+            try:
+                from src.contacts.models import ContactRecord
+                import re
+
+                # 6.1 Processa o Speaker da mensagem
+                speaker_val = (data.speaker or "").strip()
+                if speaker_val:
+                    meta = data.meta_info if isinstance(data.meta_info, dict) else {}
+                    raw_phone = meta.get("remoteJid", "") or meta.get("phone", "") or speaker_val
+                    digits = re.sub(r"\D", "", str(raw_phone).split("@")[0])
+                    push_name = meta.get("pushName")
+
+                    existing_contact = None
+                    if digits and len(digits) >= 8:
+                        existing_contact = db.query(ContactRecord).filter(
+                            (ContactRecord.phone_number == digits) | (ContactRecord.phone_number.like(f"%{digits[-8:]}%"))
+                        ).first()
+
+                    if not existing_contact:
+                        existing_contact = db.query(ContactRecord).filter(
+                            ContactRecord.name.ilike(speaker_val)
+                        ).first()
+
+                    if not existing_contact:
+                        contact_name = push_name if (push_name and speaker_val.isdigit()) else speaker_val
+                        c_id = str(uuid4())
+                        new_contact = ContactRecord(
+                            id=c_id,
+                            name=contact_name,
+                            phone_number=digits if len(digits) >= 8 else "",
+                            role="UNKNOWN",
+                            company="",
+                            projects_json=[],
+                            notes="Contato identificado automaticamente via mensagem recebida.",
+                            created_at=datetime.now(timezone.utc),
+                            updated_at=datetime.now(timezone.utc),
+                        )
+                        db.add(new_contact)
+                        db.commit()
+                        contact_service._sync_contact_to_graph(new_contact)
+                    elif push_name and existing_contact.name.isdigit():
+                        existing_contact.name = push_name
+                        db.commit()
+                        contact_service._sync_contact_to_graph(existing_contact)
+
+                # 6.2 Processa Entidades do tipo PERSON extraídas da mensagem
+                for e in extracted.entities:
+                    if e.category and e.category.upper() == "PERSON" and e.name:
+                        person_name = e.name.strip()
+                        if len(person_name) > 1:
+                            existing_person = db.query(ContactRecord).filter(
+                                ContactRecord.name.ilike(person_name)
+                            ).first()
+                            if not existing_person:
+                                p_id = str(uuid4())
+                                new_person = ContactRecord(
+                                    id=p_id,
+                                    name=person_name,
+                                    phone_number="",
+                                    role="UNKNOWN",
+                                    company="",
+                                    projects_json=[],
+                                    notes=e.details or "Pessoa mencionada em mensagens de áudio/texto.",
+                                    created_at=datetime.now(timezone.utc),
+                                    updated_at=datetime.now(timezone.utc),
+                                )
+                                db.add(new_person)
+                                db.commit()
+                                contact_service._sync_contact_to_graph(new_person)
+            except Exception as exc:
+                logger.warning(f"Aviso ao auto-cadastrar contatos na mensagem: {exc}")
+                db.rollback()
+
+            # 7. Atualiza o Grafo Relacional de Conhecimento e Triplas Semânticas
             knowledge_graph.add_interaction(
                 speaker=data.speaker,
                 entities=extracted_entities_dicts,

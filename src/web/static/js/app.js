@@ -88,9 +88,18 @@ document.addEventListener('DOMContentLoaded', () => {
     loadContacts();
     loadDictionary();
     loadTasks();
+    loadMessages();
     loadGraphData();
     showToast('Dados recarregados da VPS!');
   });
+
+  const btnRefreshMessages = document.getElementById('btn-refresh-messages');
+  if (btnRefreshMessages) {
+    btnRefreshMessages.addEventListener('click', () => {
+      loadMessages();
+      showToast('Feed de mensagens e áudios atualizado!');
+    });
+  }
 
   // Graph Controls
   const btnResetGraph = document.getElementById('btn-reset-graph');
@@ -544,22 +553,34 @@ function renderMessages() {
   if (allMessages.length === 0) {
     messagesContainer.innerHTML = `
       <div class="empty-state" style="text-align: center; padding: 3rem; color: var(--text-muted);">
-        <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">Nenhuma mensagem de áudio processada ainda</p>
+        <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">Nenhuma mensagem de áudio ou texto processada ainda</p>
+        <small>As notas de voz enviadas no WhatsApp aparecerão aqui em tempo real.</small>
       </div>
     `;
     return;
   }
 
-  messagesContainer.innerHTML = allMessages.map(m => `
-    <div class="message-item">
-      <div class="message-header">
-        <span class="message-speaker">${m.speaker || 'Usuário'}</span>
-        <span>${m.created_at || ''}</span>
+  messagesContainer.innerHTML = allMessages.map(m => {
+    const urgencyColor = m.urgency === 'URGENT' ? '#ef4444' : m.urgency === 'HIGH' ? '#f59e0b' : '#10b981';
+    return `
+      <div class="message-item">
+        <div class="message-header">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="message-speaker">${m.speaker || 'Desconhecido'}</span>
+            ${m.urgency ? `<span class="badge" style="font-size: 0.75rem; background: rgba(255,255,255,0.08); color: ${urgencyColor};">${m.urgency}</span>` : ''}
+            ${m.intent ? `<span class="badge badge-executive" style="font-size: 0.7rem;">${m.intent}</span>` : ''}
+          </div>
+          <span style="font-size: 0.8rem; color: var(--text-muted);">${m.created_at || ''}</span>
+        </div>
+        <div class="message-text">"${m.revised_text || m.raw_text}"</div>
+        ${m.summary ? `<div class="message-summary">💡 <b>Resumo:</b> ${m.summary}</div>` : ''}
+        <div style="display: flex; gap: 0.75rem; margin-top: 0.4rem; font-size: 0.75rem; color: var(--text-muted);">
+          ${m.tasks_count ? `<span>📋 <b>${m.tasks_count}</b> tarefa(s) extraída(s)</span>` : ''}
+          ${m.entities_count ? `<span>🏷️ <b>${m.entities_count}</b> entidade(s)</span>` : ''}
+        </div>
       </div>
-      <div class="message-text">"${m.revised_text || m.raw_text}"</div>
-      ${m.summary ? `<div class="message-summary">💡 ${m.summary}</div>` : ''}
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 function renderDictionary() {
