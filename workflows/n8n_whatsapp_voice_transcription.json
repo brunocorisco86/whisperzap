@@ -76,7 +76,7 @@
         "url": "={{ $env.HERMES_API_URL || 'http://host.docker.internal:8000' }}/ai/revise",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"text\": \"{{ $json.text }}\",\n  \"context\": \"Mensagem de voz via WhatsApp do usuário.\"\n}",
+        "jsonBody": "={{ JSON.stringify({ text: $json.text, context: 'Mensagem de voz via WhatsApp do usuário.' }) }}",
         "options": {}
       },
       "name": "AI Gateway (POST /ai/revise)",
@@ -100,7 +100,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"number\": \"{{ $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API)').item.json.body?.sender?.phone }}\",\n  \"text\": \"🎙️ James (Mordomo Virtual)\\n\\n_Transcrição_:\\n{{ $json.text_revised }}\"\n}",
+        "jsonBody": "={{ JSON.stringify({ number: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API)').item.json.body?.sender?.phone || '', text: '🎙️ James (Mordomo Virtual)\\n\\n_Transcrição_:\\n' + ($json.text_revised || $json.text || '') }) }}",
         "options": {}
       },
       "name": "Envia Transcrição James (WhatsApp)",
@@ -133,7 +133,7 @@
         "url": "={{ $env.HERMES_API_URL || 'http://host.docker.internal:8000' }}/api/v1/memory/query",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"query\": \"{{ ($json.body?.data?.message?.conversation || $json.body?.data?.message?.extendedTextMessage?.text || $json.body?.text || $json.body?.message || '').replace(/^(\\?|\\/hermes|hermes,)\\s*/i, '') }}\",\n  \"top_k\": 5,\n  \"include_graph\": true\n}",
+        "jsonBody": "={{ JSON.stringify({ query: ($json.body?.data?.message?.conversation || $json.body?.data?.message?.extendedTextMessage?.text || $json.body?.text || $json.body?.message || '').replace(/^(\\?|\\/hermes|hermes,)\\s*/i, ''), top_k: 5, include_graph: true }) }}",
         "options": {}
       },
       "name": "Agente Hermes (POST /api/v1/memory/query)",
@@ -157,7 +157,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"number\": \"{{ $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API)').item.json.body?.sender?.phone || '' }}\",\n  \"text\": \"🧠 *Hermes Agent*:\\n\\n{{ $json.answer }}\"\n}",
+        "jsonBody": "={{ JSON.stringify({ number: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API)').item.json.body?.sender?.phone || '', text: '🧠 *Hermes Agent*:\\n\\n' + ($json.answer || '') }) }}",
         "options": {}
       },
       "name": "Envia Resposta Hermes (WhatsApp)",
