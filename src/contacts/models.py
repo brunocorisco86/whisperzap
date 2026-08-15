@@ -15,7 +15,7 @@ class ContactRecord(Base):
     __tablename__ = "contacts"
 
     id = Column(String(36), primary_key=True)
-    phone_number = Column(String(30), unique=True, nullable=False, index=True)
+    phone_number = Column(String(50), nullable=True, index=True)
     name = Column(String(150), nullable=False, index=True)
     nickname = Column(String(100), nullable=True)
     role = Column(String(50), default="UNKNOWN", index=True)

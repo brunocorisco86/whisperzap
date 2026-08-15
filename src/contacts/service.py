@@ -77,21 +77,19 @@ class ContactService:
             should_close = True
 
         try:
-            # 1. Garante que TODA pessoa do Grafo NetworkX possua um card no banco SQL
+            # 1. Garante que TODA pessoa do Grafo NetworkX possua um card no banco SQL (sem inventar telefones fictícios!)
             try:
                 person_nodes = knowledge_graph.list_nodes(category="PERSON")
-                for idx, node in enumerate(person_nodes):
+                for node in person_nodes:
                     node_name = node.get("name")
                     if not node_name:
                         continue
-                    existing = db.query(ContactRecord).filter(ContactRecord.name == node_name).first()
+                    existing = db.query(ContactRecord).filter(ContactRecord.name.ilike(node_name.strip())).first()
                     if not existing:
                         phone = (node.get("phone") or "").strip()
-                        if not phone or db.query(ContactRecord).filter(ContactRecord.phone_number == phone).first():
-                            phone = f"554499{idx:04d}{hash(node_name) % 10000:04d}"
                         c_rec = ContactRecord(
                             id=str(uuid4()),
-                            name=node_name,
+                            name=node_name.strip(),
                             phone_number=phone,
                             role=node.get("role") or "UNKNOWN",
                             company=node.get("company") or "",
@@ -122,13 +120,14 @@ class ContactService:
             from src.memory.models import MessageRecord
             responses = []
             for r in records:
+                msg_filters = [MessageRecord.speaker == r.name, MessageRecord.speaker.ilike(f"%{r.name}%")]
+                if r.phone_number and len(r.phone_number) >= 8:
+                    msg_filters.append(MessageRecord.speaker == r.phone_number)
+                    msg_filters.append(MessageRecord.speaker.like(f"%{r.phone_number[-8:]}%"))
+
                 recent_msgs = (
                     db.query(MessageRecord)
-                    .filter(
-                        (MessageRecord.speaker == r.name)
-                        | (MessageRecord.speaker == r.phone_number)
-                        | (MessageRecord.speaker.ilike(f"%{r.name}%"))
-                    )
+                    .filter(db.query(MessageRecord).filter(*msg_filters).whereclause)
                     .order_by(MessageRecord.created_at.desc())
                     .limit(3)
                     .all()
@@ -153,7 +152,10 @@ class ContactService:
                 db.close()
 
     def get_contact_by_phone(self, phone: str, db: Session | None = None) -> ContactRecord | None:
-        """Busca contato por número de telefone."""
+        """Busca contato por número de telefone de forma segura e flexível."""
+        if not phone or not isinstance(phone, str):
+            return None
+
         should_close = False
         if db is None:
             db = SessionLocal()
@@ -162,8 +164,20 @@ class ContactService:
         try:
             import re
             digits = re.sub(r"\D", "", phone.strip())
-            return db.query(ContactRecord).filter(
+            if len(digits) < 8:
+                return None
+
+            # 1. Busca por correspondência exata de dígitos ou string
+            exact = db.query(ContactRecord).filter(
                 (ContactRecord.phone_number == digits) | (ContactRecord.phone_number == phone.strip())
+            ).first()
+            if exact:
+                return exact
+
+            # 2. Busca por sufixo dos últimos 8 dígitos (evitando inconsistência de DDD/DDI)
+            suffix = digits[-8:]
+            return db.query(ContactRecord).filter(
+                ContactRecord.phone_number.like(f"%{suffix}%")
             ).first()
         finally:
             if should_close:
@@ -171,6 +185,9 @@ class ContactService:
 
     def get_contact_by_name(self, name: str, db: Session | None = None) -> ContactRecord | None:
         """Busca contato por nome ou apelido."""
+        if not name or not isinstance(name, str):
+            return None
+
         should_close = False
         if db is None:
             db = SessionLocal()
@@ -178,27 +195,43 @@ class ContactService:
 
         try:
             name_clean = name.strip()
+            if not name_clean:
+                return None
             return db.query(ContactRecord).filter(
-                (ContactRecord.name.ilike(f"%{name_clean}%")) | (ContactRecord.nickname.ilike(f"%{name_clean}%"))
+                (ContactRecord.name.ilike(name_clean)) | (ContactRecord.nickname.ilike(name_clean))
             ).first()
         finally:
             if should_close:
                 db.close()
 
     def create_or_update_contact(self, data: ContactCreate, db: Session | None = None) -> ContactResponse:
-        """Cria ou atualiza um contato e sincroniza com o Grafo de Conhecimento."""
+        """Cria ou atualiza um contato deduplicando por telefone ou nome."""
         should_close = False
         if db is None:
             db = SessionLocal()
             should_close = True
 
         try:
-            existing = self.get_contact_by_phone(data.phone_number, db=db)
+            import re
+            phone_clean = (data.phone_number or "").strip()
+            digits = re.sub(r"\D", "", phone_clean)
+
+            existing = None
+            if digits and len(digits) >= 8:
+                existing = self.get_contact_by_phone(digits, db=db)
+
+            if not existing and data.name:
+                existing = self.get_contact_by_name(data.name, db=db)
+
             if existing:
-                existing.name = data.name
+                if data.name:
+                    existing.name = data.name
+                if phone_clean:
+                    existing.phone_number = digits if len(digits) >= 8 else phone_clean
                 if data.nickname:
                     existing.nickname = data.nickname
-                existing.role = data.role.value if isinstance(data.role, ContactRole) else str(data.role)
+                if data.role:
+                    existing.role = data.role.value if isinstance(data.role, ContactRole) else str(data.role)
                 if data.company is not None:
                     existing.company = data.company
                 if data.projects:
@@ -215,7 +248,7 @@ class ContactService:
                 contact_id = str(uuid4())
                 rec = ContactRecord(
                     id=contact_id,
-                    phone_number=data.phone_number,
+                    phone_number=digits if len(digits) >= 8 else phone_clean,
                     name=data.name,
                     nickname=data.nickname,
                     role=data.role.value if isinstance(data.role, ContactRole) else str(data.role),
