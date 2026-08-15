@@ -18,7 +18,22 @@ from src.contacts.schemas import (
 from src.memory.database import SessionLocal
 from src.memory.graph import knowledge_graph
 
+import hashlib
+import re
+
 logger = logging.getLogger(__name__)
+
+
+def generate_contact_id(name: str, phone: str = "") -> str:
+    """Gera um identificador determinístico único para o contato.
+    Se possuir telefone válido (>= 8 dígitos), usa 'wa_{digits}'.
+    Caso contrário, usa 'c_{md5(name)[:12]}'.
+    """
+    digits = re.sub(r"\D", "", phone.strip()) if phone else ""
+    if len(digits) >= 8:
+        return f"wa_{digits}"
+    name_clean = name.strip().lower()
+    return f"c_{hashlib.md5(name_clean.encode('utf-8')).hexdigest()[:12]}"
 
 
 def calculate_effective_weight(contact: ContactRecord | ContactCreate) -> float:
@@ -84,11 +99,14 @@ class ContactService:
                     node_name = node.get("name")
                     if not node_name:
                         continue
-                    existing = db.query(ContactRecord).filter(ContactRecord.name.ilike(node_name.strip())).first()
+                    phone = (node.get("phone") or "").strip()
+                    c_id = generate_contact_id(node_name.strip(), phone)
+                    existing = db.query(ContactRecord).filter(
+                        (ContactRecord.name.ilike(node_name.strip())) | (ContactRecord.id == c_id)
+                    ).first()
                     if not existing:
-                        phone = (node.get("phone") or "").strip()
                         c_rec = ContactRecord(
-                            id=str(uuid4()),
+                            id=c_id,
                             name=node_name.strip(),
                             phone_number=phone,
                             role=node.get("role") or "UNKNOWN",
@@ -245,7 +263,7 @@ class ContactService:
                 db.refresh(existing)
                 rec = existing
             else:
-                contact_id = str(uuid4())
+                contact_id = generate_contact_id(data.name, digits or phone_clean)
                 rec = ContactRecord(
                     id=contact_id,
                     phone_number=digits if len(digits) >= 8 else phone_clean,

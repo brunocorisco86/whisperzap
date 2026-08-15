@@ -716,7 +716,7 @@ async function fetchWhatsAppAvatar(phone) {
 
 async function handleSaveContact(e) {
   e.preventDefault();
-  const contactId = document.getElementById('contact-id').value;
+  const contactId = document.getElementById('contact-id').value.trim();
   const name = document.getElementById('contact-name').value.trim();
   const nickname = document.getElementById('contact-nickname').value.trim();
   const phone_number = document.getElementById('contact-phone').value.trim();
@@ -738,20 +738,26 @@ async function handleSaveContact(e) {
   };
 
   try {
-    const res = await fetch('/api/v1/contacts', {
-      method: 'POST',
+    const isEditing = Boolean(contactId);
+    const url = isEditing ? `/api/v1/contacts/${encodeURIComponent(contactId)}` : '/api/v1/contacts';
+    const method = isEditing ? 'PATCH' : 'POST';
+
+    const res = await fetch(url, {
+      method: method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
     if (res.ok) {
-      showToast(`Contato ${name} salvo e sincronizado na VPS!`);
+      showToast(`Contato ${name} ${isEditing ? 'atualizado' : 'cadastrado'} e sincronizado na VPS!`);
       modalContact.classList.remove('active');
+      document.getElementById('contact-id').value = '';
       loadContacts();
       loadStats();
       loadGraphData();
     } else {
-      showToast('Erro ao salvar contato na VPS', true);
+      const errData = await res.json().catch(() => ({}));
+      showToast(`Erro ao salvar contato: ${errData.detail || res.statusText}`, true);
     }
   } catch (err) {
     console.error('Erro:', err);

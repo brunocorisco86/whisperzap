@@ -105,6 +105,7 @@ class ContactCreate(ContactBase):
 
 class ContactUpdate(BaseModel):
     name: Optional[str] = None
+    phone_number: Optional[str] = None
     nickname: Optional[str] = None
     role: Optional[ContactRole] = None
     company: Optional[str] = None

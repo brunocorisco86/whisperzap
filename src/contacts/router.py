@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
@@ -53,19 +54,31 @@ async def batch_import_contacts(payload: ContactBatchImportRequest, db: Session 
 
 @router.patch("/{contact_id}", response_model=ContactResponse)
 async def update_contact(contact_id: str, payload: ContactUpdate, db: Session = Depends(get_db)):
-    """Atualiza dados específicos de um contato."""
-    rec = db.query(ContactRecord).filter(ContactRecord.id == contact_id).first()
+    """Atualiza dados específicos de um contato existente."""
+    from src.memory.graph import knowledge_graph
+    import re
+
+    rec = db.query(ContactRecord).filter(
+        (ContactRecord.id == contact_id)
+        | (ContactRecord.name == contact_id)
+        | (ContactRecord.phone_number == contact_id)
+    ).first()
     if not rec:
         raise HTTPException(status_code=404, detail="Contato não encontrado")
 
-    if payload.name is not None:
-        rec.name = payload.name
+    old_name = rec.name
+
+    if payload.name is not None and payload.name.strip():
+        rec.name = payload.name.strip()
+    if payload.phone_number is not None:
+        digits = re.sub(r"\D", "", payload.phone_number.strip())
+        rec.phone_number = digits if len(digits) >= 8 else payload.phone_number.strip()
     if payload.nickname is not None:
-        rec.nickname = payload.nickname
+        rec.nickname = payload.nickname.strip() if payload.nickname else None
     if payload.role is not None:
-        rec.role = payload.role.value
+        rec.role = payload.role.value if hasattr(payload.role, "value") else str(payload.role)
     if payload.company is not None:
-        rec.company = payload.company
+        rec.company = payload.company.strip() if payload.company else None
     if payload.projects is not None:
         rec.projects_json = payload.projects
     if payload.custom_weight is not None:
@@ -73,8 +86,17 @@ async def update_contact(contact_id: str, payload: ContactUpdate, db: Session = 
     if payload.notes is not None:
         rec.notes = payload.notes
 
+    rec.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(rec)
+
+    # Se o nome mudou, remove o nó antigo do grafo
+    if old_name and old_name != rec.name:
+        try:
+            knowledge_graph.remove_node(old_name)
+        except Exception:
+            pass
+
     contact_service._sync_contact_to_graph(rec)
     return record_to_response(rec)
 

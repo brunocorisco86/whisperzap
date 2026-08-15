@@ -188,7 +188,7 @@ class MemoryRepository:
 
                     if not existing_contact:
                         contact_name = push_name if (push_name and speaker_val.isdigit()) else speaker_val
-                        c_id = str(uuid4())
+                        c_id = generate_contact_id(contact_name, digits)
                         new_contact = ContactRecord(
                             id=c_id,
                             name=contact_name,
@@ -217,7 +217,7 @@ class MemoryRepository:
                                 ContactRecord.name.ilike(person_name)
                             ).first()
                             if not existing_person:
-                                p_id = str(uuid4())
+                                p_id = generate_contact_id(person_name, "")
                                 new_person = ContactRecord(
                                     id=p_id,
                                     name=person_name,
