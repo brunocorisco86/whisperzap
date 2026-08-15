@@ -72,3 +72,32 @@ async def test_transcribe_endpoint():
             assert data["language"] == "pt"
             assert data["duration"] == 1.0
             assert len(data["segments"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_transcribe_base64_endpoint():
+    """Valida o endpoint POST /transcribe/base64 com string base64 válida."""
+    import base64
+    mock_segments = [
+        TranscriptionSegment(id=0, start=0.0, end=1.0, text="Mensagem base64")
+    ]
+    with patch("src.transcriber.router.whisper_service.transcribe_audio", new_callable=AsyncMock) as mock_transcribe:
+        mock_transcribe.return_value = ("Mensagem base64", "pt", 0.99, 1.0, mock_segments)
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            fake_b64 = base64.b64encode(b"A" * 64).decode("utf-8")
+            response = await client.post("/transcribe/base64", json={"base64": fake_b64, "language": "pt"})
+            assert response.status_code == 200
+            data = response.json()
+            assert data["text"] == "Mensagem base64"
+
+
+@pytest.mark.asyncio
+async def test_transcribe_base64_endpoint_empty():
+    """Valida erro 400 ao enviar base64 vazio."""
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post("/transcribe/base64", json={"base64": "", "language": "pt"})
+        assert response.status_code == 400
+        assert "Payload base64 vazio" in response.json()["detail"]

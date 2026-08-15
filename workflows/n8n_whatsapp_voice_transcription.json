@@ -10,7 +10,7 @@
       "name": "Webhook WhatsApp (Evolution API / Z-API)",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
-      "position": [240, 300],
+      "position": [200, 300],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000001"
     },
     {
@@ -18,7 +18,7 @@
         "conditions": {
           "string": [
             {
-              "value1": "={{ $json.body?.data?.messageType || $json.body?.messageType || $json.body?.data?.message?.audioMessage ? 'audioMessage' : '' }}",
+              "value1": "={{ $json.body?.data?.messageType || $json.body?.messageType || ($json.body?.data?.message?.audioMessage ? 'audioMessage' : '') }}",
               "operation": "contains",
               "value2": "audio"
             }
@@ -28,8 +28,32 @@
       "name": "Filtro: É Mensagem de Áudio?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [460, 300],
+      "position": [420, 300],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000002"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WHATSAPP_MEDIA_ENDPOINT || 'http://evolution-api:8080/chat/getBase64FromMediaMessage/hermes' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.WHATSAPP_API_TOKEN || 'seu_token_whatsapp_aqui' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"message\": {\n    \"key\": {\n      \"id\": \"{{ $('Webhook WhatsApp (Evolution API / Z-API)').item.json.body?.data?.key?.id }}\",\n      \"fromMe\": {{ $('Webhook WhatsApp (Evolution API / Z-API)').item.json.body?.data?.key?.fromMe ? true : false }},\n      \"remoteJid\": \"{{ $('Webhook WhatsApp (Evolution API / Z-API)').item.json.body?.data?.key?.remoteJid }}\"\n    }\n  },\n  \"convertToMp4\": false\n}",
+        "options": {}
+      },
+      "name": "Baixar Base64 (Evolution API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [640, 200],
+      "id": "1e112d7c-a7a2-4bb0-80a1-000000000006"
     },
     {
       "parameters": {
@@ -37,13 +61,13 @@
         "url": "={{ $env.HERMES_API_URL || 'http://host.docker.internal:8000' }}/transcribe/base64",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"base64\": \"{{ $json.body?.data?.message?.base64 || $json.body?.data?.base64 || $json.body?.base64 || '' }}\",\n  \"language\": \"pt\"\n}",
+        "jsonBody": "={\n  \"base64\": \"{{ $json.base64 }}\",\n  \"language\": \"pt\"\n}",
         "options": {}
       },
       "name": "Speech-to-Text (POST /transcribe)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [680, 200],
+      "position": [860, 200],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000003"
     },
     {
@@ -58,7 +82,7 @@
       "name": "AI Gateway (POST /ai/revise)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [900, 200],
+      "position": [1080, 200],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000004"
     },
     {
@@ -82,7 +106,7 @@
       "name": "Envia Texto Revisado (WhatsApp)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [1120, 200],
+      "position": [1300, 200],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000005"
     }
   ],
@@ -99,6 +123,17 @@
       ]
     },
     "Filtro: É Mensagem de Áudio?": {
+      "main": [
+        [
+          {
+            "node": "Baixar Base64 (Evolution API)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar Base64 (Evolution API)": {
       "main": [
         [
           {

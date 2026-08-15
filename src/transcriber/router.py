@@ -92,7 +92,13 @@ async def transcribe_audio_base64(
     start_time = time.perf_counter()
     assigned_id = payload.audio_id or f"audio_{uuid.uuid4().hex[:10]}"
 
-    raw_base64 = payload.base64
+    raw_base64 = (payload.base64 or "").strip()
+    if not raw_base64 or len(raw_base64) < 32:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payload base64 vazio ou inválido. Verifique se o áudio foi extraído corretamente da Evolution API.",
+        )
+
     if "," in raw_base64:
         raw_base64 = raw_base64.split(",", 1)[1]
 
@@ -102,6 +108,12 @@ async def transcribe_audio_base64(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"String base64 inválida: {str(exc)}",
+        )
+
+    if not audio_bytes or len(audio_bytes) < 32:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Arquivo de áudio decodificado é vazio ou corrompido.",
         )
 
     with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp_file:
