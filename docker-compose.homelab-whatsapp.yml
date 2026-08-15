@@ -1,6 +1,32 @@
-version: "3.8"
-
 services:
+  # ==============================================================================
+  # PostgreSQL dedicado para a Evolution API v2
+  # ==============================================================================
+  evolution-postgres:
+    image: postgres:16-alpine
+    container_name: hermes-evolution-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: evolution_user
+      POSTGRES_PASSWORD: evolution_password
+      POSTGRES_DB: evolution_db
+    volumes:
+      - evolution_postgres_data:/var/lib/postgresql/data
+    networks:
+      - hermes-homelab-net
+
+  # ==============================================================================
+  # Redis (Cache e fila para a Evolution API)
+  # ==============================================================================
+  evolution-redis:
+    image: redis:7-alpine
+    container_name: hermes-evolution-redis
+    restart: unless-stopped
+    volumes:
+      - evolution_redis_data:/data
+    networks:
+      - hermes-homelab-net
+
   # ==============================================================================
   # Evolution API v2 (Conector Oficial WhatsApp via QR Code)
   # ==============================================================================
@@ -15,7 +41,13 @@ services:
       SERVER_PORT: 8080
       SERVER_URL: http://localhost:8080
       AUTHENTICATION_API_KEY: ${WHATSAPP_API_TOKEN:-hermes_evolution_token_secret_123}
-      DATABASE_ENABLED: "false"
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution_user:evolution_password@evolution-postgres:5432/evolution_db?schema=evolution_api
+      DATABASE_CONNECTION_CLIENT_NAME: hermes_evolution
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "true"
+      DATABASE_SAVE_DATA_CONTACTS: "true"
       REDIS_ENABLED: "true"
       REDIS_URI: redis://evolution-redis:6379
       CACHE_REDIS_ENABLED: "true"
@@ -23,21 +55,10 @@ services:
       LOG_LEVEL: ERROR,WARN,INFO
       CONFIG_SESSION_PHONE_CLIENT: "Hermes Voice Memory"
     depends_on:
+      - evolution-postgres
       - evolution-redis
     volumes:
       - evolution_instances:/evolution/instances
-    networks:
-      - hermes-homelab-net
-
-  # ==============================================================================
-  # Redis (Cache e fila para a Evolution API)
-  # ==============================================================================
-  evolution-redis:
-    image: redis:7-alpine
-    container_name: hermes-evolution-redis
-    restart: unless-stopped
-    volumes:
-      - evolution_redis_data:/data
     networks:
       - hermes-homelab-net
 
@@ -71,6 +92,8 @@ services:
       - hermes-homelab-net
 
 volumes:
+  evolution_postgres_data:
+    name: hermes_evolution_postgres_data
   evolution_instances:
     name: hermes_evolution_instances
   evolution_redis_data:
