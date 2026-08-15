@@ -1019,6 +1019,17 @@ select:focus {
   color: var(--text-muted);
 }
 
+.task-card.task-cancelled {
+  opacity: 0.55;
+  background: rgba(239, 68, 68, 0.03);
+  border-color: rgba(239, 68, 68, 0.15);
+}
+
+.task-card.task-cancelled .task-title {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
 .task-top-row {
   display: flex;
   justify-content: space-between;
@@ -1072,6 +1083,50 @@ select:focus {
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   font-style: italic;
   line-height: 1.45;
+}
+
+.task-notes-section {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.task-notes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.task-notes-textarea {
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  padding: 0.5rem 0.75rem;
+  resize: vertical;
+  min-height: 55px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.task-notes-textarea:focus {
+  border-color: var(--color-primary);
+}
+
+.task-notes-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
 }
 
 .task-footer-row {

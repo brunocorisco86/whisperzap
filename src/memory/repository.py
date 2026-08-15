@@ -566,6 +566,7 @@ class MemoryRepository:
                         due_date=r.due_date,
                         priority=r.priority,
                         status=r.status,
+                        notes=r.notes,
                         created_at=r.created_at,
                         completed_at=r.completed_at,
                         speaker=speaker_name,
@@ -581,7 +582,7 @@ class MemoryRepository:
                 db.close()
 
     def update_task(self, task_id: str, updates: TaskUpdate, db: Session | None = None) -> Any | None:
-        """Atualiza dados e status de uma tarefa."""
+        """Atualiza dados, status e anotações de uma tarefa."""
         should_close = False
         if db is None:
             db = SessionLocal()
@@ -603,6 +604,8 @@ class MemoryRepository:
                 task.due_date = updates.due_date
             if updates.priority is not None:
                 task.priority = updates.priority
+            if updates.notes is not None:
+                task.notes = updates.notes
             if updates.status is not None:
                 task.status = updates.status
                 if updates.status == "DONE":
@@ -629,6 +632,7 @@ class MemoryRepository:
                 due_date=task.due_date,
                 priority=task.priority,
                 status=task.status,
+                notes=task.notes,
                 created_at=task.created_at,
                 completed_at=task.completed_at,
                 speaker=speaker_name,

@@ -91,14 +91,32 @@ def test_memory_messages_and_tasks_flow():
     tasks = res_tasks.json()
     assert len(tasks) >= 1
 
-    # 3. Atualiza status da tarefa
+    # 3. Atualiza status da tarefa e notas
     task_id = tasks[0]["id"]
     res_patch = client.patch(
         f"/api/v1/memory/tasks/{task_id}",
-        json={"status": "DONE"},
+        json={
+            "status": "DONE",
+            "notes": "Anotação de teste para conferência futura: falei com o responsável",
+        },
     )
     assert res_patch.status_code == 200
-    assert res_patch.json()["status"] == "DONE"
+    patched = res_patch.json()
+    assert patched["status"] == "DONE"
+    assert "Anotação de teste" in patched["notes"]
+
+    # 4. Testa ignorar tarefa (CANCELLED) e depois restaurar
+    res_cancel = client.patch(
+        f"/api/v1/memory/tasks/{task_id}",
+        json={"status": "CANCELLED"},
+    )
+    assert res_cancel.status_code == 200
+    assert res_cancel.json()["status"] == "CANCELLED"
+
+    # 5. Testa listagem filtrada por status
+    res_cancelled_list = client.get("/api/v1/memory/tasks?status=CANCELLED")
+    assert res_cancelled_list.status_code == 200
+    assert any(t["id"] == task_id for t in res_cancelled_list.json())
 
 
 def test_memory_search_and_graph_endpoints():

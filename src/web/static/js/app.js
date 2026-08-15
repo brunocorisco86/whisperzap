@@ -601,6 +601,7 @@ function renderTasks() {
 
   tasksContainer.innerHTML = filtered.map(t => {
     const isDone = t.status === 'DONE';
+    const isCancelled = t.status === 'CANCELLED';
     const priorityColor = t.priority === 'URGENT' ? '#ef4444' : t.priority === 'HIGH' ? '#f59e0b' : '#10b981';
     const speakerName = t.speaker || 'Desconhecido';
     const initials = speakerName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
@@ -621,12 +622,19 @@ function renderTasks() {
     };
     const roleBadge = t.sender_role ? (roleLabels[t.sender_role] || t.sender_role) : null;
 
+    let cardClass = 'task-card';
+    if (isDone) cardClass += ' task-done';
+    if (isCancelled) cardClass += ' task-cancelled';
+
     return `
-      <div class="task-card ${isDone ? 'task-done' : ''}">
+      <div class="${cardClass}" id="task-card-${t.id}">
         <!-- Topo: Título da Tarefa e Solicitante (Gatilho) -->
         <div class="task-top-row">
           <div style="flex: 1;">
-            <div class="task-title">${t.title}</div>
+            <div class="task-title">
+              ${isCancelled ? '<span style="color: #ef4444; font-size: 0.85rem; margin-right: 0.4rem;">[IGNORADA]</span>' : ''}
+              ${t.title}
+            </div>
           </div>
 
           <!-- Box de Ancoragem do Solicitante (Gatilho) -->
@@ -647,11 +655,28 @@ function renderTasks() {
           </div>
         ` : ''}
 
+        <!-- Caixa de Anotações & Observações Futuras -->
+        <div class="task-notes-section">
+          <div class="task-notes-header">
+            <span>📝 <b>Anotações & Observações:</b></span>
+            ${t.notes ? '<span style="color: #10b981; font-size: 0.72rem;">● Anotação salva</span>' : '<span style="font-size: 0.72rem;">Sem anotações</span>'}
+          </div>
+          <textarea class="task-notes-textarea" id="task-notes-${t.id}" placeholder="Escreva observações, acompanhamentos ou decisões para conferir no futuro...">${t.notes || ''}</textarea>
+          <div class="task-notes-actions">
+            <button class="btn btn-secondary btn-sm" onclick="saveTaskNotes('${t.id}')" title="Salvar anotação para conferência futura">
+              💾 Salvar Anotação
+            </button>
+          </div>
+        </div>
+
         <!-- Rodapé: Metadados e Ações -->
         <div class="task-footer-row">
           <div class="task-meta-items">
             <span class="badge" style="background: rgba(255,255,255,0.08); color: ${priorityColor}; font-weight: 700;">
               ● ${t.priority}
+            </span>
+            <span class="badge" style="background: rgba(255,255,255,0.06);">
+              Status: ${t.status}
             </span>
             ${t.assignee ? `<span>🎯 <b>Responsável:</b> ${t.assignee}</span>` : ''}
             ${t.due_date ? `<span>📅 <b>Prazo:</b> ${t.due_date}</span>` : ''}
@@ -664,9 +689,19 @@ function renderTasks() {
                 💬 WhatsApp
               </a>
             ` : ''}
-            <button class="btn btn-secondary btn-sm" onclick="toggleTaskStatus('${t.id}', '${isDone ? 'PENDING' : 'DONE'}')">
-              ${isDone ? '🔄 Reabrir Tarefa' : '✅ Concluir Tarefa'}
-            </button>
+
+            ${isCancelled ? `
+              <button class="btn btn-secondary btn-sm" style="color: var(--color-primary);" onclick="toggleTaskStatus('${t.id}', 'PENDING')" title="Restaurar tarefa para pendente">
+                🔄 Restaurar Tarefa
+              </button>
+            ` : `
+              <button class="btn btn-secondary btn-sm" onclick="toggleTaskStatus('${t.id}', '${isDone ? 'PENDING' : 'DONE'}')">
+                ${isDone ? '🔄 Reabrir Tarefa' : '✅ Concluir Tarefa'}
+              </button>
+              <button class="btn btn-secondary btn-sm" style="color: var(--color-danger);" onclick="toggleTaskStatus('${t.id}', 'CANCELLED')" title="Ignorar esta tarefa">
+                🚫 Ignorar
+              </button>
+            `}
           </div>
         </div>
       </div>
@@ -1252,13 +1287,40 @@ async function toggleTaskStatus(taskId, newStatus) {
       body: JSON.stringify({ status: newStatus })
     });
     if (res.ok) {
-      showToast(`Status da tarefa atualizado para ${newStatus}!`);
+      const label = newStatus === 'DONE' ? 'Concluída' : (newStatus === 'CANCELLED' ? 'Ignorada' : 'Pendente');
+      showToast(`Tarefa marcada como ${label}!`);
       loadTasks();
     }
   } catch (err) {
     console.error('Erro ao atualizar tarefa:', err);
+    showToast('Falha ao atualizar tarefa', true);
   }
 }
+window.toggleTaskStatus = toggleTaskStatus;
+
+async function saveTaskNotes(taskId) {
+  const textarea = document.getElementById(`task-notes-${taskId}`);
+  if (!textarea) return;
+
+  const notesText = textarea.value.trim();
+  try {
+    const res = await fetch(`/api/v1/memory/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes: notesText })
+    });
+    if (res.ok) {
+      showToast('Anotação da tarefa salva com sucesso!');
+      await loadTasks();
+    } else {
+      showToast('Erro ao salvar anotação da tarefa', true);
+    }
+  } catch (err) {
+    console.error('Erro ao salvar anotação:', err);
+    showToast('Falha na comunicação com o servidor', true);
+  }
+}
+window.saveTaskNotes = saveTaskNotes;
 
 // --- Live Hermes Query Testing ---
 

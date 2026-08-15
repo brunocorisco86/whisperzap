@@ -62,6 +62,7 @@ class TaskRecord(Base):
     due_date = Column(String(100), nullable=True)
     priority = Column(String(20), default="MEDIUM", index=True)
     status = Column(String(20), default="PENDING", index=True)  # PENDING, IN_PROGRESS, DONE, CANCELLED
+    notes = Column(Text, nullable=True)
     completed_at = Column(DateTime, nullable=True)
 
     message = relationship("MessageRecord", back_populates="tasks")
@@ -197,6 +198,7 @@ class TaskResponse(BaseModel):
     due_date: Optional[str] = None
     priority: str
     status: str
+    notes: Optional[str] = None
     created_at: datetime
     completed_at: Optional[datetime] = None
 
@@ -215,6 +217,7 @@ class TaskUpdate(BaseModel):
     due_date: Optional[str] = None
     priority: Optional[Literal["LOW", "MEDIUM", "HIGH", "URGENT"]] = None
     status: Optional[Literal["PENDING", "IN_PROGRESS", "DONE", "CANCELLED"]] = None
+    notes: Optional[str] = None
 
 
 class MessageCreate(BaseModel):
