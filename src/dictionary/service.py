@@ -30,7 +30,7 @@ DEFAULT_TERMS = [
     },
     {
         "term": "C.Vale",
-        "phonetic_variations": ["Sevale", "cvale", "c vale", "cevale", "se vale", "sivale"],
+        "phonetic_variations": ["Sevala", "sevala", "Sevale", "sevale", "cvale", "c vale", "cevale", "ce vale", "se vale", "sivale", "civale", "si vale"],
         "expansion": "Cooperativa Agroindustrial C.Vale",
         "category": "AGRONEGOCIO",
         "description": "Cooperativa agroindustrial de integração avícola e grãos.",
