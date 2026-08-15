@@ -100,6 +100,8 @@ class MemoryRepository:
                 audio_filename=data.audio_filename,
                 intent=extracted.intent,
                 summary=extracted.summary,
+                sentiment=extracted.sentiment or "NEUTRAL",
+                sentiment_score=extracted.sentiment_score or 0.0,
                 urgency=weighted_message_urgency,
                 meta_info=data.meta_info or {},
             )

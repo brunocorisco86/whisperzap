@@ -372,6 +372,19 @@ function getRoleLabel(role) {
   return map[r] || r;
 }
 
+function getSentimentInfo(sentiment) {
+  const s = (sentiment || 'NEUTRAL').toUpperCase();
+  const map = {
+    'POSITIVE': { emoji: '😊', label: 'Positivo', class: 'sentiment-positive' },
+    'CONFIDENT': { emoji: '🎯', label: 'Confiante', class: 'sentiment-confident' },
+    'NEUTRAL': { emoji: '😐', label: 'Neutro', class: 'sentiment-neutral' },
+    'URGENT': { emoji: '🚨', label: 'Urgente', class: 'sentiment-urgent' },
+    'ANXIOUS': { emoji: '😟', label: 'Preocupado', class: 'sentiment-anxious' },
+    'FRUSTRATED': { emoji: '😤', label: 'Frustrado', class: 'sentiment-frustrated' }
+  };
+  return map[s] || { emoji: '😐', label: 'Neutro', class: 'sentiment-neutral' };
+}
+
 function getInitials(name) {
   if (!name) return '??';
   const parts = name.trim().split(' ');
@@ -411,7 +424,20 @@ function renderContacts() {
     const initials = getInitials(c.name);
     const badgeClass = getRoleBadgeClass(c.role);
     const roleLabel = getRoleLabel(c.role);
+    const latestSentInfo = getSentimentInfo(c.latest_sentiment);
     const projectsHtml = (c.projects || []).map(p => `<span class="project-chip">${p}</span>`).join('');
+
+    const recentSentimentsHtml = (c.recent_sentiments && c.recent_sentiments.length > 0)
+      ? `
+        <div class="sentiments-history">
+          <span>Últimos Áudios:</span>
+          ${c.recent_sentiments.map(s => {
+            const sInfo = getSentimentInfo(s.sentiment);
+            return `<span class="sentiment-pill ${sInfo.class}" title="${s.created_at || ''}: ${s.summary || s.sentiment}">${sInfo.emoji} ${s.created_at || ''}</span>`;
+          }).join('')}
+        </div>
+      `
+      : '';
 
     return `
       <div class="contact-card" id="contact-card-${c.id || rawDigits}">
@@ -422,7 +448,10 @@ function renderContacts() {
           <div class="contact-title-group">
             <div class="contact-name">${c.name}</div>
             <div class="contact-company">${c.company || 'Pessoal / Geral'}</div>
-            <span class="badge ${badgeClass}">${roleLabel}</span>
+            <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap; margin-top: 0.2rem;">
+              <span class="badge ${badgeClass}">${roleLabel}</span>
+              <span class="sentiment-badge ${latestSentInfo.class}" title="Sentimento mais recente">${latestSentInfo.emoji} ${latestSentInfo.label}</span>
+            </div>
           </div>
         </div>
 
@@ -438,6 +467,8 @@ function renderContacts() {
           ${c.notes ? `<div style="font-size: 0.8rem; color: var(--text-muted);">${c.notes}</div>` : ''}
 
           ${projectsHtml ? `<div class="contact-projects">${projectsHtml}</div>` : ''}
+
+          ${recentSentimentsHtml}
         </div>
 
         <div class="contact-actions">

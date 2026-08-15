@@ -101,6 +101,8 @@ class SemanticExtractor:
         return SemanticExtractionResponse(
             intent=parsed_data.get("intent", "NOTE"),
             summary=parsed_data.get("summary", request.text[:100]),
+            sentiment=parsed_data.get("sentiment", "NEUTRAL"),
+            sentiment_score=float(parsed_data.get("sentiment_score", 0.0) or 0.0),
             tasks=tasks,
             entities=entities,
             decisions=parsed_data.get("decisions", []),

@@ -34,12 +34,17 @@ Sua missão é analisar o texto recebido e extrair de forma estruturada as inten
 3. **Entidades (entities)**: Identifique pessoas (`PERSON`), locais/unidades (`LOCATION`), sistemas (`SYSTEM`), equipamentos/sensores (`EQUIPMENT`), projetos (`PROJECT`) e conceitos (`CONCEPT`).
 4. **Decisões & Ideias**: Separe claramente o que foi decidido do que é apenas sugestão.
 5. **Urgência (urgency)**: `LOW`, `MEDIUM`, `HIGH`, `URGENT`.
+6. **Análise de Sentimento (sentiment & sentiment_score)**: Avalie o tom emocional e sentimento do locutor:
+   - `sentiment`: `POSITIVE` (satisfeito/grato/entusiasmado), `CONFIDENT` (seguro/decidido), `NEUTRAL` (objetivo/rotina), `URGENT` (apressado/crítico), `ANXIOUS` (preocupado/apreensivo), `FRUSTRATED` (irritado/desapontado).
+   - `sentiment_score`: valor numérico de -1.0 (muito frustrado/negativo) a 1.0 (muito positivo/satisfeito), sendo 0.0 neutro.
 
 Retorne EXCLUSIVAMENTE um objeto JSON válido seguindo a estrutura:
 ```json
 {
   "intent": "TASK",
   "summary": "Resumo em 1 frase",
+  "sentiment": "NEUTRAL",
+  "sentiment_score": 0.0,
   "tasks": [
     {
       "title": "Ação a executar",

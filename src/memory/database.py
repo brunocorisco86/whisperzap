@@ -43,9 +43,21 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def init_db() -> None:
-    """Inicializa as tabelas do banco de dados se não existirem."""
+    """Inicializa as tabelas do banco de dados se não existirem e adiciona novas colunas."""
+    from sqlalchemy import text
     try:
         Base.metadata.create_all(bind=engine)
+        with engine.connect() as conn:
+            try:
+                conn.execute(text("ALTER TABLE messages ADD COLUMN sentiment VARCHAR(32) DEFAULT 'NEUTRAL'"))
+                conn.commit()
+            except Exception:
+                pass
+            try:
+                conn.execute(text("ALTER TABLE messages ADD COLUMN sentiment_score FLOAT DEFAULT 0.0"))
+                conn.commit()
+            except Exception:
+                pass
         logger.info(f"Banco de dados inicializado com sucesso usando: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL}")
     except Exception as e:
         logger.error(f"Erro ao inicializar banco de dados: {e}")

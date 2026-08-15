@@ -34,7 +34,11 @@ def calculate_effective_weight(contact: ContactRecord | ContactCreate) -> float:
         return 0.40
 
 
-def record_to_response(rec: ContactRecord) -> ContactResponse:
+def record_to_response(
+    rec: ContactRecord,
+    latest_sentiment: str = "NEUTRAL",
+    recent_sentiments: list[dict] | None = None,
+) -> ContactResponse:
     """Converte ContactRecord para ContactResponse enriquecido."""
     role_val = ContactRole(rec.role) if rec.role in ContactRole._value2member_map_ else ContactRole.UNKNOWN
     return ContactResponse(
@@ -48,6 +52,8 @@ def record_to_response(rec: ContactRecord) -> ContactResponse:
         custom_weight=rec.custom_weight,
         notes=rec.notes,
         effective_weight=calculate_effective_weight(rec),
+        latest_sentiment=latest_sentiment,
+        recent_sentiments=recent_sentiments or [],
         created_at=rec.created_at,
         updated_at=rec.updated_at,
     )
@@ -63,13 +69,43 @@ class ContactService:
         only_unknown: bool = False,
         db: Session | None = None,
     ) -> list[ContactResponse]:
-        """Lista contatos com filtros opcionais."""
+        """Lista contatos com filtros opcionais e enriquecimento de sentimentos."""
         should_close = False
         if db is None:
             db = SessionLocal()
             should_close = True
 
         try:
+            # 1. Garante que TODA pessoa do Grafo NetworkX possua um card no banco SQL
+            try:
+                person_nodes = knowledge_graph.list_nodes(category="PERSON")
+                for idx, node in enumerate(person_nodes):
+                    node_name = node.get("name")
+                    if not node_name:
+                        continue
+                    existing = db.query(ContactRecord).filter(ContactRecord.name == node_name).first()
+                    if not existing:
+                        phone = (node.get("phone") or "").strip()
+                        if not phone or db.query(ContactRecord).filter(ContactRecord.phone_number == phone).first():
+                            phone = f"554499{idx:04d}{hash(node_name) % 10000:04d}"
+                        c_rec = ContactRecord(
+                            id=str(uuid4()),
+                            name=node_name,
+                            phone_number=phone,
+                            role=node.get("role") or "UNKNOWN",
+                            company=node.get("company") or "",
+                            projects_json=[node.get("details")] if node.get("details") else [],
+                            notes=node.get("details") or "",
+                            created_at=datetime.now(timezone.utc),
+                            updated_at=datetime.now(timezone.utc),
+                        )
+                        db.add(c_rec)
+                        db.commit()
+            except Exception as e:
+                logger.warning(f"Aviso ao auto-sincronizar nós de pessoas do grafo: {e}")
+                db.rollback()
+
+            # 2. Busca contatos com filtros
             query = db.query(ContactRecord)
             if only_unknown:
                 query = query.filter(ContactRecord.role == "UNKNOWN")
@@ -80,7 +116,37 @@ class ContactService:
                 query = query.filter(ContactRecord.company.ilike(f"%{company}%"))
 
             records = query.order_by(ContactRecord.name.asc()).all()
-            return [record_to_response(r) for r in records]
+
+            # 3. Enriquece com as últimas 3 mensagens e sentimentos de cada pessoa
+            from src.memory.models import MessageRecord
+            responses = []
+            for r in records:
+                recent_msgs = (
+                    db.query(MessageRecord)
+                    .filter(
+                        (MessageRecord.speaker == r.name)
+                        | (MessageRecord.speaker == r.phone_number)
+                        | (MessageRecord.speaker.ilike(f"%{r.name}%"))
+                    )
+                    .order_by(MessageRecord.created_at.desc())
+                    .limit(3)
+                    .all()
+                )
+
+                recent_sentiments = [
+                    {
+                        "sentiment": m.sentiment or "NEUTRAL",
+                        "sentiment_score": m.sentiment_score or 0.0,
+                        "summary": m.summary or (m.revised_text[:60] if m.revised_text else ""),
+                        "created_at": m.created_at.strftime("%d/%m %H:%M") if m.created_at else "",
+                        "urgency": m.urgency or "MEDIUM",
+                    }
+                    for m in recent_msgs
+                ]
+                latest_sentiment = recent_sentiments[0]["sentiment"] if recent_sentiments else "NEUTRAL"
+                responses.append(record_to_response(r, latest_sentiment=latest_sentiment, recent_sentiments=recent_sentiments))
+
+            return responses
         finally:
             if should_close:
                 db.close()

@@ -38,6 +38,8 @@ class MessageRecord(Base):
     audio_filename = Column(String(255), nullable=True)
     intent = Column(String(50), default="NOTE", index=True)
     summary = Column(Text, nullable=True)
+    sentiment = Column(String(32), default="NEUTRAL", index=True)
+    sentiment_score = Column(Float, default=0.0)
     urgency = Column(String(20), default="MEDIUM")
     meta_info = Column(JSON, default=dict)
 

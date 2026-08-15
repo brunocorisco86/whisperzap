@@ -117,6 +117,8 @@ class ContactResponse(ContactBase):
 
     id: str
     effective_weight: float = Field(..., description="Peso final calculado para priorização")
+    latest_sentiment: Optional[str] = Field(default="NEUTRAL", description="Sentimento mais recente do contato")
+    recent_sentiments: list[dict] = Field(default_factory=list, description="Últimos sentimentos e resumos de mensagens")
     created_at: datetime
     updated_at: datetime
 
