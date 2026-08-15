@@ -54,6 +54,14 @@ class ExtractedEntity(BaseModel):
     details: Optional[str] = Field(default=None, description="Detalhes contextuais ou especificação")
 
 
+class ExtractedTriple(BaseModel):
+    """Tripla semântica de relacionamento (Sujeito, Predicado, Objeto)."""
+
+    source: str = Field(..., description="Entidade de origem (Sujeito)")
+    relation: str = Field(..., description="Relação semântica em maiúsculas (ex: SPOUSE_OF, MANAGES, RESPONSIBLE_FOR, BELONGS_TO, LOCATED_IN, DEPENDS_ON, HAS_PROBLEM)")
+    target: str = Field(..., description="Entidade de destino (Objeto)")
+
+
 class SemanticExtractionRequest(BaseModel):
     """Requisição para extração semântica de intenções e entidades."""
 
@@ -74,6 +82,7 @@ class SemanticExtractionResponse(BaseModel):
     sentiment_score: Optional[float] = Field(default=0.0, description="Score numérico de -1.0 a 1.0")
     tasks: list[ExtractedTask] = Field(default_factory=list, description="Lista de tarefas acionáveis extraídas")
     entities: list[ExtractedEntity] = Field(default_factory=list, description="Entidades nomeadas identificadas")
+    triples: list[ExtractedTriple] = Field(default_factory=list, description="Relacionamentos e triplas semânticas explícitas extraídas")
     decisions: list[str] = Field(default_factory=list, description="Decisões tomadas ou acordos firmados")
     ideas: list[str] = Field(default_factory=list, description="Ideias, insights ou sugestões")
     topics: list[str] = Field(default_factory=list, description="Tópicos e palavras-chave principais")

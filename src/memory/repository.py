@@ -162,13 +162,18 @@ class MemoryRepository:
             db.commit()
             db.refresh(message)
 
-            # 6. Atualiza o Grafo Relacional de Conhecimento
+            # 6. Atualiza o Grafo Relacional de Conhecimento e Triplas Semânticas
             knowledge_graph.add_interaction(
                 speaker=data.speaker,
                 entities=extracted_entities_dicts,
                 tasks=extracted_tasks_dicts,
                 intent=extracted.intent,
             )
+            if hasattr(extracted, "triples") and extracted.triples:
+                knowledge_graph.link_triples(
+                    triples=extracted.triples,
+                    speaker=data.speaker,
+                )
 
             return message
         except Exception as e:

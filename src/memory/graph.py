@@ -116,6 +116,45 @@ class KnowledgeGraph:
 
         self._save()
 
+    def resolve_canonical_node(self, name: str) -> str:
+        """Resolve o nome canônico de um nó no grafo por busca exata, aliases ou primeiro nome."""
+        name_clean = name.strip()
+        if not name_clean:
+            return ""
+        if self.graph.has_node(name_clean):
+            return name_clean
+
+        name_lower = name_clean.lower()
+        for n, attrs in self.graph.nodes(data=True):
+            if n.lower() == name_lower:
+                return n
+            aliases = [a.lower() for a in attrs.get("aliases", [])]
+            if name_lower in aliases:
+                return n
+            # Se for sobrenome ou primeiro nome correspondente a um nome completo (ex: "Varolo" -> "Fernando Varolo")
+            parts = n.lower().split()
+            if len(parts) > 1 and name_lower in parts:
+                return n
+
+        return name_clean
+
+    def link_triples(self, triples: list[Any], speaker: str | None = None) -> None:
+        """Processa e vincula triplas semânticas explícitas extraídas pela LLM com reforço de peso."""
+        for tr in triples:
+            src = getattr(tr, "source", None) or (tr.get("source") if isinstance(tr, dict) else None)
+            rel = getattr(tr, "relation", None) or (tr.get("relation") if isinstance(tr, dict) else "RELATED_TO")
+            tgt = getattr(tr, "target", None) or (tr.get("target") if isinstance(tr, dict) else None)
+
+            if not src or not tgt:
+                continue
+
+            src_canon = self.resolve_canonical_node(str(src))
+            tgt_canon = self.resolve_canonical_node(str(tgt))
+
+            self.add_edge(src_canon, tgt_canon, relation=str(rel).upper().replace(" ", "_"), weight=1.0)
+
+        self._save()
+
     def get_neighborhood(self, entity_name: str, depth: int = 1) -> dict[str, Any]:
         """Retorna subgrafo vizinho de uma entidade com suas conexões."""
         name_clean = entity_name.strip()

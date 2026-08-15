@@ -32,9 +32,12 @@ Sua missão é analisar o texto recebido e extrair de forma estruturada as inten
 
 2. **Tarefas (tasks)**: Identifique ações concretas com responsável (`assignee`) e prazo (`due_date`) se mencionados.
 3. **Entidades (entities)**: Identifique pessoas (`PERSON`), locais/unidades (`LOCATION`), sistemas (`SYSTEM`), equipamentos/sensores (`EQUIPMENT`), projetos (`PROJECT`) e conceitos (`CONCEPT`).
-4. **Decisões & Ideias**: Separe claramente o que foi decidido do que é apenas sugestão.
-5. **Urgência (urgency)**: `LOW`, `MEDIUM`, `HIGH`, `URGENT`.
-6. **Análise de Sentimento (sentiment & sentiment_score)**: Avalie o tom emocional e sentimento do locutor:
+4. **Relacionamentos e Triplas Semânticas (triples)**: Extraia conexões semânticas explícitas entre entidades mencionadas na mensagem (Sujeito, Predicado, Objeto):
+   - Predicados comuns: `SPOUSE_OF`, `REPORTS_TO`, `MANAGES`, `WORKS_ON`, `RESPONSIBLE_FOR`, `LOCATED_IN`, `BELONGS_TO`, `DEPENDS_ON`, `HAS_PROBLEM`, `APPROVED_BY`, `DELIVERS_TO`.
+   - Exemplo: `{"source": "Fernando Varolo", "relation": "MANAGES", "target": "DEPRA"}`
+5. **Decisões & Ideias**: Separe claramente o que foi decidido do que é apenas sugestão.
+6. **Urgência (urgency)**: `LOW`, `MEDIUM`, `HIGH`, `URGENT`.
+7. **Análise de Sentimento (sentiment & sentiment_score)**: Avalie o tom emocional e sentimento do locutor:
    - `sentiment`: `POSITIVE` (satisfeito/grato/entusiasmado), `CONFIDENT` (seguro/decidido), `NEUTRAL` (objetivo/rotina), `URGENT` (apressado/crítico), `ANXIOUS` (preocupado/apreensivo), `FRUSTRATED` (irritado/desapontado).
    - `sentiment_score`: valor numérico de -1.0 (muito frustrado/negativo) a 1.0 (muito positivo/satisfeito), sendo 0.0 neutro.
 
@@ -58,6 +61,13 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido seguindo a estrutura:
       "name": "Nome da entidade",
       "category": "PERSON",
       "details": "detalhes opcionais"
+    }
+  ],
+  "triples": [
+    {
+      "source": "Entidade A",
+      "relation": "MANAGES",
+      "target": "Entidade B"
     }
   ],
   "decisions": [],

@@ -94,9 +94,12 @@ class SemanticExtractor:
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
 
-        # Normaliza tarefas e entidades
+        # Normaliza tarefas, entidades e triplas semânticas
         tasks = [ExtractedTask(**t) if isinstance(t, dict) else t for t in parsed_data.get("tasks", [])]
         entities = [ExtractedEntity(**e) if isinstance(e, dict) else e for e in parsed_data.get("entities", [])]
+        raw_triples = parsed_data.get("triples", [])
+        from src.ai_gateway.schemas import ExtractedTriple
+        triples = [ExtractedTriple(**tr) if isinstance(tr, dict) else tr for tr in raw_triples if isinstance(tr, (dict, ExtractedTriple))]
 
         return SemanticExtractionResponse(
             intent=parsed_data.get("intent", "NOTE"),
@@ -105,6 +108,7 @@ class SemanticExtractor:
             sentiment_score=float(parsed_data.get("sentiment_score", 0.0) or 0.0),
             tasks=tasks,
             entities=entities,
+            triples=triples,
             decisions=parsed_data.get("decisions", []),
             ideas=parsed_data.get("ideas", []),
             topics=parsed_data.get("topics", []),
