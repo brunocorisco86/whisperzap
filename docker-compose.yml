@@ -36,6 +36,8 @@ services:
         condition: service_healthy
     env_file:
       - .env
+    ports:
+      - "${HERMES_PORT:-8005}:8000"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-hermes_admin}:${POSTGRES_PASSWORD:-hermes_secret_password}@hermes-db:5432/${POSTGRES_DB:-hermes_voice_memory}
       ENVIRONMENT: production
