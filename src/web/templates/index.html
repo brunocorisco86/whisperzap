@@ -9,6 +9,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛️</text></svg>">
+  <!-- Vis.js Network for Interactive Graph -->
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 </head>
 <body>
 
@@ -43,13 +45,22 @@
     <!-- Tab Navigation -->
     <nav class="tab-nav">
       <button class="tab-btn active" data-tab="tab-contacts">
-        👥 Contatos & Grafo Social (<span id="count-contacts">0</span>)
+        👥 Contatos (<span id="count-contacts">0</span>)
+      </button>
+      <button class="tab-btn" data-tab="tab-graph">
+        🕸️ Grafo Interativo NetworkX
+      </button>
+      <button class="tab-btn" data-tab="tab-tasks">
+        📋 Tarefas (<span id="count-tasks">0</span>)
+      </button>
+      <button class="tab-btn" data-tab="tab-messages">
+        🎙️ Áudios & Transcrições
       </button>
       <button class="tab-btn" data-tab="tab-dictionary">
-        📖 Dicionário Léxico & Fonemas (<span id="count-dict">0</span>)
+        📖 Dicionário Léxico (<span id="count-dict">0</span>)
       </button>
       <button class="tab-btn" data-tab="tab-query">
-        🧠 Testar Consulta Hermes RAG
+        🧠 Testador RAG
       </button>
       <button class="tab-btn" data-tab="tab-infra">
         ⚙️ Infra & Topologia
@@ -85,7 +96,79 @@
       </div>
     </section>
 
-    <!-- Tab 2: Lexical Dictionary -->
+    <!-- Tab 2: Interactive NetworkX Knowledge Graph -->
+    <section id="tab-graph" class="tab-content">
+      <div class="graph-toolbar">
+        <div class="graph-legend">
+          <span class="legend-item"><span class="legend-dot" style="background:#10b981"></span> Pessoas & Contatos</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#3b82f6"></span> Locais & Empresas</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#8b5cf6"></span> Projetos & Temas</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span> Sistemas (FAL, Agrocenter)</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#f97316"></span> Equipamentos (Silos)</span>
+        </div>
+        <div class="graph-controls">
+          <button class="btn btn-secondary btn-sm" id="btn-reset-graph">🎯 Centralizar Visão</button>
+          <button class="btn btn-secondary btn-sm" id="btn-reload-graph">🔄 Recarregar Grafo</button>
+        </div>
+      </div>
+
+      <div class="graph-wrapper">
+        <div id="graph-canvas" class="graph-canvas"></div>
+        
+        <!-- Node Detail Side Panel -->
+        <div class="node-detail-panel" id="node-detail-panel" style="display: none;">
+          <div class="node-detail-header">
+            <h3 id="node-detail-title">Nome do Nó</h3>
+            <button class="btn-close-sm" id="btn-close-node-detail">&times;</button>
+          </div>
+          <div class="node-detail-body" id="node-detail-body">
+            <!-- Node Attributes -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 3: Tasks & Action Items -->
+    <section id="tab-tasks" class="tab-content">
+      <div class="section-toolbar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="tasks-search" placeholder="Buscar tarefas...">
+        </div>
+        <div class="filter-group">
+          <select id="tasks-filter-status">
+            <option value="">Todos os Status</option>
+            <option value="PENDING">Pendentes (PENDING)</option>
+            <option value="DONE">Concluídas (DONE)</option>
+          </select>
+          <select id="tasks-filter-priority">
+            <option value="">Todas as Prioridades</option>
+            <option value="URGENT">Urgente (URGENT)</option>
+            <option value="HIGH">Alta (HIGH)</option>
+            <option value="MEDIUM">Média (MEDIUM)</option>
+            <option value="LOW">Baixa (LOW)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="tasks-list" id="tasks-container">
+        <!-- Rendered via JS -->
+      </div>
+    </section>
+
+    <!-- Tab 4: Messages & Voice Transcriptions -->
+    <section id="tab-messages" class="tab-content">
+      <div class="section-toolbar">
+        <h2>🎙️ Feed de Mensagens de Voz & Transcrições do James</h2>
+        <button class="btn btn-secondary btn-sm" id="btn-refresh-messages">🔄 Atualizar</button>
+      </div>
+
+      <div class="messages-feed" id="messages-container">
+        <!-- Rendered via JS -->
+      </div>
+    </section>
+
+    <!-- Tab 5: Lexical Dictionary -->
     <section id="tab-dictionary" class="tab-content">
       <div class="section-toolbar">
         <div class="search-box">
@@ -112,7 +195,7 @@
       </div>
     </section>
 
-    <!-- Tab 3: Live Query & Memory Test -->
+    <!-- Tab 6: Live Query & Memory Test -->
     <section id="tab-query" class="tab-content">
       <div class="card query-card">
         <div class="card-header">
@@ -121,7 +204,7 @@
         </div>
         
         <div class="query-input-group">
-          <input type="text" id="query-input" placeholder="Ex: Qual o telefone da Debora? Ou: Quais os pilares de entrega de ração?" autocomplete="off">
+          <input type="text" id="query-input" placeholder="Ex: Quem é minha esposa? Ou: Quais os pilares de entrega de ração?" autocomplete="off">
           <button class="btn btn-primary" id="btn-run-query">
             ⚡ Perguntar
           </button>
@@ -129,7 +212,8 @@
 
         <div class="quick-prompts">
           <span>Sugestões rápidas:</span>
-          <button class="btn-chip" onclick="setQuery('Qual o telefone e role da Debora Patel Conter?')">Debora Esposa</button>
+          <button class="btn-chip" onclick="setQuery('Quem é minha esposa?')">Quem é minha esposa?</button>
+          <button class="btn-chip" onclick="setQuery('Qual o telefone da Debora Patel Conter?')">Telefone da Debora</button>
           <button class="btn-chip" onclick="setQuery('Quais os dados do Roberto Diretor e João Silva na C.Vale?')">Roberto & João C.Vale</button>
           <button class="btn-chip" onclick="setQuery('Quais são os 3 pilares para resolver a entrega de ração?')">Logística de Ração</button>
           <button class="btn-chip" onclick="setQuery('O que é FAL e como funciona no lote avícola?')">FAL Zootecnia</button>
@@ -151,7 +235,7 @@
       </div>
     </section>
 
-    <!-- Tab 4: Infrastructure & Topology -->
+    <!-- Tab 7: Infrastructure & Topology -->
     <section id="tab-infra" class="tab-content">
       <div class="infra-grid">
         <div class="card stat-card">

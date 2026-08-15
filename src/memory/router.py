@@ -150,8 +150,89 @@ async def get_entity_neighborhood(name: str, depth: int = Query(default=1, ge=1,
     return result
 
 
+@router.get("/graph/full")
+async def get_full_graph():
+    """Retorna o grafo completo estruturado para renderização no frontend (vis-network / force-directed)."""
+    nodes = []
+    category_colors = {
+        "PERSON": {"background": "#10b981", "border": "#059669", "highlight": "#34d399"},
+        "LOCATION": {"background": "#3b82f6", "border": "#2563eb", "highlight": "#60a5fa"},
+        "PROJECT": {"background": "#8b5cf6", "border": "#7c3aed", "highlight": "#a78bfa"},
+        "SYSTEM": {"background": "#f59e0b", "border": "#d97706", "highlight": "#fbbf24"},
+        "EQUIPMENT": {"background": "#f97316", "border": "#ea580c", "highlight": "#fb923c"},
+        "CONCEPT": {"background": "#64748b", "border": "#475569", "highlight": "#94a3b8"},
+        "OTHER": {"background": "#64748b", "border": "#475569", "highlight": "#94a3b8"},
+    }
+
+    for n, attrs in knowledge_graph.graph.nodes(data=True):
+        cat = attrs.get("category", "OTHER").upper()
+        colors = category_colors.get(cat, category_colors["OTHER"])
+        mentions = attrs.get("mentions", 1)
+        size = 18 + min(mentions * 2, 32)
+
+        title_parts = [f"<b>{n}</b> ({cat})"]
+        if attrs.get("role"):
+            title_parts.append(f"Role: {attrs.get('role')}")
+        if attrs.get("phone"):
+            title_parts.append(f"Tel: {attrs.get('phone')}")
+        if attrs.get("company"):
+            title_parts.append(f"Empresa: {attrs.get('company')}")
+        if attrs.get("details"):
+            title_parts.append(f"Detalhes: {attrs.get('details')}")
+
+        nodes.append({
+            "id": n,
+            "label": n,
+            "category": cat,
+            "color": colors,
+            "size": size,
+            "title": "<br>".join(title_parts),
+            "attributes": attrs,
+        })
+
+    edges = []
+    for u, v, attrs in knowledge_graph.graph.edges(data=True):
+        rel = attrs.get("relation", "RELATED_TO")
+        weight = float(attrs.get("weight", 1.0))
+        edges.append({
+            "from": u,
+            "to": v,
+            "label": rel,
+            "arrows": "to",
+            "font": {"size": 9, "color": "#94a3b8", "strokeWidth": 2, "strokeColor": "#090d16"},
+            "color": {"color": "#334155", "highlight": "#10b981"},
+            "width": 1.0 + min(weight / 20.0, 3.0),
+        })
+
+    return {"nodes": nodes, "edges": edges, "stats": knowledge_graph.stats()}
+
+
+@router.get("/messages")
+async def list_recent_messages(limit: int = Query(default=20, le=100), db: Session = Depends(get_db)):
+    """Lista as mensagens e notas de áudio mais recentes processadas."""
+    from src.memory.models import MessageRecord
+
+    records = db.query(MessageRecord).order_by(MessageRecord.created_at.desc()).limit(limit).all()
+    return [
+        {
+            "id": r.id,
+            "speaker": r.speaker,
+            "intent": r.intent,
+            "urgency": r.urgency,
+            "summary": r.summary,
+            "revised_text": r.revised_text,
+            "raw_text": r.raw_text,
+            "created_at": r.created_at.strftime("%d/%m/%Y %H:%M") if r.created_at else None,
+            "tasks_count": len(r.tasks),
+            "entities_count": len(r.entities),
+        }
+        for r in records
+    ]
+
+
 @router.get("/stats", response_model=MemoryStats)
 async def get_memory_stats(db: Session = Depends(get_db)):
     """Retorna estatísticas globais da memória e grafo."""
     return memory_repository.get_stats(db=db)
+
 

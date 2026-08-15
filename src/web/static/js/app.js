@@ -5,18 +5,29 @@
 // State
 let allContacts = [];
 let allDictionaryTerms = [];
+let allTasks = [];
+let allMessages = [];
+let visNetworkInstance = null;
+let graphRawData = null;
 
 // DOM Elements
 const contactsContainer = document.getElementById('contacts-container');
 const dictionaryContainer = document.getElementById('dictionary-container');
+const tasksContainer = document.getElementById('tasks-container');
+const messagesContainer = document.getElementById('messages-container');
+
 const countContactsEl = document.getElementById('count-contacts');
 const countDictEl = document.getElementById('count-dict');
+const countTasksEl = document.getElementById('count-tasks');
 const statGraphNodesEl = document.getElementById('stat-graph-nodes');
 
 const contactSearchInput = document.getElementById('contact-search');
 const contactFilterRole = document.getElementById('contact-filter-role');
 const dictSearchInput = document.getElementById('dict-search');
 const dictFilterCategory = document.getElementById('dict-filter-category');
+const tasksSearchInput = document.getElementById('tasks-search');
+const tasksFilterStatus = document.getElementById('tasks-filter-status');
+const tasksFilterPriority = document.getElementById('tasks-filter-priority');
 
 // Modals
 const modalContact = document.getElementById('modal-contact');
@@ -44,6 +55,14 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     const targetId = btn.dataset.tab;
     const targetContent = document.getElementById(targetId);
     if (targetContent) targetContent.classList.add('active');
+
+    if (targetId === 'tab-graph') {
+      setTimeout(renderInteractiveGraph, 100);
+    } else if (targetId === 'tab-tasks') {
+      loadTasks();
+    } else if (targetId === 'tab-messages') {
+      loadMessages();
+    }
   });
 });
 
@@ -58,14 +77,43 @@ document.addEventListener('DOMContentLoaded', () => {
   contactFilterRole.addEventListener('change', renderContacts);
   dictSearchInput.addEventListener('input', renderDictionary);
   dictFilterCategory.addEventListener('change', renderDictionary);
+  
+  if (tasksSearchInput) tasksSearchInput.addEventListener('input', renderTasks);
+  if (tasksFilterStatus) tasksFilterStatus.addEventListener('change', renderTasks);
+  if (tasksFilterPriority) tasksFilterPriority.addEventListener('change', renderTasks);
 
   // Global Refresh
   document.getElementById('btn-refresh-all').addEventListener('click', () => {
     loadStats();
     loadContacts();
     loadDictionary();
+    loadTasks();
+    loadGraphData();
     showToast('Dados recarregados da VPS!');
   });
+
+  // Graph Controls
+  const btnResetGraph = document.getElementById('btn-reset-graph');
+  if (btnResetGraph) {
+    btnResetGraph.addEventListener('click', () => {
+      if (visNetworkInstance) visNetworkInstance.fit({ animation: { duration: 600 } });
+    });
+  }
+
+  const btnReloadGraph = document.getElementById('btn-reload-graph');
+  if (btnReloadGraph) {
+    btnReloadGraph.addEventListener('click', () => {
+      loadGraphData();
+      showToast('Grafo NetworkX recarregado!');
+    });
+  }
+
+  const btnCloseNodeDetail = document.getElementById('btn-close-node-detail');
+  if (btnCloseNodeDetail) {
+    btnCloseNodeDetail.addEventListener('click', () => {
+      document.getElementById('node-detail-panel').style.display = 'none';
+    });
+  }
 
   // Contact Modal Triggers
   document.getElementById('btn-open-new-contact').addEventListener('click', () => {
@@ -94,6 +142,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('query-input').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') runHermesQuery();
   });
+
+  // Carrega dados do grafo
+  loadGraphData();
 });
 
 // --- API Calls & Loading ---
@@ -117,7 +168,7 @@ async function loadContacts() {
       allContacts = await res.json();
     }
     
-    // Se a tabela SQL ainda não tiver os nós do grafo, busca do grafo
+    // Fallback se SQL vazio
     if (allContacts.length === 0) {
       const graphRes = await fetch('/api/v1/memory/graph/nodes?category=PERSON');
       if (graphRes.ok) {
@@ -153,6 +204,145 @@ async function loadDictionary() {
   } catch (err) {
     console.error('Erro ao carregar dicionário:', err);
   }
+}
+
+async function loadTasks() {
+  try {
+    const res = await fetch('/api/v1/memory/tasks');
+    if (res.ok) {
+      allTasks = await res.json();
+      if (countTasksEl) countTasksEl.textContent = allTasks.filter(t => t.status === 'PENDING').length;
+      renderTasks();
+    }
+  } catch (err) {
+    console.error('Erro ao carregar tarefas:', err);
+  }
+}
+
+async function loadMessages() {
+  try {
+    const res = await fetch('/api/v1/memory/messages');
+    if (res.ok) {
+      allMessages = await res.json();
+      renderMessages();
+    }
+  } catch (err) {
+    console.error('Erro ao carregar mensagens:', err);
+  }
+}
+
+async function loadGraphData() {
+  try {
+    const res = await fetch('/api/v1/memory/graph/full');
+    if (res.ok) {
+      graphRawData = await res.json();
+      if (document.getElementById('tab-graph').classList.contains('active')) {
+        renderInteractiveGraph();
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao carregar grafo completo:', err);
+  }
+}
+
+// --- Interactive Graph NetworkX Engine ---
+
+function renderInteractiveGraph() {
+  const container = document.getElementById('graph-canvas');
+  if (!container || !graphRawData || typeof vis === 'undefined') return;
+
+  const data = {
+    nodes: new vis.DataSet(graphRawData.nodes),
+    edges: new vis.DataSet(graphRawData.edges)
+  };
+
+  const options = {
+    nodes: {
+      shape: 'dot',
+      font: {
+        face: 'Inter',
+        color: '#f8fafc',
+        size: 13,
+        strokeWidth: 3,
+        strokeColor: '#090d16'
+      },
+      borderWidth: 2,
+      shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 8 }
+    },
+    edges: {
+      smooth: { type: 'continuous', roundness: 0.2 },
+      arrows: { to: { enabled: true, scaleFactor: 0.6 } }
+    },
+    physics: {
+      solver: 'forceAtlas2Based',
+      forceAtlas2Based: {
+        gravitationalConstant: -35,
+        centralGravity: 0.008,
+        springLength: 95,
+        springConstant: 0.18,
+        damping: 0.75
+      },
+      stabilization: { iterations: 120 }
+    },
+    interaction: {
+      hover: true,
+      tooltipDelay: 100,
+      zoomView: true,
+      dragView: true
+    }
+  };
+
+  if (visNetworkInstance) {
+    visNetworkInstance.destroy();
+  }
+
+  visNetworkInstance = new vis.Network(container, data, options);
+
+  visNetworkInstance.on('click', (params) => {
+    if (params.nodes.length > 0) {
+      const nodeId = params.nodes[0];
+      showNodeDetails(nodeId);
+    } else {
+      document.getElementById('node-detail-panel').style.display = 'none';
+    }
+  });
+}
+
+function showNodeDetails(nodeId) {
+  const node = graphRawData.nodes.find(n => n.id === nodeId);
+  if (!node) return;
+
+  const panel = document.getElementById('node-detail-panel');
+  const title = document.getElementById('node-detail-title');
+  const body = document.getElementById('node-detail-body');
+
+  title.textContent = node.label;
+  
+  const attrs = node.attributes || {};
+  const connectedEdges = graphRawData.edges.filter(e => e.from === nodeId || e.to === nodeId);
+
+  let connectionsHtml = connectedEdges.map(e => {
+    const isOut = e.from === nodeId;
+    const target = isOut ? e.to : e.from;
+    const arrow = isOut ? '➔' : '⬅';
+    return `<div style="font-size: 0.78rem; padding: 0.2rem 0;">${arrow} <b>${e.label}</b> ${target}</div>`;
+  }).join('');
+
+  body.innerHTML = `
+    <div><strong>Categoria:</strong> <span class="badge badge-executive">${node.category}</span></div>
+    ${attrs.role ? `<div><strong>Papel / Role:</strong> ${attrs.role}</div>` : ''}
+    ${attrs.phone ? `<div><strong>Telefone:</strong> <a href="https://wa.me/${attrs.phone.replace(/\D/g, '')}" target="_blank" class="contact-phone-link">📱 ${attrs.phone}</a></div>` : ''}
+    ${attrs.company ? `<div><strong>Empresa:</strong> ${attrs.company}</div>` : ''}
+    ${attrs.details ? `<div><strong>Detalhes:</strong> ${attrs.details}</div>` : ''}
+    <div style="margin-top: 0.5rem; border-top: 1px solid var(--border-subtle); padding-top: 0.5rem;">
+      <strong>Conexões no Grafo (${connectedEdges.length}):</strong>
+      <div style="max-height: 140px; overflow-y: auto; margin-top: 0.3rem;">
+        ${connectionsHtml || '<span class="text-muted">Sem conexões diretas</span>'}
+      </div>
+    </div>
+  `;
+
+  panel.style.display = 'block';
 }
 
 // --- Renderers ---
@@ -265,6 +455,80 @@ function renderContacts() {
       </div>
     `;
   }).join('');
+}
+
+function renderTasks() {
+  if (!tasksContainer) return;
+
+  const searchTerm = (tasksSearchInput ? tasksSearchInput.value : '').toLowerCase().trim();
+  const filterStatus = tasksFilterStatus ? tasksFilterStatus.value.toUpperCase() : '';
+  const filterPriority = tasksFilterPriority ? tasksFilterPriority.value.toUpperCase() : '';
+
+  const filtered = allTasks.filter(t => {
+    const matchSearch = (
+      t.title.toLowerCase().includes(searchTerm) ||
+      (t.assignee && t.assignee.toLowerCase().includes(searchTerm))
+    );
+    const matchStatus = !filterStatus || t.status === filterStatus;
+    const matchPriority = !filterPriority || t.priority === filterPriority;
+    return matchSearch && matchStatus && matchPriority;
+  });
+
+  if (filtered.length === 0) {
+    tasksContainer.innerHTML = `
+      <div class="empty-state" style="text-align: center; padding: 3rem; color: var(--text-muted);">
+        <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">Nenhuma tarefa encontrada</p>
+      </div>
+    `;
+    return;
+  }
+
+  tasksContainer.innerHTML = filtered.map(t => {
+    const isDone = t.status === 'DONE';
+    const priorityColor = t.priority === 'URGENT' ? '#ef4444' : t.priority === 'HIGH' ? '#f59e0b' : '#10b981';
+
+    return `
+      <div class="task-card ${isDone ? 'task-done' : ''}">
+        <div class="task-info">
+          <div class="task-title">${t.title}</div>
+          <div class="task-meta">
+            <span class="badge" style="background: rgba(255,255,255,0.08); color: ${priorityColor};">${t.priority}</span>
+            ${t.assignee ? `<span>👤 ${t.assignee}</span>` : ''}
+            ${t.due_date ? `<span>📅 ${t.due_date}</span>` : ''}
+          </div>
+        </div>
+        <div>
+          <button class="btn btn-secondary btn-sm" onclick="toggleTaskStatus('${t.id}', '${isDone ? 'PENDING' : 'DONE'}')">
+            ${isDone ? '🔄 Reabrir' : '✅ Concluir'}
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderMessages() {
+  if (!messagesContainer) return;
+
+  if (allMessages.length === 0) {
+    messagesContainer.innerHTML = `
+      <div class="empty-state" style="text-align: center; padding: 3rem; color: var(--text-muted);">
+        <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">Nenhuma mensagem de áudio processada ainda</p>
+      </div>
+    `;
+    return;
+  }
+
+  messagesContainer.innerHTML = allMessages.map(m => `
+    <div class="message-item">
+      <div class="message-header">
+        <span class="message-speaker">${m.speaker || 'Usuário'}</span>
+        <span>${m.created_at || ''}</span>
+      </div>
+      <div class="message-text">"${m.revised_text || m.raw_text}"</div>
+      ${m.summary ? `<div class="message-summary">💡 ${m.summary}</div>` : ''}
+    </div>
+  `).join('');
 }
 
 function renderDictionary() {
@@ -381,6 +645,7 @@ async function handleSaveContact(e) {
       modalContact.classList.remove('active');
       loadContacts();
       loadStats();
+      loadGraphData();
     } else {
       showToast('Erro ao salvar contato na VPS', true);
     }
@@ -419,6 +684,7 @@ async function deleteContact(idOrName) {
       showToast(`Contato removido da VPS!`);
       loadContacts();
       loadStats();
+      loadGraphData();
     } else {
       showToast('Erro ao excluir contato', true);
     }
@@ -484,6 +750,24 @@ async function deleteTerm(idOrTerm) {
     }
   } catch (err) {
     console.error('Erro:', err);
+  }
+}
+
+// --- Task Actions ---
+
+async function toggleTaskStatus(taskId, newStatus) {
+  try {
+    const res = await fetch(`/api/v1/memory/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus })
+    });
+    if (res.ok) {
+      showToast(`Status da tarefa atualizado para ${newStatus}!`);
+      loadTasks();
+    }
+  } catch (err) {
+    console.error('Erro ao atualizar tarefa:', err);
   }
 }
 
