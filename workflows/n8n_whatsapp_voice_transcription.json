@@ -10,7 +10,7 @@
       "name": "Webhook WhatsApp (Evolution API / Z-API)",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
-      "position": [180, 300],
+      "position": [200, 300],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000001"
     },
     {
@@ -28,7 +28,7 @@
       "name": "Filtro: É Mensagem de Áudio?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [400, 300],
+      "position": [420, 300],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000002"
     },
     {
@@ -52,7 +52,7 @@
       "name": "Baixar Base64 (Evolution API)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [620, 200],
+      "position": [640, 200],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000006"
     },
     {
@@ -67,7 +67,7 @@
       "name": "Speech-to-Text (POST /transcribe)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [840, 200],
+      "position": [860, 200],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000003"
     },
     {
@@ -82,23 +82,8 @@
       "name": "AI Gateway (POST /ai/revise)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [1060, 200],
+      "position": [1080, 200],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000004"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $env.HERMES_API_URL || 'http://host.docker.internal:8000' }}/api/v1/memory/messages",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"speaker\": \"{{ $('Webhook WhatsApp (Evolution API / Z-API)').item.json.body?.data?.pushName || $('Webhook WhatsApp (Evolution API / Z-API)').item.json.body?.data?.key?.remoteJid || 'user' }}\",\n  \"raw_text\": \"{{ $('Speech-to-Text (POST /transcribe)').item.json.text }}\",\n  \"revised_text\": \"{{ $json.text_revised }}\",\n  \"audio_duration_s\": {{ $('Speech-to-Text (POST /transcribe)').item.json.duration || 0 }},\n  \"meta_info\": {\n    \"remoteJid\": \"{{ $('Webhook WhatsApp (Evolution API / Z-API)').item.json.body?.data?.key?.remoteJid }}\",\n    \"message_id\": \"{{ $('Webhook WhatsApp (Evolution API / Z-API)').item.json.body?.data?.key?.id }}\"\n  }\n}",
-        "options": {}
-      },
-      "name": "Gravar na Memória Hermes (POST /memory)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.1,
-      "position": [1280, 100],
-      "id": "1e112d7c-a7a2-4bb0-80a1-000000000007"
     },
     {
       "parameters": {
@@ -121,7 +106,7 @@
       "name": "Envia Texto Revisado (WhatsApp)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [1280, 300],
+      "position": [1300, 200],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000005"
     }
   ],
@@ -173,11 +158,6 @@
     "AI Gateway (POST /ai/revise)": {
       "main": [
         [
-          {
-            "node": "Gravar na Memória Hermes (POST /memory)",
-            "type": "main",
-            "index": 0
-          },
           {
             "node": "Envia Texto Revisado (WhatsApp)",
             "type": "main",
