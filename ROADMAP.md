@@ -127,7 +127,7 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [CONCLUÍDO]
 ## 🚀 Trilha Prática de Go-Live & Ativação Operacional Passo a Passo
 
 ### 📍 Etapa 1: Validação Local Interativa (Agora no seu PC)
-- [ ] **1.1** Iniciar o servidor da API localmente (`uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload`).
+- [x] **1.1** Iniciar o servidor da API localmente (`uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload`).
 - [ ] **1.2** Abrir o Swagger UI no navegador em `http://localhost:8000/docs`.
 - [ ] **1.3** Testar o endpoint `POST /transcribe` enviando um arquivo de áudio real de `assets/AudioSample/`.
 - [ ] **1.4** Testar `POST /api/v1/memory/messages` enviando uma instrução de voz simulada.
