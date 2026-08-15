@@ -18,7 +18,7 @@
         "conditions": {
           "string": [
             {
-              "value1": "={{ $json.body?.messageType || $json.body?.data?.messageType || $json.body?.type || '' }}",
+              "value1": "={{ $json.body?.data?.messageType || $json.body?.messageType || $json.body?.data?.message?.audioMessage ? 'audioMessage' : '' }}",
               "operation": "contains",
               "value2": "audio"
             }
@@ -34,9 +34,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.HERMES_API_URL || 'http://localhost:8000' }}/transcribe",
-        "sendBinaryData": true,
-        "binaryPropertyName": "data",
+        "url": "={{ $env.HERMES_API_URL || 'http://host.docker.internal:8000' }}/transcribe/base64",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"base64\": \"{{ $json.body?.data?.message?.base64 || $json.body?.data?.base64 || $json.body?.base64 || '' }}\",\n  \"language\": \"pt\"\n}",
         "options": {}
       },
       "name": "Speech-to-Text (POST /transcribe)",
@@ -48,20 +49,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.HERMES_API_URL || 'http://localhost:8000' }}/ai/revise",
+        "url": "={{ $env.HERMES_API_URL || 'http://host.docker.internal:8000' }}/ai/revise",
         "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "text",
-              "value": "={{ $json.text }}"
-            },
-            {
-              "name": "context",
-              "value": "Mensagem de voz via WhatsApp do usuário."
-            }
-          ]
-        },
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": \"{{ $json.text }}\",\n  \"context\": \"Mensagem de voz via WhatsApp do usuário.\"\n}",
         "options": {}
       },
       "name": "AI Gateway (POST /ai/revise)",
@@ -73,29 +64,19 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.WHATSAPP_API_ENDPOINT || 'http://localhost:8080/message/sendText/default' }}",
+        "url": "={{ $env.WHATSAPP_API_ENDPOINT || 'http://evolution-api:8080/message/sendText/hermes' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $env.WHATSAPP_API_TOKEN }}"
+              "value": "={{ $env.WHATSAPP_API_TOKEN || 'seu_token_whatsapp_aqui' }}"
             }
           ]
         },
         "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "number",
-              "value": "={{ $('Webhook WhatsApp (Evolution API / Z-API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API / Z-API)').item.json.body?.sender?.phone || '' }}"
-            },
-            {
-              "name": "text",
-              "value": "={{ $json.text_revised }}"
-            }
-          ]
-        },
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $('Webhook WhatsApp (Evolution API / Z-API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API / Z-API)').item.json.body?.sender?.phone }}\",\n  \"text\": \"{{ $json.text_revised }}\"\n}",
         "options": {}
       },
       "name": "Envia Texto Revisado (WhatsApp)",

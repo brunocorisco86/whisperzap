@@ -26,3 +26,12 @@ class TranscriptionResponse(BaseModel):
         description="Segmentos detalhados de áudio com timestamps",
     )
     processing_time_ms: float = Field(..., description="Tempo de processamento em milissegundos")
+
+
+class TranscriptionBase64Request(BaseModel):
+    """Requisição de transcrição com áudio em base64 (Ideal para Webhooks n8n e WhatsApp)."""
+
+    base64: str = Field(..., description="Conteúdo do arquivo de áudio codificado em base64")
+    language: Optional[str] = Field(default="pt", description="Código do idioma (ex: pt, en)")
+    audio_id: Optional[str] = Field(default=None, description="Identificador único opcional")
+
