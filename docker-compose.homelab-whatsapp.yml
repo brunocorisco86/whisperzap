@@ -5,7 +5,7 @@ services:
   # Evolution API v2 (Conector Oficial WhatsApp via QR Code)
   # ==============================================================================
   evolution-api:
-    image: atendai/evolution-api:v2.1.2
+    image: evoapicloud/evolution-api:latest
     container_name: hermes-evolution-api
     restart: unless-stopped
     ports:
@@ -45,7 +45,7 @@ services:
   # n8n (Motor Visual de Automação & Workflows)
   # ==============================================================================
   n8n:
-    image: docker.n8n.io/n8nio/n8n:latest
+    image: n8nio/n8n:latest
     container_name: hermes-n8n
     restart: unless-stopped
     ports:
