@@ -150,9 +150,14 @@
       "fau",
       "fao",
       "fal",
+      "falo",
+      "Falo",
       "folha de lote",
+      "folha do lote",
       "ficha de lote",
-      "ficha de acompanhamento"
+      "ficha do lote",
+      "ficha de acompanhamento",
+      "ficha de acompanhamento de lote"
     ],
     "expansion": "Ficha de Acompanhamento de Lote",
     "category": "ZOOTECNIA",

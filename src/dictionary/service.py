@@ -79,7 +79,7 @@ DEFAULT_TERMS = [
     },
     {
         "term": "FAL",
-        "phonetic_variations": ["FAU", "fau", "fao", "fal", "folha de lote", "ficha de lote", "ficha de acompanhamento"],
+        "phonetic_variations": ["FAU", "fau", "fao", "fal", "falo", "Falo", "folha de lote", "folha do lote", "ficha de lote", "ficha do lote", "ficha de acompanhamento", "ficha de acompanhamento de lote"],
         "expansion": "Ficha de Acompanhamento de Lote",
         "category": "ZOOTECNIA",
         "description": "Documento e registro diário com mortalidade, consumo de ração e peso das aves.",
