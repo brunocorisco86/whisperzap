@@ -47,15 +47,6 @@
       "id": "Expansão"
     },
     {
-      "category": "PERSON",
-      "mentions": 26,
-      "role": "FAMILY_CORE",
-      "phone": "44988881111",
-      "company": null,
-      "weight": 0.95,
-      "id": "Maria Esposa"
-    },
-    {
       "category": "PROJECT",
       "mentions": 32,
       "id": "Pessoal"
@@ -184,15 +175,6 @@
       "id": "Automação e Sensores"
     },
     {
-      "category": "PERSON",
-      "mentions": 6,
-      "role": "FAMILY_CORE",
-      "phone": "5544999990003",
-      "company": "Família",
-      "weight": 0.95,
-      "id": "Paula Esposa"
-    },
-    {
       "category": "LOCATION",
       "mentions": 6,
       "id": "Família"
@@ -212,6 +194,16 @@
       "mentions": 1,
       "details": "Sensores de monitoramento de nível de ração",
       "id": "Sensores de Silos"
+    },
+    {
+      "category": "PERSON",
+      "mentions": 50,
+      "role": "FAMILY_CORE",
+      "phone": "(44) 99921-4934",
+      "details": "Esposa do Bruno",
+      "company": "Família",
+      "weight": 1.0,
+      "id": "Debora Patel Conter"
     }
   ],
   "links": [
@@ -286,12 +278,6 @@
       "weight": 51.0,
       "source": "Diretor Geral",
       "target": "Expansão"
-    },
-    {
-      "relation": "WORKS_ON",
-      "weight": 26.0,
-      "source": "Maria Esposa",
-      "target": "Pessoal"
     },
     {
       "relation": "AFFILIATED_AS_COLLEAGUE",
@@ -444,18 +430,6 @@
       "target": "Expansão"
     },
     {
-      "relation": "AFFILIATED_AS_FAMILY_CORE",
-      "weight": 6.0,
-      "source": "Paula Esposa",
-      "target": "Família"
-    },
-    {
-      "relation": "WORKS_ON",
-      "weight": 6.0,
-      "source": "Paula Esposa",
-      "target": "Pessoal"
-    },
-    {
       "relation": "MENTIONED",
       "weight": 6.0,
       "source": "5544999990001",
@@ -496,6 +470,24 @@
       "weight": 6.0,
       "source": "5544999990002",
       "target": "FAL"
+    },
+    {
+      "relation": "SPOUSE_OF",
+      "weight": 50.0,
+      "source": "Bruno",
+      "target": "Debora Patel Conter"
+    },
+    {
+      "relation": "AFFILIATED_AS_FAMILY_CORE",
+      "weight": 50.0,
+      "source": "Debora Patel Conter",
+      "target": "Família"
+    },
+    {
+      "relation": "WORKS_ON",
+      "weight": 50.0,
+      "source": "Debora Patel Conter",
+      "target": "Pessoal"
     }
   ]
 }
