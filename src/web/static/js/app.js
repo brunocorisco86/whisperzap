@@ -146,6 +146,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // RAG Query Testing Listeners
+  const btnRunQuery = document.getElementById('btn-run-query');
+  if (btnRunQuery) {
+    btnRunQuery.addEventListener('click', runHermesQuery);
+  }
+
+  const queryInput = document.getElementById('query-input');
+  if (queryInput) {
+    queryInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        runHermesQuery();
+      }
+    });
+  }
+
   // Contact Modal Triggers
   document.getElementById('btn-open-new-contact').addEventListener('click', () => {
     document.getElementById('modal-contact-title').textContent = 'Novo Contato';
@@ -1373,13 +1389,37 @@ window.saveTaskNotes = saveTaskNotes;
 // --- Live Hermes Query Testing ---
 
 function setQuery(text) {
-  document.getElementById('query-input').value = text;
-  runHermesQuery();
+  const input = document.getElementById('query-input');
+  if (input) {
+    input.value = text;
+    runHermesQuery();
+  }
+}
+window.setQuery = setQuery;
+
+function formatQueryAnswerMarkdown(text) {
+  if (!text) return '';
+  let formatted = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // Negrito **texto**
+  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  // Itálico *texto*
+  formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  // Itens de lista
+  formatted = formatted.replace(/^\s*-\s+(.*)$/gm, '• $1');
+  // Quebras de linha
+  formatted = formatted.replace(/\n/g, '<br>');
+
+  return formatted;
 }
 
 async function runHermesQuery() {
   const queryInput = document.getElementById('query-input');
-  const query = queryInput.value.trim();
+  const btnRunQuery = document.getElementById('btn-run-query');
+  const query = queryInput ? queryInput.value.trim() : '';
   if (!query) return;
 
   const resultBox = document.getElementById('query-result-box');
@@ -1387,10 +1427,15 @@ async function runHermesQuery() {
   const metaEl = document.getElementById('query-meta');
   const timeEl = document.getElementById('query-time');
 
-  resultBox.style.display = 'block';
-  answerEl.textContent = 'Processando com Gemini 3.1 Flash Lite + RAG Híbrido...';
-  timeEl.textContent = 'Consultando...';
-  metaEl.innerHTML = '';
+  if (btnRunQuery) {
+    btnRunQuery.disabled = true;
+    btnRunQuery.textContent = '⚡ Consultando...';
+  }
+
+  if (resultBox) resultBox.style.display = 'block';
+  if (answerEl) answerEl.innerHTML = '<div style="color: #38bdf8;">🧠 Processando com Gemini 3.1 Flash Lite + RAG Híbrido...</div>';
+  if (timeEl) timeEl.textContent = 'Consultando...';
+  if (metaEl) metaEl.innerHTML = '';
 
   const startTime = performance.now();
 
@@ -1402,24 +1447,34 @@ async function runHermesQuery() {
     });
 
     const elapsed = Math.round(performance.now() - startTime);
-    timeEl.textContent = `${elapsed}ms`;
+    if (timeEl) timeEl.textContent = `${elapsed}ms`;
 
     if (res.ok) {
       const data = await res.json();
-      answerEl.textContent = data.answer || 'Sem resposta gerada.';
+      if (answerEl) {
+        answerEl.innerHTML = formatQueryAnswerMarkdown(data.answer) || 'Sem resposta gerada.';
+      }
 
-      const mentions = (data.entities_mentioned || []).join(', ');
-      metaEl.innerHTML = `
-        <div><strong>Entidades do Grafo Mencionadas:</strong> ${mentions || 'Nenhuma'}</div>
-        <div><strong>Fontes Citadas:</strong> ${data.sources ? data.sources.length : 0} memórias de áudio</div>
-      `;
+      const mentions = (data.entities_mentioned || []).map(e => `<span class="message-chip" style="margin-right: 4px;">🏷️ ${e}</span>`).join('');
+      if (metaEl) {
+        metaEl.innerHTML = `
+          <div style="margin-bottom: 0.4rem;"><strong>Entidades do Grafo Mencionadas:</strong> ${mentions || '<span style="color:var(--text-muted)">Nenhuma</span>'}</div>
+          <div><strong>Fontes Citadas:</strong> ${data.sources ? data.sources.length : 0} memórias registradas</div>
+        `;
+      }
     } else {
-      answerEl.textContent = 'Erro ao consultar a API do Hermes.';
+      if (answerEl) answerEl.innerHTML = '<span style="color: #ef4444;">❌ Erro ao consultar a API do Hermes.</span>';
     }
   } catch (err) {
-    answerEl.textContent = `Erro de conexão: ${err.message}`;
+    if (answerEl) answerEl.innerHTML = `<span style="color: #ef4444;">❌ Erro de conexão: ${err.message}</span>`;
+  } finally {
+    if (btnRunQuery) {
+      btnRunQuery.disabled = false;
+      btnRunQuery.textContent = '⚡ Perguntar';
+    }
   }
 }
+window.runHermesQuery = runHermesQuery;
 
 // --- Subsistema de Sentimentos & Série Temporal ---
 

@@ -30,8 +30,8 @@
     },
     {
       "category": "LOCATION",
-      "mentions": 551,
-      "details": "Cooperativa",
+      "mentions": 552,
+      "details": "Cooperativa Agroindustrial",
       "id": "C.Vale"
     },
     {
@@ -223,7 +223,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 46,
+      "mentions": 49,
       "role": "UNKNOWN",
       "phone": "",
       "company": "",
@@ -357,7 +357,7 @@
     },
     {
       "relation": "CO_OCCURRED",
-      "weight": 14.0,
+      "weight": 15.0,
       "source": "C.Vale",
       "target": "Carlos Gestor"
     },
@@ -620,8 +620,8 @@
       "target": "Sanidade"
     },
     {
-      "relation": "ASSIGNED_WITH",
-      "weight": 36.0,
+      "relation": "MENTIONED",
+      "weight": 37.0,
       "source": "Carlos Gestor",
       "target": "C.Vale"
     },
@@ -633,7 +633,7 @@
     },
     {
       "relation": "RESPONSIBLE_FOR",
-      "weight": 9.0,
+      "weight": 10.0,
       "source": "Carlos Gestor",
       "target": "relatório de ração"
     },
