@@ -185,6 +185,18 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
   - Atualização do `ROADMAP.md` marcando **100% das 6 Fases do projeto concluídas**.
 - **Resultado**: Fase 6 e todo o ciclo de desenvolvimento do Hermes Voice Memory concluídos com excelência.
 
+### Sessão 009 — Auditoria Geral do Agente de QA & Playbook Prático de Go-Live
+- **Data**: 2026-08-14
+- **Objetivo**: Criar o subagente especialista em QA (`qa-specialist`), realizar a auditoria completa de ponta a ponta com áudios reais de WhatsApp contra todos os endpoints da arquitetura, e elaborar o Playbook Prático de Go-Live ("Como Começar a Usar").
+- **Ações Realizadas**:
+  - Definição do subagente `qa-specialist`.
+  - Implementação do script executivo de auditoria [`scripts/qa_full_suite_runner.py`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/scripts/qa_full_suite_runner.py).
+  - Execução ao vivo do pipeline completo com 15 etapas de validação (Whisper STT com arquivos reais da pasta `assets/AudioSample/`, Dicionário Léxico C.Vale, Contatos e Roles, Grafo NetworkX, RAG Híbrido com citação de fontes, Resumo Diário WhatsApp e Relatório Semanal).
+  - Geração do relatório executivo [`test_results/qa_live_audit_report.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/test_results/qa_live_audit_report.md) com 100% de aprovação (`15/15` módulos operacionais).
+  - Elaboração do Playbook Prático de Go-Live em [`docs/go_live_playbook.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/go_live_playbook.md) com orientações passo a passo para teste imediato via Swagger UI (`/docs`), integração com WhatsApp/n8n e deploy final na VPS Alpine Linux via Tailscale.
+- **Resultado**: Sistema 100% auditado, comprovado operacionalmente e pronto para uso diário.
+
+
 
 
 
