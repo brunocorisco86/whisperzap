@@ -71,11 +71,18 @@ class SemanticExtractionRequest(BaseModel):
     include_dictionary: bool = Field(default=True, description="Se deve injetar o glossário léxico de domínio no prompt")
 
 
+class UnclearTerm(BaseModel):
+    raw_snippet: str = Field(..., description="Termo ou trecho do áudio com dúvida fonética")
+    suggested_meaning: Optional[str] = Field(default=None, description="Termo ou significado provável")
+    category: str = Field(default="GERAL", description="Categoria temática provável")
+    reason: Optional[str] = Field(default=None, description="Motivo da dúvida ou dificuldade de adaptação")
+
+
 class SemanticExtractionResponse(BaseModel):
     """Resposta estruturada da extração semântica."""
 
     intent: Literal["TASK", "IDEA", "DECISION", "EVENT", "PROBLEM", "NOTE", "QUESTION"] = Field(
-        ..., description="Intenção primária da mensagem"
+        ..., description="Intenção principal da mensagem"
     )
     summary: str = Field(..., description="Resumo em 1 frase do conteúdo principal")
     sentiment: Optional[str] = Field(default="NEUTRAL", description="Sentimento/tom emocional do locutor (POSITIVE, NEUTRAL, URGENT, ANXIOUS, FRUSTRATED, CONFIDENT)")
@@ -83,6 +90,7 @@ class SemanticExtractionResponse(BaseModel):
     tasks: list[ExtractedTask] = Field(default_factory=list, description="Lista de tarefas acionáveis extraídas")
     entities: list[ExtractedEntity] = Field(default_factory=list, description="Entidades nomeadas identificadas")
     triples: list[ExtractedTriple] = Field(default_factory=list, description="Relacionamentos e triplas semânticas explícitas extraídas")
+    unclear_terms: list[UnclearTerm] = Field(default_factory=list, description="Termos ambíguos para o buffer de aprendizado léxico ativo")
     decisions: list[str] = Field(default_factory=list, description="Decisões tomadas ou acordos firmados")
     ideas: list[str] = Field(default_factory=list, description="Ideias, insights ou sugestões")
     topics: list[str] = Field(default_factory=list, description="Tópicos e palavras-chave principais")

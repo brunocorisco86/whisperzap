@@ -118,6 +118,25 @@ class DailySentimentSnapshotRecord(Base):
     created_at = Column(DateTime, default=utc_now)
 
 
+class LexicalCandidateRecord(Base):
+    """Tabela de termos não compreendidos ou com alto esforço de adaptação (Buffer de Aprendizado Ativo)."""
+
+    __tablename__ = "lexical_candidates"
+
+    id = Column(String(36), primary_key=True)
+    raw_term = Column(String(150), nullable=False, index=True)
+    suggested_term = Column(String(150), nullable=True)
+    context = Column(Text, nullable=True)
+    speaker = Column(String(100), nullable=True)
+    category = Column(String(50), default="GERAL")
+    reason = Column(String(255), nullable=True)
+    status = Column(String(20), default="PENDING", index=True)  # PENDING, HARVESTED, REJECTED
+    occurrence_count = Column(Integer, default=1)
+    resolution_notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+
 # ===================== Schemas Pydantic da API =====================
 
 
@@ -224,3 +243,29 @@ class MemoryStats(BaseModel):
     total_entities: int
     graph_nodes: int
     graph_edges: int
+
+
+class LexicalCandidateResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    raw_term: str
+    suggested_term: Optional[str] = None
+    context: Optional[str] = None
+    speaker: Optional[str] = None
+    category: str = "GERAL"
+    reason: Optional[str] = None
+    status: str = "PENDING"
+    occurrence_count: int = 1
+    resolution_notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class LexicalHarvestResult(BaseModel):
+    harvested_at: datetime
+    total_candidates_analyzed: int
+    promoted_terms_count: int
+    rejected_terms_count: int
+    promoted_terms: list[str] = []
+    details: list[dict] = []

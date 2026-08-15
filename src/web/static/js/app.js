@@ -180,6 +180,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Harvest Trigger Listener
+  const btnTriggerHarvest = document.getElementById('btn-trigger-harvest');
+  if (btnTriggerHarvest) {
+    btnTriggerHarvest.addEventListener('click', triggerHarvest);
+  }
+
   // Carrega dados do grafo
   loadGraphData();
 });
@@ -238,6 +244,7 @@ async function loadDictionary() {
       countDictEl.textContent = allDictionaryTerms.length;
       renderDictionary();
     }
+    await loadCandidates();
   } catch (err) {
     console.error('Erro ao carregar dicionário:', err);
   }
@@ -675,6 +682,127 @@ function renderDictionary() {
       </div>
     `;
   }).join('');
+}
+
+let allLexicalCandidates = [];
+
+async function loadCandidates() {
+  try {
+    const res = await fetch('/api/v1/dictionary/candidates?status=PENDING');
+    if (res.ok) {
+      allLexicalCandidates = await res.json();
+      renderCandidates();
+    }
+  } catch (err) {
+    console.error('Erro ao carregar candidatos léxicos:', err);
+  }
+}
+
+function renderCandidates() {
+  const container = document.getElementById('candidates-container');
+  const badge = document.getElementById('candidates-count-badge');
+  if (!container) return;
+
+  if (badge) {
+    badge.textContent = `${allLexicalCandidates.length} pendente(s)`;
+    badge.className = allLexicalCandidates.length > 0 ? 'badge badge-warning' : 'badge badge-success';
+  }
+
+  if (allLexicalCandidates.length === 0) {
+    container.innerHTML = `
+      <div style="width: 100%; color: var(--text-muted); font-size: 0.85rem; padding: 0.5rem 0;">
+        ✨ Nenhum termo ambíguo pendente no buffer! A IA compreendeu todos os áudios recentes com clareza.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = allLexicalCandidates.map(c => `
+    <div style="background: rgba(255,255,255,0.03); border: 1px dashed var(--border-color); border-radius: 8px; padding: 0.75rem 1rem; flex: 1 1 calc(33.333% - 0.75rem); min-width: 250px; display: flex; flex-direction: column; justify-content: space-between; gap: 0.5rem;">
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong style="color: var(--accent-color); font-size: 0.95rem;">"${c.raw_term}"</strong>
+          <span class="badge" style="font-size: 0.7rem; background: rgba(245, 158, 11, 0.15); color: #f59e0b;">
+            ${c.occurrence_count || 1}x ouvido
+          </span>
+        </div>
+        ${c.suggested_term ? `<div style="font-size: 0.8rem; color: var(--text-main); margin-top: 0.2rem;">💡 Sugestão: <b>${c.suggested_term}</b></div>` : ''}
+        ${c.context ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem; font-style: italic;">"${c.context.substring(0, 80)}..."</div>` : ''}
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 0.4rem; margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.05);">
+        <button class="btn btn-primary btn-sm" onclick="promoteCandidate('${c.id}', '${c.suggested_term || c.raw_term}', '${c.category || 'GERAL'}')" title="Promover imediatamente para o Dicionário Oficial">
+          ✅ Promover
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="rejectCandidate('${c.id}')" title="Descartar este ruído">
+          🗑️
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function triggerHarvest() {
+  const btn = document.getElementById('btn-trigger-harvest');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Pescando...';
+  }
+
+  try {
+    const res = await fetch('/api/v1/dictionary/harvest', { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.promoted_terms_count > 0) {
+        showToast(`🎣 Harvester finalizado! ${data.promoted_terms_count} novo(s) termo(s) incorporados ao Dicionário: ${data.promoted_terms.join(', ')}`);
+      } else {
+        showToast(`🎣 Harvester analisou ${data.total_candidates_analyzed} termos. Nenhum novo jargão pendente para promoção.`);
+      }
+      loadDictionary();
+      loadCandidates();
+    } else {
+      showToast('Erro ao rodar Harvester', true);
+    }
+  } catch (err) {
+    console.error('Erro no Harvester:', err);
+    showToast('Erro ao comunicar com o Harvester', true);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🎣 Rodar Pesca (19h)';
+    }
+  }
+}
+
+async function promoteCandidate(candidateId, defaultTerm, category) {
+  const termName = prompt('Confirme ou edite o termo canônico oficial:', defaultTerm || '');
+  if (!termName) return;
+
+  try {
+    const res = await fetch(`/api/v1/dictionary/candidates/${candidateId}/promote?term_override=${encodeURIComponent(termName)}&category=${encodeURIComponent(category || 'GERAL')}`, {
+      method: 'PATCH'
+    });
+    if (res.ok) {
+      showToast(`Termo "${termName}" promovido com sucesso para o Dicionário Oficial!`);
+      loadDictionary();
+      loadCandidates();
+    } else {
+      showToast('Erro ao promover termo', true);
+    }
+  } catch (err) {
+    console.error('Erro:', err);
+  }
+}
+
+async function rejectCandidate(candidateId) {
+  try {
+    const res = await fetch(`/api/v1/dictionary/candidates/${candidateId}`, { method: 'DELETE' });
+    if (res.ok || res.status === 204) {
+      showToast('Candidato descartado.');
+      loadCandidates();
+    }
+  } catch (err) {
+    console.error('Erro:', err);
+  }
 }
 
 // --- WhatsApp Avatar & Profile Fetcher ---

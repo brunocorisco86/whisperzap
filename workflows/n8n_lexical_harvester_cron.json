@@ -1,0 +1,118 @@
+{
+  "name": "Hermes Voice Memory - Agente Pescador Léxico (Cron 19:00)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 19 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Cron Diário (19:00 Todos os dias)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300],
+      "id": "3f223e8d-b8b3-4cc1-91b2-000000000001"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.HERMES_API_URL || 'http://host.docker.internal:8000' }}/api/v1/dictionary/harvest",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {}
+      },
+      "name": "Pesca Termos Léxicos (POST /api/v1/dictionary/harvest)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [480, 300],
+      "id": "3f223e8d-b8b3-4cc1-91b2-000000000002"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.promoted_terms_count }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "name": "Houve Termos Promovidos?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [720, 300],
+      "id": "3f223e8d-b8b3-4cc1-91b2-000000000003"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WHATSAPP_API_ENDPOINT || 'http://evolution-api:8080/message/sendText/hermes' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.WHATSAPP_API_TOKEN || 'seu_token_whatsapp_aqui' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $env.ADMIN_WHATSAPP_NUMBER || '5544979604925' }}\",\n  \"text\": \"📖 *Hermes Lexical Harvester (19:00)*\\n\\n🎣 *{{ $json.promoted_terms_count }} novo(s) termo(s)* incorporados ao Dicionário Léxico Oficial:\\n{{ $json.promoted_terms.map(t => '• *' + t + '*').join('\\n') }}\\n\\nTotal analisados: {{ $json.total_candidates_analyzed }} | Rejeitados: {{ $json.rejected_terms_count }}\"\n}",
+        "options": {}
+      },
+      "name": "Notifica Termos no WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [960, 220],
+      "id": "3f223e8d-b8b3-4cc1-91b2-000000000004"
+    }
+  ],
+  "connections": {
+    "Cron Diário (19:00 Todos os dias)": {
+      "main": [
+        [
+          {
+            "node": "Pesca Termos Léxicos (POST /api/v1/dictionary/harvest)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pesca Termos Léxicos (POST /api/v1/dictionary/harvest)": {
+      "main": [
+        [
+          {
+            "node": "Houve Termos Promovidos?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Houve Termos Promovidos?": {
+      "main": [
+        [
+          {
+            "node": "Notifica Termos no WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

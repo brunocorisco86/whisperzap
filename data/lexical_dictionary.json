@@ -115,15 +115,18 @@
   {
     "term": "TMS",
     "phonetic_variations": [
-      "tms",
       "t m s",
-      "têemeésse",
+      "têmessi",
+      "tem esse",
+      "roteirizador",
+      "t.m.s.",
       "sistema tms",
-      "roteirizador"
+      "tms",
+      "têemeésse"
     ],
     "expansion": "Transportation Management System",
     "category": "LOGISTICA",
-    "description": "Sistema de gestão e otimização de rotas e frotas para entrega de ração nos silos.",
+    "description": "Sistema de gestão de transporte utilizado para alocação e roteirização de cargas de ração.",
     "id": "2f3a4b56",
     "created_at": "2026-08-15T01:06:00.000000"
   },
@@ -281,5 +284,16 @@
     "description": "Módulo de recepção, transcrição e revisão léxica de áudios do WhatsApp.",
     "id": "6d7e8f90",
     "created_at": "2026-08-15T01:06:00.000000"
+  },
+  {
+    "term": "Silos IoT",
+    "phonetic_variations": [
+      "sensores de silo io te"
+    ],
+    "expansion": null,
+    "category": "LOGISTICA",
+    "description": "Promovido manualmente a partir de: 'sensores de silo io te' (Estamos instalando sensores de silo io te na granja 04)",
+    "id": "969e7342",
+    "created_at": "2026-08-15T16:50:44.245649+00:00"
   }
 ]

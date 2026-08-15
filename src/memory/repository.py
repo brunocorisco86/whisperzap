@@ -232,8 +232,41 @@ class MemoryRepository:
                                 db.add(new_person)
                                 db.commit()
                                 contact_service._sync_contact_to_graph(new_person)
+
+                # 6.3 Processa Termos Dúbios / Esforço de Adaptação (Buffer de Aprendizado Ativo)
+                if hasattr(extracted, "unclear_terms") and extracted.unclear_terms:
+                    from src.memory.models import LexicalCandidateRecord
+                    for ut in extracted.unclear_terms:
+                        raw = getattr(ut, "raw_snippet", "") or ""
+                        if raw and len(raw.strip()) > 1:
+                            raw_clean = raw.strip()
+                            cand = db.query(LexicalCandidateRecord).filter(
+                                LexicalCandidateRecord.raw_term.ilike(raw_clean),
+                                LexicalCandidateRecord.status == "PENDING"
+                            ).first()
+                            if cand:
+                                cand.occurrence_count = (cand.occurrence_count or 1) + 1
+                                cand.updated_at = datetime.now(timezone.utc)
+                                if getattr(ut, "suggested_meaning", None):
+                                    cand.suggested_term = getattr(ut, "suggested_meaning", None)
+                            else:
+                                new_cand = LexicalCandidateRecord(
+                                    id=str(uuid4()),
+                                    raw_term=raw_clean,
+                                    suggested_term=getattr(ut, "suggested_meaning", None),
+                                    context=data.revised_text[:300] if data.revised_text else "",
+                                    speaker=data.speaker,
+                                    category=getattr(ut, "category", "GERAL") or "GERAL",
+                                    reason=getattr(ut, "reason", None) or "Termo ambíguo identificado no áudio/texto",
+                                    status="PENDING",
+                                    occurrence_count=1,
+                                    created_at=datetime.now(timezone.utc),
+                                    updated_at=datetime.now(timezone.utc),
+                                )
+                                db.add(new_cand)
+                    db.commit()
             except Exception as exc:
-                logger.warning(f"Aviso ao auto-cadastrar contatos na mensagem: {exc}")
+                logger.warning(f"Aviso ao auto-cadastrar contatos ou termos léxicos na mensagem: {exc}")
                 db.rollback()
 
             # 7. Atualiza o Grafo Relacional de Conhecimento e Triplas Semânticas
