@@ -146,16 +146,15 @@ class HermesAgentService:
             tasks_block=tasks_block,
         )
 
-        raw_response = await self.provider.generate_text(
-            prompt=prompt,
-            system_instruction=DAILY_SUMMARY_SYSTEM_PROMPT,
-            temperature=0.2,
-        )
-
         try:
+            raw_response = await self.provider.generate_text(
+                prompt=prompt,
+                system_instruction=DAILY_SUMMARY_SYSTEM_PROMPT,
+                temperature=0.2,
+            )
             parsed = extract_json_payload(raw_response)
         except Exception as e:
-            logger.error(f"Erro no parsing do Resumo Diário da IA: {e}")
+            logger.warning(f"Aviso no Resumo Diário da IA ({e}). Gerando síntese estruturada resiliente.")
             from src.reports.daily import deduplicate_list
 
             raw_events = [m.get("summary", m.get("revised_text", ""))[:80] for m in messages]
@@ -252,16 +251,15 @@ class HermesAgentService:
             weekly_metrics_block=weekly_metrics_block,
         )
 
-        raw_response = await self.provider.generate_text(
-            prompt=prompt,
-            system_instruction=WEEKLY_ANALYSIS_SYSTEM_PROMPT,
-            temperature=0.2,
-        )
-
         try:
+            raw_response = await self.provider.generate_text(
+                prompt=prompt,
+                system_instruction=WEEKLY_ANALYSIS_SYSTEM_PROMPT,
+                temperature=0.2,
+            )
             parsed = extract_json_payload(raw_response)
         except Exception as e:
-            logger.error(f"Erro no parsing do Relatório Semanal da IA: {e}")
+            logger.warning(f"Aviso no Relatório Semanal da IA ({e}). Gerando síntese estruturada resiliente.")
             parsed = {
                 "executive_summary": f"Relatório semanal para o período {period_str}.",
                 "active_projects": ["Operações e Homelab", "Automação WhatsApp"],

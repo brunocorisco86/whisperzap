@@ -372,6 +372,12 @@ class MemoryRepository:
         try:
             from src.ai_gateway.agent import hermes_agent_service
             from src.ai_gateway.schemas import MemorySourceCitation
+            import re
+            from sqlalchemy import or_
+
+            # Extrai tokens limpos sem pontuação
+            query_tokens = [w for w in re.findall(r"\w+", query.lower()) if len(w) >= 3]
+            is_today = any(t in ("hoje", "atual", "recente") for t in query_tokens)
 
             # 1. Busca Semântica Vetorial
             search_results = await self.search_memories(
@@ -381,25 +387,65 @@ class MemoryRepository:
                 db=db,
             )
 
-            sources: list[MemorySourceCitation] = [
-                MemorySourceCitation(
-                    message_id=sr.message_id,
-                    speaker=sr.speaker,
-                    text_snippet=sr.summary or sr.text[:140],
-                    similarity=sr.similarity,
-                    created_at=sr.created_at.strftime("%Y-%m-%d %H:%M") if sr.created_at else None,
-                )
-                for sr in search_results
-            ]
+            seen_ids = set()
+            sources: list[MemorySourceCitation] = []
 
-            # 2. Extração de conexões e metadados no Grafo de Conhecimento e Contatos
+            for sr in search_results:
+                seen_ids.add(sr.message_id)
+                sources.append(
+                    MemorySourceCitation(
+                        message_id=sr.message_id,
+                        speaker=sr.speaker,
+                        text_snippet=sr.summary or sr.text[:140],
+                        similarity=sr.similarity,
+                        created_at=sr.created_at.strftime("%Y-%m-%d %H:%M") if sr.created_at else None,
+                    )
+                )
+
+            # 2. Busca Híbrida Direta por Remetente / Pessoa Mencionada na Query
+            for tok in query_tokens:
+                if tok in ("que", "para", "com", "como", "onde", "qual", "quais", "quem", "hoje", "ontem", "queria", "disse", "pediu", "falou"):
+                    continue
+
+                # Busca mensagens enviadas ou que citam o nome da pessoa
+                person_messages = (
+                    db.query(MessageRecord)
+                    .filter(
+                        or_(
+                            MessageRecord.speaker.ilike(f"%{tok}%"),
+                            MessageRecord.revised_text.ilike(f"%{tok}%"),
+                            MessageRecord.raw_text.ilike(f"%{tok}%"),
+                            MessageRecord.summary.ilike(f"%{tok}%"),
+                        )
+                    )
+                    .order_by(MessageRecord.created_at.desc())
+                    .limit(10)
+                    .all()
+                )
+
+                for pm in person_messages:
+                    if pm.id not in seen_ids:
+                        seen_ids.add(pm.id)
+                        snippet = pm.revised_text or pm.raw_text or pm.summary or ""
+                        if len(snippet) > 200:
+                            snippet = snippet[:197] + "..."
+                        sources.append(
+                            MemorySourceCitation(
+                                message_id=pm.id,
+                                speaker=pm.speaker or "Desconhecido",
+                                text_snippet=snippet,
+                                similarity=0.95 if (pm.speaker and tok in pm.speaker.lower()) else 0.85,
+                                created_at=pm.created_at.strftime("%Y-%m-%d %H:%M") if pm.created_at else None,
+                            )
+                        )
+
+            # Se pediu informações de "hoje", ordena priorizando mensagens recentes/do dia
+            if is_today:
+                sources.sort(key=lambda s: s.created_at or "", reverse=True)
+
+            # 3. Extração de conexões e metadados no Grafo de Conhecimento e Contatos
             related_entities = []
             if include_graph:
-                import re
-
-                # Extrai tokens limpos sem pontuação
-                query_tokens = [w for w in re.findall(r"\w+", query.lower()) if len(w) >= 3]
-
                 # Se a pergunta for em 1ª pessoa ("minha", "meu", "eu", "esposa", "família"), expande o nó do usuário (Bruno)
                 is_first_person = any(t in ("minha", "meu", "eu", "esposa", "marido", "familia", "família", "minhas", "meus") for t in query_tokens)
                 if is_first_person and "bruno" not in query_tokens:
@@ -490,20 +536,32 @@ class MemoryRepository:
                             c_parts.append(f"Detalhes: {c.notes}")
                         related_entities.append(" | ".join(c_parts))
 
-            # 3. Busca de tarefas pendentes relacionadas
+            # 4. Busca de tarefas pendentes relacionadas (por Solicitante, Responsável ou Título)
             pending_tasks_objs = self.list_tasks(status="PENDING", db=db)
             related_tasks = []
             for t in pending_tasks_objs:
                 t_tokens = [w.lower() for w in t.title.split() if len(w) > 3]
-                if any(tok in query.lower() for tok in t_tokens) or (t.assignee and t.assignee.lower() in query.lower()):
+                spk = (t.speaker or "").lower()
+                asg = (t.assignee or "").lower()
+
+                matches_task = (
+                    any(tok in query.lower() for tok in t_tokens)
+                    or any(tok in spk for tok in query_tokens)
+                    or any(tok in asg for tok in query_tokens)
+                    or (t.message_id in seen_ids)
+                )
+
+                if matches_task:
+                    speaker_info = f"[Solicitante: {t.speaker}] " if t.speaker else ""
                     assignee = f" (Resp: {t.assignee})" if t.assignee else ""
                     due = f" [Prazo: {t.due_date}]" if t.due_date else ""
-                    related_tasks.append(f"{t.title}{assignee}{due} [Prioridade: {t.priority}]")
+                    notes = f" (Notas: {t.notes})" if t.notes else ""
+                    related_tasks.append(f"{speaker_info}{t.title}{assignee}{due}{notes} [Prioridade: {t.priority}]")
 
-            # 4. Chama o Agente Hermes para inferência e resposta estrita
+            # 5. Chama o Agente Hermes para inferência e resposta estrita
             return await hermes_agent_service.answer_hermes_query(
                 query=query,
-                sources=sources,
+                sources=sources[:12],  # Limite confortável de fontes relevantes
                 related_entities=list(set(related_entities)),
                 pending_tasks=related_tasks,
             )
