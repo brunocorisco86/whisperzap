@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     WHISPER_MODEL: str = "base"
     WHISPER_DEVICE: str = "cpu"
     WHISPER_COMPUTE_TYPE: str = "int8"
+    WHISPER_MAX_CONCURRENCY: int = 2
 
     # Banco de dados e Persistência
     POSTGRES_HOST: str = "localhost"

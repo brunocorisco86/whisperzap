@@ -77,19 +77,29 @@ class WhisperService:
 
         return full_text, detected_lang, lang_prob, duration, segments_list
 
+    _semaphore: Optional[asyncio.Semaphore] = None
+
+    def _get_semaphore(self) -> asyncio.Semaphore:
+        """Garante que o semáforo seja instanciado no event loop ativo."""
+        if self._semaphore is None:
+            self._semaphore = asyncio.Semaphore(settings.WHISPER_MAX_CONCURRENCY)
+        return self._semaphore
+
     async def transcribe_audio(
         self,
         audio_path_or_file: str | BinaryIO,
         language: Optional[str] = "pt",
         beam_size: int = 5,
     ) -> Tuple[str, str, float, float, List[TranscriptionSegment]]:
-        """Executa a transcrição em thread pool para evitar bloqueio do event loop."""
-        return await asyncio.to_thread(
-            self._sync_transcribe,
-            audio_path_or_file,
-            language=language,
-            beam_size=beam_size,
-        )
+        """Executa a transcrição em thread pool controlando a concorrência máxima com semáforo."""
+        sem = self._get_semaphore()
+        async with sem:
+            return await asyncio.to_thread(
+                self._sync_transcribe,
+                audio_path_or_file,
+                language=language,
+                beam_size=beam_size,
+            )
 
 
 whisper_service = WhisperService()

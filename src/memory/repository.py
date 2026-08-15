@@ -11,6 +11,7 @@ from src.ai_gateway.extractor import semantic_extractor
 from src.ai_gateway.providers import get_ai_provider
 from src.ai_gateway.schemas import SemanticExtractionRequest
 from src.config import settings
+from src.contacts.service import contact_service, generate_contact_id
 from src.memory.database import SessionLocal
 from src.memory.graph import knowledge_graph
 from src.memory.models import (

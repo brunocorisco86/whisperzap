@@ -32,7 +32,7 @@ def get_database_url() -> str:
 DATABASE_URL = get_database_url()
 
 # Cria o engine com configurações apropriadas
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+connect_args = {"check_same_thread": False, "timeout": 15} if DATABASE_URL.startswith("sqlite") else {}
 engine = create_engine(
     DATABASE_URL,
     connect_args=connect_args,
@@ -46,7 +46,7 @@ def set_database_url(new_url: str):
     """Reconfigura dinamicamente o engine e SessionLocal (usado pelo isolamento de testes)."""
     global DATABASE_URL, engine, SessionLocal
     DATABASE_URL = new_url
-    c_args = {"check_same_thread": False} if new_url.startswith("sqlite") else {}
+    c_args = {"check_same_thread": False, "timeout": 15} if new_url.startswith("sqlite") else {}
     engine = create_engine(new_url, connect_args=c_args, echo=False)
     SessionLocal.configure(bind=engine)
     return engine
@@ -56,6 +56,15 @@ def init_db() -> None:
     """Inicializa as tabelas do banco de dados se não existirem e adiciona novas colunas."""
     from sqlalchemy import text
     try:
+        if DATABASE_URL.startswith("sqlite"):
+            with engine.connect() as conn:
+                try:
+                    conn.execute(text("PRAGMA journal_mode=WAL"))
+                    conn.execute(text("PRAGMA busy_timeout=10000"))
+                    conn.commit()
+                except Exception:
+                    pass
+
         Base.metadata.create_all(bind=engine)
         with engine.connect() as conn:
             try:
