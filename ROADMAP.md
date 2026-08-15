@@ -122,6 +122,34 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [CONCLUÍDO]
   - Enriquecimento de nós no Grafo NetworkX com conexões `(Pessoa) -[ROLE]-> (Empresa)` e `(Pessoa) -[WORKS_ON]-> (Projeto)`.
   - Endpoints REST em `/api/v1/contacts/*` com 11 novos testes automatizados passando.
 
+---
+
+## 🚀 Trilha Prática de Go-Live & Ativação Operacional Passo a Passo
+
+### 📍 Etapa 1: Validação Local Interativa (Agora no seu PC)
+- [ ] **1.1** Iniciar o servidor da API localmente (`uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload`).
+- [ ] **1.2** Abrir o Swagger UI no navegador em `http://localhost:8000/docs`.
+- [ ] **1.3** Testar o endpoint `POST /transcribe` enviando um arquivo de áudio real de `assets/AudioSample/`.
+- [ ] **1.4** Testar `POST /api/v1/memory/messages` enviando uma instrução de voz simulada.
+- [ ] **1.5** Testar `POST /api/v1/memory/query` fazendo uma pergunta em linguagem natural para o Hermes.
+- [ ] **1.6** Visualizar o Resumo Diário (`/api/v1/memory/daily`) e Relatório Semanal (`/api/v1/memory/weekly`).
+
+### 📍 Etapa 2: Conexão com WhatsApp & n8n (Homelab / Raspberry Pi)
+- [ ] **2.1** Verificar a instância ativa da Evolution API / Z-API.
+- [ ] **2.2** Importar os 4 workflows da pasta `workflows/` no n8n.
+- [ ] **2.3** Configurar variáveis de ambiente do n8n (`HERMES_API_URL`, `WHATSAPP_API_TOKEN`, `ADMIN_WHATSAPP_NUMBER`).
+- [ ] **2.4** Enviar uma mensagem de voz real no WhatsApp e validar o recebimento do texto revisado.
+- [ ] **2.5** Testar o comando `? sua pergunta` no WhatsApp para validação do Agente Hermes.
+
+### 📍 Etapa 3: Deploy em Produção (VPS Alpine Linux & Tailscale)
+- [ ] **3.1** Conectar na VPS via SSH e clonar o repositório em `/opt/whisperzap`.
+- [ ] **3.2** Configurar o arquivo `.env` de produção com chaves seguras e `GEMINI_API_KEY`.
+- [ ] **3.3** Executar o script automatizado `./scripts/deploy_vps_alpine.sh`.
+- [ ] **3.4** Conectar o Tailscale na VPS (`tailscale up`) e no Raspberry Pi para criar a rede mesh privada.
+- [ ] **3.5** Apontar o n8n para o IP Tailscale da VPS (`http://100.x.y.z:8000`).
+- [ ] **3.6** Agendar o Cron de backup diário às 03:00 (`scripts/backup_db.sh`).
+
+
 
 
 
