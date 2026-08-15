@@ -62,6 +62,9 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       loadTasks();
     } else if (targetId === 'tab-messages') {
       loadMessages();
+    } else if (targetId === 'tab-sentiment') {
+      loadDailySentiments();
+      populateSentimentSpeakers();
     }
   });
 });
@@ -146,11 +149,36 @@ document.addEventListener('DOMContentLoaded', () => {
   formContact.addEventListener('submit', handleSaveContact);
   formTerm.addEventListener('submit', handleSaveTerm);
 
-  // Query Testing
-  document.getElementById('btn-run-query').addEventListener('click', runHermesQuery);
-  document.getElementById('query-input').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') runHermesQuery();
-  });
+  // Sentiment Tab Listeners
+  const sentimentDatePicker = document.getElementById('sentiment-date-picker');
+  if (sentimentDatePicker) {
+    const todayStr = new Date().toISOString().split('T')[0];
+    sentimentDatePicker.value = todayStr;
+    sentimentDatePicker.addEventListener('change', (e) => {
+      loadDailySentiments(e.target.value);
+    });
+  }
+
+  const btnCollectSentiment = document.getElementById('btn-collect-today-sentiment');
+  if (btnCollectSentiment) {
+    btnCollectSentiment.addEventListener('click', async () => {
+      const selectedDate = sentimentDatePicker ? sentimentDatePicker.value : '';
+      await collectSentiments(selectedDate);
+    });
+  }
+
+  const speakerSelect = document.getElementById('sentiment-speaker-select');
+  if (speakerSelect) {
+    speakerSelect.addEventListener('change', (e) => {
+      const speaker = e.target.value;
+      if (speaker) {
+        loadSentimentTimeline(speaker);
+      } else {
+        const panel = document.getElementById('sentiment-timeline-panel');
+        if (panel) panel.style.display = 'none';
+      }
+    });
+  }
 
   // Carrega dados do grafo
   loadGraphData();
@@ -879,4 +907,202 @@ async function runHermesQuery() {
   } catch (err) {
     answerEl.textContent = `Erro de conexão: ${err.message}`;
   }
+}
+
+// --- Subsistema de Sentimentos & Série Temporal ---
+
+async function loadDailySentiments(targetDate = '') {
+  const container = document.getElementById('sentiment-daily-container');
+  const badge = document.getElementById('sentiment-day-badge');
+  if (!container) return;
+
+  const dateParam = targetDate ? `?date=${targetDate}` : '';
+  if (badge) badge.textContent = targetDate || 'Hoje';
+
+  try {
+    const res = await fetch(`/api/v1/memory/sentiment/daily${dateParam}`);
+    if (res.ok) {
+      const snapshots = await res.json();
+      renderDailySentiments(snapshots, targetDate);
+    }
+  } catch (err) {
+    console.error('Erro ao carregar sentimentos diários:', err);
+  }
+}
+
+async function collectSentiments(targetDate = '') {
+  try {
+    const dateParam = targetDate ? `?date=${targetDate}` : '';
+    const res = await fetch(`/api/v1/memory/sentiment/collect${dateParam}`, { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      showToast(`Consolidação concluída! ${data.total_people} pessoa(s) e ${data.total_interactions} interação(ões).`);
+      loadDailySentiments(targetDate);
+      populateSentimentSpeakers();
+    }
+  } catch (err) {
+    console.error('Erro ao consolidar sentimentos:', err);
+    showToast('Erro ao consolidar sentimentos na VPS.', true);
+  }
+}
+
+function renderDailySentiments(snapshots, targetDate) {
+  const container = document.getElementById('sentiment-daily-container');
+  if (!container) return;
+
+  if (!snapshots || snapshots.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 2.5rem; color: var(--text-muted);">
+        <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">Nenhuma interação registrada para ${targetDate || 'esta data'}</p>
+        <small>Clique em "Consolidar Sentimentos" ou envie mensagens de voz no WhatsApp para alimentar o termômetro.</small>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = snapshots.map(s => {
+    const sInfo = getSentimentInfo(s.dominant_sentiment);
+    const badgeClass = getRoleBadgeClass(s.role);
+    const roleLabel = getRoleLabel(s.role);
+    const scoreFormatted = (s.avg_sentiment_score > 0 ? '+' : '') + s.avg_sentiment_score.toFixed(2);
+    const initials = getInitials(s.speaker);
+
+    const highlightsHtml = (s.highlights || []).map(h => `
+      <div style="font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 0.25rem 0.4rem; border-radius: 4px; margin-top: 0.2rem;">
+        ${h}
+      </div>
+    `).join('');
+
+    return `
+      <div class="contact-card" style="cursor: pointer;" onclick="selectSpeakerForTimeline('${s.speaker}')">
+        <div class="contact-header">
+          <div class="contact-avatar">${initials}</div>
+          <div class="contact-title-group">
+            <div class="contact-name">${s.speaker}</div>
+            <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap; margin-top: 0.2rem;">
+              <span class="badge ${badgeClass}">${roleLabel}</span>
+              <span class="sentiment-badge ${sInfo.class}">
+                ${sInfo.emoji} ${sInfo.label} (${scoreFormatted})
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="contact-details" style="margin-top: 0.6rem;">
+          <div style="font-size: 0.8rem; color: var(--text-main); font-weight: 500;">
+            📊 <b>${s.interactions_count}</b> interações hoje:
+            <span style="color: #4ade80;">+${s.positive_count}</span> / 
+            <span style="color: #94a3b8;">~${s.neutral_count}</span> / 
+            <span style="color: #f87171;">-${s.negative_count}</span>
+          </div>
+
+          ${s.executive_summary ? `<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.3rem;">📝 ${s.executive_summary}</div>` : ''}
+
+          ${highlightsHtml ? `<div style="margin-top: 0.4rem;">${highlightsHtml}</div>` : ''}
+        </div>
+
+        <div class="contact-actions" style="margin-top: 0.6rem;">
+          <button class="btn btn-secondary btn-sm" style="width: 100%;" onclick="event.stopPropagation(); selectSpeakerForTimeline('${s.speaker}')">
+            📈 Ver Série Temporal
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function populateSentimentSpeakers() {
+  const select = document.getElementById('sentiment-speaker-select');
+  if (!select) return;
+
+  try {
+    const res = await fetch('/api/v1/contacts');
+    if (res.ok) {
+      const contacts = await res.json();
+      select.innerHTML = '<option value="">Selecione uma pessoa para ver a Série Temporal...</option>' +
+        contacts.map(c => `<option value="${c.name}">${c.name} (${c.role})</option>`).join('');
+    }
+  } catch (err) {
+    console.error('Erro ao popular lista de pessoas para sentimentos:', err);
+  }
+}
+
+function selectSpeakerForTimeline(speakerName) {
+  const select = document.getElementById('sentiment-speaker-select');
+  if (select) {
+    select.value = speakerName;
+  }
+  loadSentimentTimeline(speakerName);
+}
+
+async function loadSentimentTimeline(speakerName) {
+  const panel = document.getElementById('sentiment-timeline-panel');
+  const nameEl = document.getElementById('timeline-speaker-name');
+  const metaEl = document.getElementById('timeline-speaker-meta');
+  const badgeEl = document.getElementById('timeline-overall-badge');
+  const container = document.getElementById('timeline-points-container');
+
+  if (!panel || !speakerName) return;
+
+  panel.style.display = 'block';
+  nameEl.textContent = speakerName;
+  metaEl.textContent = 'Carregando série temporal...';
+  container.innerHTML = '<p class="text-muted">Buscando dados históricos na VPS...</p>';
+
+  try {
+    const res = await fetch(`/api/v1/memory/sentiment/timeline?speaker=${encodeURIComponent(speakerName)}`);
+    if (res.ok) {
+      const data = await res.json();
+      renderSentimentTimeline(data);
+    }
+  } catch (err) {
+    console.error('Erro ao carregar série temporal:', err);
+    container.innerHTML = '<p class="text-muted">Erro ao carregar série temporal.</p>';
+  }
+}
+
+function renderSentimentTimeline(data) {
+  const metaEl = document.getElementById('timeline-speaker-meta');
+  const badgeEl = document.getElementById('timeline-overall-badge');
+  const container = document.getElementById('timeline-points-container');
+
+  const sInfo = getSentimentInfo(data.overall_sentiment);
+  metaEl.textContent = `Papel: ${data.role} • ${data.total_days_tracked} dia(s) rastreado(s) • Score Médio Geral: ${data.avg_score > 0 ? '+' : ''}${data.avg_score.toFixed(2)}`;
+  badgeEl.innerHTML = `<span class="sentiment-badge ${sInfo.class}" style="font-size: 0.9rem;">${sInfo.emoji} Humor Geral: ${sInfo.label}</span>`;
+
+  if (!data.timeline || data.timeline.length === 0) {
+    container.innerHTML = '<p class="text-muted">Nenhum ponto temporal registrado para este contato ainda.</p>';
+    return;
+  }
+
+  container.innerHTML = data.timeline.map(p => {
+    const ptInfo = getSentimentInfo(p.dominant_sentiment);
+    const scoreWidth = Math.min(Math.max((p.avg_sentiment_score + 1.0) / 2.0 * 100, 5), 100);
+    const barColor = p.dominant_sentiment === 'POSITIVE' ? '#10b981' : p.dominant_sentiment === 'NEGATIVE' ? '#ef4444' : '#64748b';
+
+    const highlightsHtml = (p.highlights || []).map(h => `
+      <div style="font-size: 0.75rem; color: var(--text-muted); padding: 0.2rem 0;">• ${h}</div>
+    `).join('');
+
+    return `
+      <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.8rem 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <span style="font-weight: 600; color: var(--text-main);">📅 ${p.date}</span>
+            <span class="sentiment-badge ${ptInfo.class}">${ptInfo.emoji} ${ptInfo.label}</span>
+          </div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);">
+            <b>${p.interactions_count}</b> msg(s) | Score: <b>${p.avg_sentiment_score > 0 ? '+' : ''}${p.avg_sentiment_score.toFixed(2)}</b>
+          </div>
+        </div>
+
+        <!-- Barra de Progresso Emocional -->
+        <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; margin: 0.4rem 0;">
+          <div style="width: ${scoreWidth}%; height: 100%; background: ${barColor}; border-radius: 3px;"></div>
+        </div>
+
+        ${highlightsHtml ? `<div style="margin-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.4rem;">${highlightsHtml}</div>` : ''}
+      </div>
+    `;
+  }).join('');
 }

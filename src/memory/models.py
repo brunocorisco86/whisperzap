@@ -97,7 +97,75 @@ class EmbeddingRecord(Base):
     message = relationship("MessageRecord", back_populates="embeddings")
 
 
+class DailySentimentSnapshotRecord(Base):
+    """Tabela de snapshots diários de sentimentos consolidados por pessoa (série temporal)."""
+
+    __tablename__ = "daily_sentiment_snapshots"
+
+    id = Column(String(36), primary_key=True)
+    date = Column(String(10), nullable=False, index=True)  # Formato: YYYY-MM-DD
+    speaker = Column(String(100), nullable=False, index=True)
+    phone_number = Column(String(50), nullable=True)
+    role = Column(String(50), default="UNKNOWN", index=True)
+    interactions_count = Column(Integer, default=0)
+    dominant_sentiment = Column(String(32), default="NEUTRAL", index=True)
+    avg_sentiment_score = Column(Float, default=0.0)
+    positive_count = Column(Integer, default=0)
+    neutral_count = Column(Integer, default=0)
+    negative_count = Column(Integer, default=0)
+    highlights = Column(JSON, default=list)  # Lista de resumos e frases da pessoa no dia
+    executive_summary = Column(Text, nullable=True)  # Síntese emocional do dia
+    created_at = Column(DateTime, default=utc_now)
+
+
 # ===================== Schemas Pydantic da API =====================
+
+
+class DailySentimentSnapshotResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    date: str
+    speaker: str
+    phone_number: Optional[str] = None
+    role: str = "UNKNOWN"
+    interactions_count: int
+    dominant_sentiment: str
+    avg_sentiment_score: float
+    positive_count: int
+    neutral_count: int
+    negative_count: int
+    highlights: list[str] = []
+    executive_summary: Optional[str] = None
+    created_at: datetime
+
+
+class SentimentTimelinePoint(BaseModel):
+    date: str
+    dominant_sentiment: str
+    avg_sentiment_score: float
+    interactions_count: int
+    positive_count: int
+    neutral_count: int
+    negative_count: int
+    highlights: list[str] = []
+
+
+class PersonSentimentTimelineResponse(BaseModel):
+    speaker: str
+    role: str
+    phone_number: Optional[str] = None
+    total_days_tracked: int
+    overall_sentiment: str
+    avg_score: float
+    timeline: list[SentimentTimelinePoint]
+
+
+class DailySentimentCollectionResponse(BaseModel):
+    date: str
+    total_people: int
+    total_interactions: int
+    snapshots: list[DailySentimentSnapshotResponse]
 
 
 class TaskResponse(BaseModel):

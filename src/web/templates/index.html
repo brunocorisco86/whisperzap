@@ -59,6 +59,9 @@
       <button class="tab-btn" data-tab="tab-dictionary">
         📖 Dicionário Léxico (<span id="count-dict">0</span>)
       </button>
+      <button class="tab-btn" data-tab="tab-sentiment">
+        🌡️ Sentimentos & Série Temporal
+      </button>
       <button class="tab-btn" data-tab="tab-query">
         🧠 Testador RAG
       </button>
@@ -192,6 +195,53 @@
 
       <div class="dictionary-grid" id="dictionary-container">
         <!-- Rendered via JS -->
+      </div>
+    </section>
+
+    <!-- Tab: Sentimentos & Série Temporal -->
+    <section id="tab-sentiment" class="tab-content">
+      <div class="section-toolbar">
+        <div class="filter-group">
+          <label style="font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem;">
+            📅 Data:
+            <input type="date" id="sentiment-date-picker" style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.4rem 0.6rem; border-radius: 6px;">
+          </label>
+          <button class="btn btn-secondary btn-sm" id="btn-collect-today-sentiment">
+            ⚡ Consolidar Sentimentos
+          </button>
+        </div>
+        <div class="filter-group">
+          <select id="sentiment-speaker-select" style="min-width: 200px;">
+            <option value="">Selecione uma pessoa para ver o histórico...</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Overview do Dia (Termômetro Social) -->
+      <div style="margin-bottom: 1.5rem;">
+        <h3 style="font-size: 1.1rem; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem;">
+          🌡️ Termômetro das Interações do Dia <span id="sentiment-day-badge" class="badge badge-executive">Hoje</span>
+        </h3>
+        <div class="contacts-grid" id="sentiment-daily-container">
+          <!-- Rendered via JS -->
+        </div>
+      </div>
+
+      <!-- Painel de Série Temporal da Pessoa -->
+      <div class="card" id="sentiment-timeline-panel" style="display: none; margin-top: 1.5rem;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+          <div>
+            <h3 id="timeline-speaker-name" style="margin: 0; font-size: 1.2rem; color: var(--color-primary);">Nome da Pessoa</h3>
+            <p id="timeline-speaker-meta" class="text-muted" style="margin: 0.2rem 0 0 0; font-size: 0.85rem;">Papel • Total de Dias Rastreados</p>
+          </div>
+          <div id="timeline-overall-badge"></div>
+        </div>
+        <div class="card-body" style="padding-top: 1rem;">
+          <h4 style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 0.8rem;">📈 Evolução Diária do Humor & Tom Emocional</h4>
+          <div id="timeline-points-container" style="display: flex; flex-direction: column; gap: 0.8rem;">
+            <!-- Rendered via JS -->
+          </div>
+        </div>
       </div>
     </section>
 

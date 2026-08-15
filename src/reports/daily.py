@@ -156,6 +156,14 @@ class DailyReportService:
                 if (t.created_at and t.created_at.strftime("%Y-%m-%d") == target_date) or t.status == "PENDING"
             ]
 
+            # Executa a coleta e consolidação dos sentimentos 'as is' para a série temporal
+            try:
+                from src.memory.sentiment_timeline import sentiment_timeline_service
+                sentiment_timeline_service.collect_daily_sentiments(target_date=target_date, db=db)
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).warning(f"Aviso ao consolidar sentimentos diários: {exc}")
+
             return await hermes_agent_service.generate_daily_summary(
                 target_date=target_date,
                 messages=day_msgs,

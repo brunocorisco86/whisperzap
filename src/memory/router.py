@@ -236,3 +236,44 @@ async def get_memory_stats(db: Session = Depends(get_db)):
     return memory_repository.get_stats(db=db)
 
 
+# ===================== Série Temporal de Sentimentos =====================
+
+
+@router.post("/sentiment/collect", summary="Consolida sentimentos do dia para série temporal")
+async def collect_daily_sentiments(
+    date: str | None = Query(default=None, description="Data no formato YYYY-MM-DD (default: hoje)"),
+    db: Session = Depends(get_db),
+):
+    """Executa a consolidação de sentimentos de todas as pessoas que interagiram na data."""
+    from src.memory.sentiment_timeline import sentiment_timeline_service
+    return sentiment_timeline_service.collect_daily_sentiments(target_date=date, db=db)
+
+
+@router.get("/sentiment/daily", summary="Consulta snapshots de sentimentos consolidados do dia")
+async def get_daily_sentiment_snapshots(
+    date: str | None = Query(default=None, description="Data no formato YYYY-MM-DD (default: hoje)"),
+    db: Session = Depends(get_db),
+):
+    """Retorna o panorama e métricas emocionais de todas as pessoas em um determinado dia."""
+    from src.memory.sentiment_timeline import sentiment_timeline_service
+    return sentiment_timeline_service.get_daily_snapshots(target_date=date, db=db)
+
+
+@router.get("/sentiment/timeline", summary="Consulta série temporal de sentimentos de uma pessoa")
+async def get_sentiment_timeline(
+    speaker: str = Query(..., description="Nome ou identificador da pessoa"),
+    start_date: str | None = Query(default=None, description="Data inicial YYYY-MM-DD"),
+    end_date: str | None = Query(default=None, description="Data final YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """Retorna a evolução histórica de sentimentos e pontos da série temporal para gráficos."""
+    from src.memory.sentiment_timeline import sentiment_timeline_service
+    return sentiment_timeline_service.get_person_timeline(
+        speaker=speaker,
+        start_date=start_date,
+        end_date=end_date,
+        db=db,
+    )
+
+
+
