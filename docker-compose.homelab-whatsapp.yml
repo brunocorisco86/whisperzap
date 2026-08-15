@@ -78,9 +78,10 @@ services:
       NODE_ENV: production
       WEBHOOK_URL: http://localhost:5678/
       GENERIC_TIMEZONE: America/Sao_Paulo
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
       HERMES_API_URL: http://host.docker.internal:8000
       WHATSAPP_API_ENDPOINT: http://evolution-api:8080/message/sendText/hermes
-      WHATSAPP_API_TOKEN: ${WHATSAPP_API_TOKEN:-hermes_evolution_token_secret_123}
+      WHATSAPP_API_TOKEN: ${WHATSAPP_API_TOKEN:-seu_token_whatsapp_aqui}
       ADMIN_WHATSAPP_NUMBER: ${ADMIN_WHATSAPP_NUMBER:-5544999999999}
     extra_hosts:
       - "host.docker.internal:host-gateway"
