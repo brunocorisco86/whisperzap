@@ -256,23 +256,43 @@ class MemoryRepository:
                 for sr in search_results
             ]
 
-            # 2. Extração de conexões e metadados no Grafo de Conhecimento
+            # 2. Extração de conexões e metadados no Grafo de Conhecimento e Contatos
             related_entities = []
             if include_graph:
-                # Procura nós no grafo que combinam com palavras da query ou das fontes
-                query_tokens = [w.lower() for w in query.split() if len(w) >= 3]
+                import re
+
+                # Extrai tokens limpos sem pontuação
+                query_tokens = [w for w in re.findall(r"\w+", query.lower()) if len(w) >= 3]
+
+                # Se a pergunta for em 1ª pessoa ("minha", "meu", "eu", "esposa", "família"), expande o nó do usuário (Bruno)
+                is_first_person = any(t in ("minha", "meu", "eu", "esposa", "marido", "familia", "família", "minhas", "meus") for t in query_tokens)
+                if is_first_person and "bruno" not in query_tokens:
+                    query_tokens.extend(["bruno", "user"])
+
+                # Mapeamento de sinônimos de papéis
+                role_filter = set()
+                if any(t in ("esposa", "marido", "conjuge", "cônjuge", "familia", "família", "filho", "filha", "mãe", "pai") for t in query_tokens):
+                    role_filter.add("FAMILY_CORE")
+                if any(t in ("produtor", "associado", "cooperado", "integrado", "granjeiro", "avicultor") for t in query_tokens):
+                    role_filter.add("PRODUCER_COOPERATED")
+                if any(t in ("diretor", "gestor", "chefe", "gerente", "lider", "líder", "executivo") for t in query_tokens):
+                    role_filter.add("EXECUTIVE")
+                if any(t in ("consultor", "consultoria", "stakeholder", "especialista") for t in query_tokens):
+                    role_filter.add("STAKEHOLDER")
+
                 all_nodes = knowledge_graph.list_nodes()
                 for node in all_nodes:
                     node_name = node.get("name", "")
                     node_details = str(node.get("details", "")).lower()
-                    node_role = str(node.get("role", "")).lower()
+                    node_role = str(node.get("role", "")).upper()
                     node_phone = str(node.get("phone", "")).lower()
 
                     matches = (
                         any(t in node_name.lower() for t in query_tokens)
                         or any(t in node_details for t in query_tokens)
-                        or any(t in node_role for t in query_tokens)
+                        or any(t in node_role.lower() for t in query_tokens)
                         or any(t in node_phone for t in query_tokens)
+                        or (node_role in role_filter)
                     )
 
                     if matches:
@@ -309,6 +329,30 @@ class MemoryRepository:
                                 for edge in neighborhood.get("edges", [])
                             ]
                             related_entities.extend(conn_strs)
+
+                # Busca cruzada na tabela SQL de Contatos
+                from src.contacts.models import ContactRecord
+                sql_contacts = db.query(ContactRecord).all()
+                for c in sql_contacts:
+                    c_role = (c.role or "").upper()
+                    c_matches = (
+                        any(t in c.name.lower() for t in query_tokens)
+                        or (c.nickname and any(t in c.nickname.lower() for t in query_tokens))
+                        or (c.notes and any(t in c.notes.lower() for t in query_tokens))
+                        or (c.company and any(t in c.company.lower() for t in query_tokens))
+                        or (c_role in role_filter)
+                    )
+                    if c_matches:
+                        c_parts = [f"Contato Oficial: {c.name}"]
+                        if c.role:
+                            c_parts.append(f"Cargo/Role: {c.role}")
+                        if c.phone_number:
+                            c_parts.append(f"Telefone: {c.phone_number}")
+                        if c.company:
+                            c_parts.append(f"Empresa: {c.company}")
+                        if c.notes:
+                            c_parts.append(f"Detalhes: {c.notes}")
+                        related_entities.append(" | ".join(c_parts))
 
             # 3. Busca de tarefas pendentes relacionadas
             pending_tasks_objs = self.list_tasks(status="PENDING", db=db)
