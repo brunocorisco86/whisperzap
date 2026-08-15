@@ -34,7 +34,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.HERMES_API_URL || 'http://localhost:8000' }}/api/v1/memory/query",
+        "url": "={{ $env.HERMES_API_URL || 'http://host.docker.internal:8000' }}/api/v1/memory/query",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"query\": \"{{ ($json.body?.text || $json.body?.message || $json.body?.data?.message?.conversation || '').replace(/^(\\?|\\/hermes|hermes,)\\s*/i, '') }}\",\n  \"top_k\": 5,\n  \"include_graph\": true\n}",
@@ -49,29 +49,19 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.WHATSAPP_API_ENDPOINT || 'http://localhost:8080/message/sendText/default' }}",
+        "url": "={{ $env.WHATSAPP_API_ENDPOINT || 'http://evolution-api:8080/message/sendText/hermes' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $env.WHATSAPP_API_TOKEN }}"
+              "value": "={{ $env.WHATSAPP_API_TOKEN || 'seu_token_whatsapp_aqui' }}"
             }
           ]
         },
         "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "number",
-              "value": "={{ $('Webhook WhatsApp Mensagem Texto').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp Mensagem Texto').item.json.body?.sender?.phone || '' }}"
-            },
-            {
-              "name": "text",
-              "value": "={{ $json.answer }}"
-            }
-          ]
-        },
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $('Webhook WhatsApp Mensagem Texto').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp Mensagem Texto').item.json.body?.sender?.phone || '' }}\",\n  \"text\": \"{{ $json.answer }}\"\n}",
         "options": {}
       },
       "name": "Envia Resposta Hermes (WhatsApp)",

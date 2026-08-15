@@ -100,7 +100,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"number\": \"{{ $('Webhook WhatsApp (Evolution API / Z-API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API / Z-API)').item.json.body?.sender?.phone }}\",\n  \"text\": \"{{ $json.text_revised }}\"\n}",
+        "jsonBody": "={\n  \"number\": \"{{ $('Webhook WhatsApp (Evolution API / Z-API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API / Z-API)').item.json.body?.sender?.phone }}\",\n  \"text\": \"_🎙️ Transcrição automática por James (Mordomo Virtual):_\\n\\n{{ $json.text_revised }}\"\n}",
         "options": {}
       },
       "name": "Envia Texto Revisado (WhatsApp)",
