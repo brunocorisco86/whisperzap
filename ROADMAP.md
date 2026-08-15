@@ -135,11 +135,11 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [CONCLUÍDO]
 - [x] **1.6** Visualizar o Resumo Diário (`/api/v1/memory/daily`) e Relatório Semanal (`/api/v1/memory/weekly`).
 
 ### 📍 Etapa 2: Conexão com WhatsApp & n8n (Homelab / Raspberry Pi)
-- [ ] **2.1** Verificar a instância ativa da Evolution API / Z-API.
-- [ ] **2.2** Importar os 4 workflows da pasta `workflows/` no n8n.
-- [ ] **2.3** Configurar variáveis de ambiente do n8n (`HERMES_API_URL`, `WHATSAPP_API_TOKEN`, `ADMIN_WHATSAPP_NUMBER`).
-- [ ] **2.4** Enviar uma mensagem de voz real no WhatsApp e validar o recebimento do texto revisado.
-- [ ] **2.5** Testar o comando `? sua pergunta` no WhatsApp para validação do Agente Hermes.
+- [ ] **2.1** Subir a stack de WhatsApp no homelab (`./scripts/start_homelab_whatsapp.sh` ou Docker Compose).
+- [ ] **2.2** Conectar o WhatsApp na Evolution API via QR Code (`http://localhost:8080`).
+- [ ] **2.3** Acessar o n8n (`http://localhost:5678`), criar o usuário admin e importar os 4 fluxos da pasta `workflows/`.
+- [ ] **2.4** Ativar o fluxo de transcrição (`n8n_whatsapp_voice_transcription.json`) e enviar um áudio de teste no WhatsApp.
+- [ ] **2.5** Validar o disparo do Resumo Diário e do comando `? pergunta` para o Agente Hermes.
 
 ### 📍 Etapa 3: Deploy em Produção (VPS Alpine Linux & Tailscale)
 - [ ] **3.1** Conectar na VPS via SSH e clonar o repositório em `/opt/whisperzap`.
