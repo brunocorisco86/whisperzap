@@ -151,23 +151,33 @@ class HermesAgentService:
             parsed = extract_json_payload(raw_response)
         except Exception as e:
             logger.error(f"Erro no parsing do Resumo Diário da IA: {e}")
+            from src.reports.daily import deduplicate_list
+
+            raw_events = [m.get("summary", m.get("revised_text", ""))[:80] for m in messages]
+            raw_done = [t.get("title", "") for t in tasks if t.get("status") == "DONE"]
+            raw_pending = [t.get("title", "") for t in tasks if t.get("status") == "PENDING"]
+
+            unique_events = deduplicate_list(raw_events)
+            unique_done = deduplicate_list(raw_done)
+            unique_pending = deduplicate_list(raw_pending)
+
             parsed = {
-                "executive_summary": f"Resumo do dia {target_date} gerado com {len(messages)} mensagens.",
-                "key_events": [m.get("summary", m.get("revised_text", ""))[:80] for m in messages[:5]],
+                "executive_summary": f"Resumo do dia {target_date} consolidado com {len(messages)} mensagens.",
+                "key_events": unique_events[:5],
                 "decisions": [],
                 "issues_and_blockers": [],
-                "completed_tasks": [t.get("title", "") for t in tasks if t.get("status") == "DONE"],
-                "pending_tasks": [t.get("title", "") for t in tasks if t.get("status") == "PENDING"],
+                "completed_tasks": unique_done[:5],
+                "pending_tasks": unique_pending[:5],
                 "plan_for_tomorrow": [
                     {
-                        "title": t.get("title", "Revisar pendências"),
-                        "assignee": t.get("assignee"),
-                        "priority": t.get("priority", "HIGH"),
+                        "title": title,
+                        "assignee": None,
+                        "priority": "HIGH",
                         "due_date": "Amanhã",
                         "related_project": None,
                     }
-                    for t in tasks if t.get("status") == "PENDING"
-                ][:5],
+                    for title in unique_pending[:5]
+                ],
             }
 
         plan_items = [

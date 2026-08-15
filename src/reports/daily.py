@@ -9,6 +9,18 @@ from src.memory.database import SessionLocal
 from src.memory.models import MessageRecord, TaskRecord
 
 
+def deduplicate_list(items: list[str]) -> list[str]:
+    """Remove repetições mantendo a ordem original e ignorando strings vazias."""
+    seen = set()
+    result = []
+    for item in items:
+        cleaned = item.strip() if isinstance(item, str) else str(item)
+        if cleaned and cleaned not in seen:
+            seen.add(cleaned)
+            result.append(cleaned)
+    return result
+
+
 def format_daily_whatsapp_message(
     date_str: str,
     executive_summary: str,
@@ -27,44 +39,59 @@ def format_daily_whatsapp_message(
     except Exception:
         friendly_date = date_str
 
+    # Deduplica seções para evitar repetições
+    unique_key_events = deduplicate_list(key_events)
+    unique_decisions = deduplicate_list(decisions)
+    unique_issues = deduplicate_list(issues)
+    unique_completed = deduplicate_list(completed_tasks)
+    unique_pending = deduplicate_list(pending_tasks)
+
+    # Deduplica plano de ação por título
+    unique_plan = []
+    seen_plan = set()
+    for item in plan:
+        if item.title.strip() not in seen_plan:
+            seen_plan.add(item.title.strip())
+            unique_plan.append(item)
+
     lines = [
         f"📅 *RESUMO DIÁRIO — {friendly_date}*",
         f"_{executive_summary}_\n",
     ]
 
-    if key_events:
+    if unique_key_events:
         lines.append("🚀 *Principais Acontecimentos:*")
-        for ev in key_events:
+        for ev in unique_key_events[:5]:
             lines.append(f"• {ev}")
         lines.append("")
 
-    if decisions:
+    if unique_decisions:
         lines.append("💡 *Decisões & Acordos:*")
-        for dec in decisions:
+        for dec in unique_decisions[:5]:
             lines.append(f"• {dec}")
         lines.append("")
 
-    if issues:
+    if unique_issues:
         lines.append("⚠️ *Pontos de Atenção / Bloqueios:*")
-        for iss in issues:
+        for iss in unique_issues[:5]:
             lines.append(f"• {iss}")
         lines.append("")
 
-    if completed_tasks:
-        lines.append(f"✅ *Concluídas Hoje ({len(completed_tasks)}):*")
-        for t in completed_tasks[:5]:
+    if unique_completed:
+        lines.append(f"✅ *Concluídas Hoje ({len(unique_completed)}):*")
+        for t in unique_completed[:5]:
             lines.append(f"• {t}")
         lines.append("")
 
-    if pending_tasks:
-        lines.append(f"⏳ *Pendências Ativas ({len(pending_tasks)}):*")
-        for t in pending_tasks[:5]:
+    if unique_pending:
+        lines.append(f"⏳ *Pendências Ativas ({len(unique_pending)}):*")
+        for t in unique_pending[:5]:
             lines.append(f"• {t}")
         lines.append("")
 
     lines.append("🎯 *PLANO PARA AMANHÃ:*")
-    if plan:
-        for idx, item in enumerate(plan, start=1):
+    if unique_plan:
+        for idx, item in enumerate(unique_plan, start=1):
             assignee_str = f" ({item.assignee})" if item.assignee else ""
             priority_icon = "🔴" if item.priority in ["HIGH", "URGENT"] else "🔵"
             lines.append(f"{idx}. {priority_icon} *{item.title}*{assignee_str}")

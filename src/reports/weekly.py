@@ -10,6 +10,18 @@ from src.memory.graph import knowledge_graph
 from src.memory.models import MessageRecord, TaskRecord
 
 
+def deduplicate_list(items: list[str]) -> list[str]:
+    """Remove repetições mantendo a ordem original e ignorando strings vazias."""
+    seen = set()
+    result = []
+    for item in items:
+        cleaned = item.strip() if isinstance(item, str) else str(item)
+        if cleaned and cleaned not in seen:
+            seen.add(cleaned)
+            result.append(cleaned)
+    return result
+
+
 def format_weekly_whatsapp_message(
     period_str: str,
     executive_summary: str,
@@ -20,6 +32,17 @@ def format_weekly_whatsapp_message(
     plan: list[DailyActionItem],
 ) -> str:
     """Formata o Relatório Semanal em texto estruturado e executivo para o WhatsApp."""
+    unique_projects = deduplicate_list(active_projects)
+    unique_contacts = deduplicate_list(top_contacts)
+    unique_bottlenecks = deduplicate_list(bottlenecks)
+
+    unique_plan = []
+    seen_plan = set()
+    for item in plan:
+        if item.title.strip() not in seen_plan:
+            seen_plan.add(item.title.strip())
+            unique_plan.append(item)
+
     lines = [
         f"📊 *RELATÓRIO SEMANAL & PLANO DE DOMINGO*",
         f"🗓️ _Período: {period_str}_\n",
@@ -35,27 +58,27 @@ def format_weekly_whatsapp_message(
     lines.append(f"• Concluídas: {done_t}/{total_t} ({pct}%) | Pendentes: {pending_t}")
     lines.append("")
 
-    if active_projects:
+    if unique_projects:
         lines.append("🚀 *Projetos com Maior Tração:*")
-        for proj in active_projects:
+        for proj in unique_projects[:5]:
             lines.append(f"• {proj}")
         lines.append("")
 
-    if top_contacts:
+    if unique_contacts:
         lines.append("👥 *Pessoas & Articulações Principais:*")
-        for c in top_contacts:
+        for c in unique_contacts[:5]:
             lines.append(f"• {c}")
         lines.append("")
 
-    if bottlenecks:
+    if unique_bottlenecks:
         lines.append("⚠️ *Gargalos & Riscos Identificados:*")
-        for b in bottlenecks:
+        for b in unique_bottlenecks[:5]:
             lines.append(f"• {b}")
         lines.append("")
 
     lines.append("🏆 *PLANO ESTRATÉGICO PARA A PRÓXIMA SEMANA:*")
-    if plan:
-        for idx, item in enumerate(plan, start=1):
+    if unique_plan:
+        for idx, item in enumerate(unique_plan, start=1):
             assignee_str = f" ({item.assignee})" if item.assignee else ""
             due_str = f" [Prazo: {item.due_date}]" if item.due_date else ""
             lines.append(f"{idx}. 📌 *{item.title}*{assignee_str}{due_str}")
