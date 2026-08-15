@@ -249,7 +249,7 @@ async def list_recent_messages(
             "raw_text": r.raw_text or r.revised_text,
             "audio_duration_s": r.audio_duration_s,
             "audio_filename": r.audio_filename,
-            "meta_info": r.meta_info_json if isinstance(r.meta_info_json, dict) else {},
+            "meta_info": r.meta_info if isinstance(r.meta_info, dict) else {},
             "created_at": r.created_at.strftime("%d/%m/%Y %H:%M") if r.created_at else None,
             "created_at_iso": r.created_at.isoformat() if r.created_at else None,
             "tasks": [

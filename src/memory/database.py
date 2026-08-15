@@ -55,8 +55,11 @@ def set_database_url(new_url: str):
 def init_db() -> None:
     """Inicializa as tabelas do banco de dados se não existirem e adiciona novas colunas."""
     from sqlalchemy import text
+
+    is_sqlite = DATABASE_URL.startswith("sqlite")
+
     try:
-        if DATABASE_URL.startswith("sqlite"):
+        if is_sqlite:
             with engine.connect() as conn:
                 try:
                     conn.execute(text("PRAGMA journal_mode=WAL"))
@@ -66,27 +69,21 @@ def init_db() -> None:
                     pass
 
         Base.metadata.create_all(bind=engine)
-        with engine.connect() as conn:
+
+        migrations = [
+            ("ALTER TABLE messages ADD COLUMN IF NOT EXISTS sentiment VARCHAR(32) DEFAULT 'NEUTRAL'" if not is_sqlite else "ALTER TABLE messages ADD COLUMN sentiment VARCHAR(32) DEFAULT 'NEUTRAL'"),
+            ("ALTER TABLE messages ADD COLUMN IF NOT EXISTS sentiment_score FLOAT DEFAULT 0.0" if not is_sqlite else "ALTER TABLE messages ADD COLUMN sentiment_score FLOAT DEFAULT 0.0"),
+            ("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500)" if not is_sqlite else "ALTER TABLE contacts ADD COLUMN avatar_url VARCHAR(500)"),
+            ("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS notes TEXT" if not is_sqlite else "ALTER TABLE tasks ADD COLUMN notes TEXT"),
+        ]
+
+        for stmt in migrations:
             try:
-                conn.execute(text("ALTER TABLE messages ADD COLUMN sentiment VARCHAR(32) DEFAULT 'NEUTRAL'"))
-                conn.commit()
+                with engine.begin() as conn:
+                    conn.execute(text(stmt))
             except Exception:
                 pass
-            try:
-                conn.execute(text("ALTER TABLE messages ADD COLUMN sentiment_score FLOAT DEFAULT 0.0"))
-                conn.commit()
-            except Exception:
-                pass
-            try:
-                conn.execute(text("ALTER TABLE contacts ADD COLUMN avatar_url VARCHAR(500)"))
-                conn.commit()
-            except Exception:
-                pass
-            try:
-                conn.execute(text("ALTER TABLE tasks ADD COLUMN notes TEXT"))
-                conn.commit()
-            except Exception:
-                pass
+
         logger.info(f"Banco de dados inicializado com sucesso usando: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL}")
     except Exception as e:
         logger.error(f"Erro ao inicializar banco de dados: {e}")

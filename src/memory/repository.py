@@ -8,7 +8,6 @@ from typing import Any, Optional, List
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
-from src.ai_gateway.extractor import semantic_extractor
 from src.ai_gateway.providers import get_ai_provider
 from src.ai_gateway.schemas import SemanticExtractionRequest
 from src.config import settings
@@ -81,6 +80,7 @@ class MemoryRepository:
                 include_dictionary=True,
             )
             try:
+                from src.ai_gateway.extractor import semantic_extractor
                 extracted = await semantic_extractor.extract(extraction_req)
             except Exception as extract_err:
                 logger.warning(f"Extração semântica com IA falhou ({extract_err}). Usando fallback heurístico.")

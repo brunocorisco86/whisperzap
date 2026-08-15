@@ -115,21 +115,21 @@
   {
     "term": "TMS",
     "phonetic_variations": [
-      "tem esse",
-      "t em esse",
+      "t m s",
       "sistema tms",
-      "t em s",
       "têmessi",
+      "temesse",
+      "t em esse",
       "tms",
+      "têemeésse",
+      "t em s",
       "roteirizador",
       "t.m.s.",
-      "t m s",
-      "temesse",
-      "têemeésse"
+      "tem esse"
     ],
     "expansion": "Transportation Management System",
     "category": "LOGISTICA",
-    "description": "Sistema de gestão de transporte utilizado para alocação de cargas e logística de ração.",
+    "description": "Sistema de gestão de transporte utilizado para alocação de cargas e logística de ração",
     "id": "2f3a4b56",
     "created_at": "2026-08-15T01:06:00.000000"
   },

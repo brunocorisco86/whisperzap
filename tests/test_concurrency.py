@@ -35,7 +35,7 @@ async def test_parallel_messages_concurrency():
         processing_time_ms=5.0,
     )
 
-    with patch("src.memory.repository.semantic_extractor.extract", new_callable=AsyncMock) as mock_extract, \
+    with patch("src.ai_gateway.extractor.semantic_extractor.extract", new_callable=AsyncMock) as mock_extract, \
          patch("src.memory.repository.get_ai_provider") as mock_get_provider:
         
         mock_extract.return_value = mock_response
