@@ -93,13 +93,28 @@ class LexicalHarvester:
                 candidates_json=json.dumps(candidates_payload, ensure_ascii=False, indent=2)
             )
 
-            raw_response = await self.provider.generate_text(
-                prompt=prompt,
-                system_instruction=HARVESTER_SYSTEM_PROMPT,
-                temperature=0.1,
-            )
-
-            decisions = self._extract_json_array(raw_response)
+            try:
+                raw_response = await self.provider.generate_text(
+                    prompt=prompt,
+                    system_instruction=HARVESTER_SYSTEM_PROMPT,
+                    temperature=0.1,
+                )
+                decisions = self._extract_json_array(raw_response)
+            except Exception as e:
+                logger.warning(f"Aviso no Pescador Léxico da IA ({e}). Usando decisão heurística resiliente.")
+                decisions = [
+                    {
+                        "candidate_id": c["id"],
+                        "raw_term": c["raw_term"],
+                        "decision": "PROMOVE",
+                        "canonical_term": c["raw_term"].capitalize(),
+                        "category": c["category"],
+                        "definition": f"Termo técnico identificado: {c['raw_term']}",
+                        "phonetic_variations": [c["raw_term"].lower()],
+                        "justification": "Promoção automática por fallback de resiliência.",
+                    }
+                    for c in candidates_payload
+                ]
 
             promoted_terms = []
             details = []

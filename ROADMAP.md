@@ -165,14 +165,14 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [CONCLUÍDO]
 
 ---
 
-## 📊 Fase 7: Analytics, Métricas & Dashboard Executivo [ROADMAP / EM PLANEJAMENTO]
+## 📊 Fase 7: Analytics, Métricas & Dashboard Executivo [CONCLUÍDO]
 
-- [ ] **7.1 Backend Analítico Multiescala (`src/analytics/`)**:
+- [x] **7.1 Backend Analítico Multiescala (`src/analytics/`)**:
   - Endpoint agregador `GET /api/v1/analytics/dashboard?period=day|week|month|custom`.
   - Agrupamento temporal otimizado (dia, semana, mês) para contatos únicos, volume de mensagens e tamanho médio.
   - Pipeline de NLP em Python para WordMap semântico (limpeza de stopwords, TF-IDF e clusters de tópicos).
   - KPIs avançados: taxa de acionabilidade de tarefas (% conversion), índice de esforço de áudio e sentimento predominante.
-- [ ] **7.2 Frontend do Dashboard no Control Hub (`src/web/`)**:
+- [x] **7.2 Frontend do Dashboard no Control Hub (`src/web/`)**:
   - Nova aba `#tab-analytics` com navegação reativa.
   - Toolbar com filtros por período (`Hoje`, `7D`, `30D`, `Mês Atual`) e granularidade (`Dia`, `Semana`, `Mês`).
   - 5 Hero KPI Cards no topo.
@@ -182,9 +182,23 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [CONCLUÍDO]
     3. *Tamanho Médio e Duração das Mensagens* (Dual Axis barras/linha);
     4. *WordMap / Nuvem Semântica de Termos e Tópicos* (Canvas interativo);
     5. *Heatmap de Horários de Pico* (Matriz 24h x 7 dias).
-- [ ] **7.3 Validação e Testes Automatizados**:
+- [x] **7.3 Validação e Testes Automatizados**:
   - Testes unitários de agregação e tokenização (`tests/test_analytics.py`).
   - Deploy e validação com dados reais na VPS Hostinger.
+
+---
+
+## 🌟 Itens Bônus & Agentes Especializados Entregues
+
+### 🟢 Sidequest 1: Dicionário Léxico & Pescador Ativo [CONCLUÍDO]
+- [x] Agente **Pescador Léxico (`LexicalHarvester`)** rodando diariamente às 19:00 para análise de candidatos.
+
+### 🟢 Sidequest 2: Agente "Zeladora" (Graph Janitor) & Faxina Semanal no Grafo [CONCLUÍDO]
+- [x] Motor de faxina cirúrgica no Grafo NetworkX com Whitelist de nós sagrados (`src/memory/janitor.py`).
+- [x] Agendamento automático aos **Domingos às 23:00** (`cron_service.py` e `workflows/n8n_graph_janitor_cron.json`).
+- [x] Botão interativo `🧹 Faxina da Zeladora` na toolbar do Grafo no Control Hub.
+- [x] Endpoints `POST /api/v1/memory/graph/clean` e `GET /api/v1/memory/graph/janitor/logs`.
+- [x] Suíte de testes automatizados [`tests/test_graph_janitor.py`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/tests/test_graph_janitor.py).
 
 
 

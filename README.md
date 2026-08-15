@@ -1,159 +1,170 @@
-# 🧠 Hermes Voice Memory
+# 🏛️ Hermes Voice Memory — Voice Memory & Knowledge Graph System
 
-> **Sistema pessoal de captura, memória e inteligência operacional por voz**
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2Bpgvector-336791.svg)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-Production%20Ready-2496ED.svg)](https://www.docker.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
-[![Framework FastAPI](https://img.shields.io/badge/framework-FastAPI-green.svg)](https://fastapi.tiangolo.com/)
-[![Tests Pytest](https://img.shields.io/badge/tests-pytest-orange.svg)](https://docs.pytest.org/)
-[![Graphify Context](https://img.shields.io/badge/context-Graphify-purple.svg)](https://github.com/safishamsi/graphify)
-
-O **Hermes Voice Memory** transforma mensagens de voz enviadas pelo WhatsApp em informação estruturada, memória contextual, grafos de relacionamento e planos de ação automatizados.
+> **Hermes Voice Memory** é um ecossistema inteligente de copiloto de voz, memória de longo prazo e inteligência estratégica, projetado para transformar mensagens e áudios do WhatsApp em conhecimento relacional, tarefas acionáveis e análises em tempo real para o agronegócio e a gestão executiva.
 
 ---
 
-## 🎯 Pilares da Solução
+## 🧭 Sumário Executivo
 
-O projeto é construído sob **três pilares fundamentais**:
-
-1. **📢 Comunicação Eficiente (Plataforma Centralizada)**
-   - WhatsApp como interface única e transparente de captura e comunicação no dia a dia.
-   - n8n atua como a camada de orquestração de workflows e integração.
-
-2. **⚙️ Processos Otimizados (Redesenho do Fluxo Operacional)**
-   - O usuário envia um áudio ➔ o sistema transcreve ➔ revisa silenciosamente com contexto sem expor JSONs ou ruído técnico ➔ retorna o **texto limpo e revisado** no WhatsApp.
-   - Gravação silenciosa em memória de intenções, tarefas, decisões, problemas e ideias.
-   - Geração automática de resumos diários, planos para o dia seguinte, consolidações semanais e planejamento estratégico aos domingos.
-
-3. **🛠️ Tecnologia Habilitadora**
-   - **AI Gateway (FastAPI)**: Abstração de modelos (Gemini, OpenRouter, LLMs locais) com roteamento inteligente por custo/tarefa.
-   - **Speech-to-Text**: `faster-whisper` dedicado para transcrição local/API.
-   - **Armazenamento de Memória**: PostgreSQL (fonte da verdade) + `pgvector` (memória semântica) + NetworkX (análise relacional de grafos).
-   - **Infraestrutura**: Alpine Linux (rodando em VPS de produção e no Raspberry Pi 3B com n8n), conteinerização Docker e segurança de rede com Tailscale.
+O Hermes resolve a dispersão de informações e a sobrecarga cognitiva na comunicação operacional diária:
+1. **Transcrição & Revisão Contextual**: Processa áudios em milissegundos via `faster-whisper` e corrige termos técnicos com **Gemini 3.1 Flash Lite**;
+2. **Memória em Camadas**: Persiste mensagens estruturadas no **PostgreSQL 16 com pgvector** (embeddings vetoriais) e modela entidades e relacionamentos no **Grafo NetworkX**;
+3. **Ancoragem de Solicitante & Tarefas**: Vincula quem originou cada demanda, permitindo anotações persistentes, status dinâmico e integração com WhatsApp;
+4. **Agentes Autônomos em Background**:
+   * 🧹 **Agente Zeladora (`GraphJanitor`)**: Faxina semanal automática no Grafo aos Domingos às 23:00, podando ruídos e unificando aliases;
+   * 🎣 **Agente Pescador Léxico (`LexicalHarvester`)**: Pesca diária de jargões técnicos às 19:00 com sugestão de termos;
+   * 🌡️ **Série Temporal de Sentimentos**: Monitoramento emocional contínuo às 18:00;
+   * 🧠 **Agente Hermes**: RAG Híbrido contextual com resposta a perguntas e citações exatas;
+5. **Analytics & Dashboard Executivo**: Visualização em **Chart.js** com agrupamento temporal (Dia, Semana, Mês), Nuvem de Palavras semântica (*WordMap*) e Matriz de Horários de Pico (*Heatmap 24x7*).
 
 ---
 
 ## 🏗️ Arquitetura do Sistema
 
-```text
-                                USUÁRIO
-                                   │
-                                   │ 🎙️ Áudio
-                                   ▼
-                               WHATSAPP
-                                   │
-                                   ▼
-                              WHATSAPP API
-                                   │
-                                   ▼
-                                  n8n (Raspberry Pi 3B / Alpine)
-                                   │
-                                   ▼
-                           DOWNLOAD DE ÁUDIO
-                                   │
-                                   ▼
-                              WHISPER API
-                                   │
-                                   ▼
-                            AI GATEWAY (FastAPI / VPS Alpine)
-                                   │
-                                   ├──────────────► WHATSAPP (Texto Revisado)
-                                   │
-                                   ▼
-                           EXTRAÇÃO SEMÂNTICA
-                                   │
-                                   ▼
-                                MEMÓRIA
-                    ┌──────────────┼──────────────┐
-                    ▼              ▼              ▼
-                PostgreSQL      pgvector        Graph (NetworkX)
-                    │              │              │
-                    └──────────────┼──────────────┘
-                                   ▼
-                             HERMES / API
+```mermaid
+flowchart TD
+    subgraph Inputs["1. Entrada de Voz & Mensagens"]
+        WA["📱 WhatsApp (Evolution API v2 / Z-API)"]
+        WEB["🎙️ Gravação no Navegador / Upload de Áudio"]
+    end
+
+    subgraph CoreEngine["2. Processamento & AI Gateway"]
+        WHISPER["⚡ Faster-Whisper (Transcrição Local CPU/GPU)"]
+        GATEWAY["🧠 AI Gateway (Gemini 3.1 Flash Lite / OpenRouter)"]
+        DICT["📖 Dicionário Léxico & Glossário Fonético"]
+    end
+
+    subgraph MemoryLayer["3. Memória em Camadas & Grafo"]
+        PG[("🐘 PostgreSQL 16 + pgvector (Embeddings)")]
+        NX[("🕸️ Grafo de Conhecimento NetworkX")]
+        CONTACTS[("👥 Tabela de Contatos & Papéis")]
+    end
+
+    subgraph AutonomousAgents["4. Agentes Autônomos (Cron & On-Demand)"]
+        JANITOR["🧹 Zeladora (Graph Janitor - Dom 23h)"]
+        HARVESTER["🎣 Pescador Léxico (Harvester - Diário 19h)"]
+        SENTIMENT["🌡️ Consolidador Emocional (Diário 18h)"]
+        HERMES["🧠 Hermes RAG Híbrido (Q&A Contextual)"]
+    end
+
+    subgraph Interfaces["5. Interfaces & Visualização"]
+        HUB["🖥️ Hermes Control Hub (Web UI)"]
+        DASH["📊 Analytics & Dashboard (Chart.js)"]
+        REPORTS["📋 Resumos Diários & Semanais no WhatsApp"]
+    end
+
+    Inputs --> WHISPER
+    WHISPER --> GATEWAY
+    DICT --> GATEWAY
+    GATEWAY --> MemoryLayer
+    MemoryLayer --> AutonomousAgents
+    AutonomousAgents --> Interfaces
 ```
 
 ---
 
-## 💻 Ambiente de Desenvolvimento vs Produção
+## 📊 Fases do Roadmap Entregues (100% Concluído)
 
-- **Ambiente de Desenvolvimento (Local)**:
-  - Desenvolvimento e testes locais em Python 3.12+ com 46 testes automatizados (`pytest`).
-  - Utilização do **Graphify** para mapeamento do código/documentação e economia de tokens dos agentes IA.
-  - Testes com banco SQLite embutido e modelos Mock para execução offline rápida.
-- **Ambiente de Produção (Topologia Homelab)**:
-  - **VPS Hostinger (`ssh hostinger`)**: Docker Alpine Linux (FastAPI + Whisper `int8` + Caddy HTTPS + PostgreSQL `pgvector`).
-  - **Raspberry Pi 3B+ (`ssh peixe`)**: Docker Alpine Linux (n8n + Evolution API WhatsApp).
-  - **Rede Privada**: Túnel WireGuard via Tailscale conectando ambos os nós.
+| Fase | Descrição | Status |
+| :--- | :--- | :---: |
+| **Fase 1** | Setup de Infraestrutura Local, Governança e Testes (`pytest`) | ✅ Concluído |
+| **Fase 2** | MVP 1 — Transcrição de Áudio WhatsApp & AI Gateway | ✅ Concluído |
+| **Fase 3** | Repositório Remoto & Sincronização Git Push Contínua | ✅ Concluído |
+| **Fase 4** | Memória em Camadas (PostgreSQL + pgvector + NetworkX) | ✅ Concluído |
+| **Fase 5** | API Memory, Agente Hermes (RAG Híbrido) & Relatórios WhatsApp | ✅ Concluído |
+| **Fase 6** | Deploy de Produção em VPS Alpine Linux com Caddy e Docker Compose | ✅ Concluído |
+| **Fase 7** | Analytics, Métricas & Dashboard Executivo com Chart.js | ✅ Concluído |
+| **Bônus** | Agente Zeladora (Graph Janitor) & Faxina Semanal no Grafo | ✅ Concluído |
 
 ---
 
-## 🚀 Como Iniciar no Desenvolvimento Local
+## 🤖 Agentes Especializados
 
-### 1. Clonar e configurar o ambiente
+### 1. 🧹 Agente "Zeladora" (`GraphJanitorService`)
+* **Propósito**: Manter o Grafo de Conhecimento enxuto, consistente e livre de termos efêmeros e ruídos;
+* **Regras de Faxina**:
+  1. *Proteção Sagrada*: Contatos oficiais (`contacts`), empresas, projetos e nós com $\ge 3$ conexões nunca são deletados;
+  2. *Poda de Efêmeros*: Remove marcadores temporais (*amanhã*, *ontem*, *segunda-feira*) e saudações;
+  3. *Poda de Órfãos*: Remove nós isolados de baixo valor (`degree == 0` e `mentions <= 1`);
+  4. *Fusão de Aliases*: Desambigua variações (ex: `silo 3` ➔ `Silo 3`) transferindo todas as arestas;
+* **Agendamento**: Todo **Domingo às 23:00** via `cron_service.py` ou sob demanda na aba do Grafo no Control Hub.
+
+### 2. 🎣 Agente "Pescador Léxico" (`LexicalHarvester`)
+* **Propósito**: Identificar termos técnicos e fonéticos não catalogados no dia a dia;
+* **Agendamento**: Diário às **19:00**.
+
+### 3. 🧠 Agente Hermes (`HermesAgentService`)
+* **Propósito**: RAG Híbrido combinando busca vetorial semântica, busca direta por interlocutor (`speaker match`), ancoragem de tarefas pendentes e conexões do Grafo NetworkX.
+
+---
+
+## 🛠️ Instalação e Execução
+
+### 1. Pré-requisitos
+* Python 3.12+
+* Docker & Docker Compose
+* FFmpeg instalado (`sudo apt install ffmpeg`)
+
+### 2. Configuração Local
 ```bash
+# Clone o repositório
 git clone git@github.com:brunocorisco86/whisperzap.git
-cd 9_Voice_Assistant
+cd whisperzap
 
-# Criar e ativar ambiente virtual Python
+# Crie o ambiente virtual
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Instalar dependências
+# Instale as dependências
 pip install -r requirements.txt
-```
 
-### 2. Configurar Variáveis de Ambiente
-```bash
+# Configure as variáveis de ambiente
 cp .env.example .env
-# Edite o arquivo .env com suas chaves de API (Gemini / OpenRouter)
+
+# Execute os testes automatizados
+pytest
 ```
 
-### 3. Executar a Suite de Testes (46 testes)
-```bash
-pytest -v
-```
-
-### 4. Executar o Servidor FastAPI
+### 3. Execução do Servidor
 ```bash
 uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-Acesse a documentação Swagger interativa em: [http://localhost:8000/docs](http://localhost:8000/docs).
+* **Control Hub**: `http://localhost:8000/`
+* **Swagger API Docs**: `http://localhost:8000/docs`
+* **Pareamento WhatsApp**: `http://localhost:8000/whatsapp/qr`
 
----
-
-## 🔌 Endpoints Principais da API
-
-- **Transcrição**: `POST /transcribe` (Áudio ➔ Transcrição Whisper)
-- **AI Gateway**: `POST /ai/revise` (Revisão Contextual) e `POST /ai/extract` (Extração Semântica estruturada)
-- **Memória & Grafo**: `POST /api/v1/memory/messages`, `GET /api/v1/memory/tasks`, `POST /api/v1/memory/search`, `GET /api/v1/memory/graph/*`, `GET /api/v1/memory/stats`
-- **Dicionário Léxico**: `GET /api/v1/dictionary`, `POST /api/v1/dictionary`, `GET /api/v1/dictionary/hints`
-- **Contatos & Roles**: `GET /api/v1/contacts`, `GET /api/v1/contacts/markdown-table`, `POST /api/v1/contacts/batch-import`
-
----
-
-## 🕸️ Uso do Graphify no Desenvolvimento
-
-Para garantir que os agentes de IA tenham acesso a contexto profundo do código sem desperdício de tokens, utilizamos o **Graphify**:
-
+### 4. Deploy em Produção (Docker Compose)
 ```bash
-# Gerar/atualizar o grafo de conhecimento AST
-graphify extract . --code-only
-
-# Listar os principais nós arquiteturais (god nodes)
-graphify god-nodes
+docker compose up -d --build
 ```
 
-Consulte o documento [`docs/graphify_guide.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/graphify_guide.md) para detalhes.
+---
+
+## 📡 Principais Endpoints da API
+
+| Método | Endpoint | Descrição |
+| :--- | :--- | :--- |
+| `POST` | `/transcribe` | Transcrição de áudio via Faster-Whisper |
+| `POST` | `/ai/revise` | Revisão contextual de texto via AI Gateway |
+| `POST` | `/api/v1/memory/messages` | Salva mensagem com extração semântica e nós no Grafo |
+| `GET` | `/api/v1/memory/messages` | Feed de mensagens com metadados e áudio |
+| `GET` | `/api/v1/memory/tasks` | Lista tarefas com ancoragem de solicitante e anotações |
+| `PATCH`| `/api/v1/memory/tasks/{id}` | Atualiza status (`DONE`, `CANCELLED`, `PENDING`) e notas |
+| `GET` | `/api/v1/analytics/dashboard` | Dados do Dashboard (KPIs, Séries, Top Contatos, WordMap, Heatmap) |
+| `POST` | `/api/v1/memory/graph/clean` | Dispara faxina da Zeladora no Grafo de Conhecimento |
+| `GET` | `/api/v1/memory/graph/janitor/logs` | Consulta histórico de relatórios da Zeladora |
+| `POST` | `/api/v1/memory/query` | Consulta contextual ao Hermes com RAG Híbrido |
 
 ---
 
-## 📚 Documentação do Projeto
+## 👥 Contatos & Governança
 
-- 🗺️ [`ROADMAP.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/ROADMAP.md): Planejamento, fases e status das Sidequests 1 e 2.
-- 📜 [`LOGS.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/LOGS.md): Histórico de decisões de arquitetura (ADRs 001 a 007) e logs das Sessões 001 a 006.
-- 📐 [`docs/architecture.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/architecture.md): Detalhamento da arquitetura técnica, dimensionamento e topologia de servidores (`ssh peixe` e `ssh hostinger`).
-- 🎙️ [`docs/tutorial_teste_audio.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/tutorial_teste_audio.md): Tutorial passo a passo para envio e teste de áudio WhatsApp.
-- 🔄 [`docs/mvp1_whatsapp_workflow.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/mvp1_whatsapp_workflow.md): Guia de importação e configuração do fluxo n8n.
-- 🤖 [`docs/subagents/`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/subagents/): Manuais dos subagentes especialistas.
-
-
+* **Desenvolvido por**: Bruno Conter
+* **Foco de Aplicação**: Gestão Operacional, Inteligência Avícola e Negócios C.Vale
+* **Repositório**: [github.com/brunocorisco86/whisperzap](https://github.com/brunocorisco86/whisperzap)

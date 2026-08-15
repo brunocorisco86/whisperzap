@@ -196,6 +196,37 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
   - Elaboração do Playbook Prático de Go-Live em [`docs/go_live_playbook.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/go_live_playbook.md) com orientações passo a passo para teste imediato via Swagger UI (`/docs`), integração com WhatsApp/n8n e deploy final na VPS Alpine Linux via Tailscale.
 - **Resultado**: Sistema 100% auditado, comprovado operacionalmente e pronto para uso diário.
 
+### Sessão 010 — Implementação da Fase 7 (Analytics & Dashboard), Agente Zeladora (Graph Janitor) e Aprimoramento do RAG Híbrido
+- **Data**: 2026-08-15
+- **Objetivo**: Desenvolver e colocar em produção o Dashboard Analítico Executivo com Chart.js (Fase 7), o Agente autônomo "Zeladora" para faxina semanal no Grafo de Conhecimento, o aprimoramento do RAG Híbrido com ancoragem por interlocutor e tarefas, e o Feed Executivo com persistência de anotações e status de tarefas.
+- **Ações Realizadas**:
+  - **Fase 7 — Analytics & Dashboard Executivo**:
+    - Criação do pacote analítico (`src/analytics/`) com schemas Pydantic, serviço com agregações SQL temporais por Dia, Semana e Mês, e pipeline de NLP para remoção de stopwords em português e classificação em 4 clusters temáticos (*Zootecnia/Silos*, *Logística*, *Gestão*, *Pessoal*).
+    - Criação do endpoint `GET /api/v1/analytics/dashboard`.
+    - Desenvolvimento da aba `#tab-analytics` no Control Hub com 5 Hero KPI Cards, 5 gráficos em **Chart.js** (Séries Temporais, Ranking de Interlocutores, Tamanho/Duração Médio de Mensagens, WordMap Semântico e Heatmap de Horários 24x7).
+    - Criação de testes automatizados em `tests/test_analytics.py`.
+  - **Agente "Zeladora" (`GraphJanitor`)**:
+    - Desenvolvimento do serviço `GraphJanitorService` (`src/memory/janitor.py`) com Whitelist de proteção de nós sagrados (contatos cadastrados, papéis, empresas, termos canônicos e nós com alta conectividade).
+    - Poda cirúrgica de termos efêmeros (*amanhã*, *áudio*, *ontem*, saudações) e nós isolados de grau 0.
+    - Desambiguação e fusão de variações quase-idênticas (aliases) transferindo todas as arestas de entrada e saída.
+    - Agendamento automático semanal aos **Domingos às 23:00** no loop assíncrono (`src/scheduler/cron_service.py`) e redundância no n8n (`workflows/n8n_graph_janitor_cron.json`).
+    - Botão interativo `🧹 Faxina da Zeladora` na toolbar do Grafo e endpoints `POST /api/v1/memory/graph/clean` e `GET /api/v1/memory/graph/janitor/logs`.
+    - Criação de testes em `tests/test_graph_janitor.py`.
+  - **Aprimoramento do RAG Híbrido & Hermes Agent**:
+    - Identificação de falha de recuperação quando a pergunta citava nomes específicos (ex: *"o que o Ailton queria hoje?"*).
+    - Implementação de busca direta no banco por interlocutor/remetente (`speaker match`) combinada com a busca vetorial por embeddings.
+    - Ancoragem de tarefas pendentes pelo `speaker` (solicitante que gerou a demanda).
+    - Correção dos event listeners e escopo global das funções no botão `⚡ Perguntar` e chips de sugestões da aba `#tab-query`.
+    - Fallback resiliente com `try/except` em chamadas LLM (`generate_daily_summary`, `generate_weekly_report`, `answer_hermes_query`) contra erros 503 temporários da API.
+  - **Feed Executivo & Tarefas**:
+    - Adicionada coluna `notes: Text` no PostgreSQL e suporte a anotações salvas por tarefa.
+    - Suporte a status `CANCELLED` (Ignorar Tarefa) e `PENDING` (Restaurar Tarefa).
+    - Migrações DDL transacionais resilientes em `src/memory/database.py`.
+  - **Auditoria de Testes e Deploy em Produção**:
+    - **75 Testes Automatizados Aprovados com 100% de Sucesso** (`pytest`).
+    - Deploy completo na VPS Hostinger (`179.197.73.80:8005`) com rebuild do container `hermes-api` e validação real de todos os endpoints.
+- **Resultado**: Todas as 7 Fases do Roadmap e Sidequests concluídas, testadas e 100% operacionais em produção.
+
 
 
 
