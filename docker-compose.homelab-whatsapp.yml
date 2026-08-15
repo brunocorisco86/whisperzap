@@ -40,7 +40,7 @@ services:
       SERVER_TYPE: http
       SERVER_PORT: 8080
       SERVER_URL: http://localhost:8080
-      AUTHENTICATION_API_KEY: ${WHATSAPP_API_TOKEN:-hermes_evolution_token_secret_123}
+      AUTHENTICATION_API_KEY: ${WHATSAPP_API_TOKEN:-8c114ae397eb273edfe82e05728be8b4e17cc25649d7e26df40c438c67c368b0}
       DATABASE_ENABLED: "true"
       DATABASE_PROVIDER: postgresql
       DATABASE_CONNECTION_URI: postgresql://evolution_user:evolution_password@evolution-postgres:5432/evolution_db?schema=evolution_api
