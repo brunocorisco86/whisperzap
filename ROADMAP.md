@@ -154,14 +154,14 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [CONCLUÍDO]
 - [x] **4.2** Configurar variáveis de ambiente no Raspberry Pi apontando `HERMES_API_URL` para a VPS (`http://179.197.73.80:8005` ou Tailscale `http://100.106.3.81:8005`).
 - [x] **4.3** Subir a stack Docker Homelab (`hermes-evolution-api`, `hermes-n8n`, `redis`, `postgres`).
 - [x] **4.4** Conectar o WhatsApp na Evolution API via QR Code no Raspberry Pi (`http://192.168.1.99:8080`).
-- [ ] **4.5** Importar e ativar o **Master Orchestrator** no n8n do Raspberry Pi (`http://192.168.1.99:5678`).
+- [x] **4.5** Importar e ativar o **Master Orchestrator** no n8n do Raspberry Pi (`http://192.168.1.99:5678`).
 
 ### 📍 Etapa 5: Auditoria & Verificação Global de Toda a Arquitetura e Stack
-- [x] **5.1** Teste de conectividade e túnel de rede: Raspberry Pi ➔ VPS Hostinger (Health Check validado).
+- [x] **5.1** Teste de conectividade e túnel de rede: Raspberry Pi ➔ VPS Hostinger (Health Check & AI Gateway validados).
 - [ ] **5.2** Teste de transcrição de áudio real do WhatsApp processado na VPS e devolvido pelo **James** no chat.
 - [ ] **5.3** Teste de consulta interativa RAG ao **Hermes Agent** via comando `?` no WhatsApp.
 - [ ] **5.4** Validação de persistência no PostgreSQL 16 + pgvector e Grafo NetworkX na VPS.
-- [ ] **5.5** Verificação do agendamento de backup diário (03:00) e integridade dos arquivos gerados.
+- [x] **5.5** Verificação do agendamento de backup diário (03:00) e integridade dos arquivos gerados.
 
 
 
