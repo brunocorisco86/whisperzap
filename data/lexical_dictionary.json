@@ -1,34 +1,5 @@
 [
   {
-    "term": "FAL",
-    "phonetic_variations": [
-      "FAU",
-      "fau",
-      "fao",
-      "fal",
-      "folha de lote"
-    ],
-    "expansion": "Ficha de Acompanhamento de Lote",
-    "category": "ZOOTECNIA",
-    "description": "Documento e registro diário com mortalidade, consumo de ração e peso das aves.",
-    "id": "21d8730a",
-    "created_at": "2026-08-14T22:47:18.174119"
-  },
-  {
-    "term": "eProdutor",
-    "phonetic_variations": [
-      "e-produtor",
-      "eprodutor",
-      "e produtor",
-      "aplicativo do produtor"
-    ],
-    "expansion": "Aplicativo eProdutor",
-    "category": "SISTEMAS",
-    "description": "Aplicativo mobile utilizado pelos cooperados e integrados para lançamento de dados de campo.",
-    "id": "3dd119a9",
-    "created_at": "2026-08-14T22:47:18.174150"
-  },
-  {
     "term": "C.Vale",
     "phonetic_variations": [
       "Sevala",
@@ -51,31 +22,110 @@
     "created_at": "2026-08-14T22:47:18.174163"
   },
   {
-    "term": "Mortalidade",
+    "term": "Agrocenter",
     "phonetic_variations": [
-      "mhotilidade",
-      "hotelidade",
-      "motilidade",
-      "mortalidade das aves"
+      "agrocenter",
+      "agro center",
+      "agrocênter",
+      "agro-center",
+      "agro senter"
     ],
-    "expansion": "Mortalidade Diária do Aviário",
-    "category": "ZOOTECNIA",
-    "description": "Contagem de perdas diárias no lote avícola.",
-    "id": "c2b9e1ac",
-    "created_at": "2026-08-14T22:47:18.174173"
+    "expansion": "Portal Agrocenter C.Vale",
+    "category": "SISTEMAS",
+    "description": "Portal ERP e centralizador de pedidos de ração e insumos agropecuários.",
+    "id": "7a8b9c01",
+    "created_at": "2026-08-15T01:06:00.000000"
   },
   {
-    "term": "Vazio Sanitário",
+    "term": "eProdutor",
     "phonetic_variations": [
-      "vazio sanitario",
-      "intervalo sanitário",
-      "vazio de lote"
+      "e-produtor",
+      "eprodutor",
+      "e produtor",
+      "aplicativo do produtor"
     ],
-    "expansion": "Período de Vazio Sanitário",
-    "category": "ZOOTECNIA",
-    "description": "Período de desinfecção, descanso e preparação do aviário entre lotes sucessivos.",
-    "id": "58a103bf",
-    "created_at": "2026-08-14T22:47:18.174181"
+    "expansion": "Aplicativo eProdutor C.Vale",
+    "category": "SISTEMAS",
+    "description": "Aplicativo mobile utilizado pelos cooperados e integrados para lançamento de dados de campo.",
+    "id": "3dd119a9",
+    "created_at": "2026-08-14T22:47:18.174150"
+  },
+  {
+    "term": "Mtech",
+    "phonetic_variations": [
+      "emitech",
+      "emitequi",
+      "m-tech",
+      "m tech",
+      "mtequi",
+      "m-teck",
+      "mtech systems"
+    ],
+    "expansion": "Mtech Systems",
+    "category": "SISTEMAS",
+    "description": "Software global de gestão de integração e rastreabilidade avícola.",
+    "id": "8b9c0d12",
+    "created_at": "2026-08-15T01:06:00.000000"
+  },
+  {
+    "term": "Amino",
+    "phonetic_variations": [
+      "amíno",
+      "amino software",
+      "mtech amino",
+      "banco amino",
+      "amino sql"
+    ],
+    "expansion": "Mtech Amino ERP",
+    "category": "SISTEMAS",
+    "description": "Banco de dados MS SQL Server e backend do ecossistema Mtech Systems.",
+    "id": "9c0d1e23",
+    "created_at": "2026-08-15T01:06:00.000000"
+  },
+  {
+    "term": "BRIM",
+    "phonetic_variations": [
+      "brin",
+      "brim",
+      "b r i m",
+      "módulo brim",
+      "modulo brim"
+    ],
+    "expansion": "Broiler Integration Module (Mtech)",
+    "category": "SISTEMAS",
+    "description": "Módulo de controle zootécnico e acompanhamento de lotes de frango de corte.",
+    "id": "0d1e2f34",
+    "created_at": "2026-08-15T01:06:00.000000"
+  },
+  {
+    "term": "FMIM",
+    "phonetic_variations": [
+      "fmin",
+      "fmim",
+      "f m i m",
+      "módulo fmim",
+      "modulo fmim"
+    ],
+    "expansion": "Feed Mill Integration Module (Mtech)",
+    "category": "SISTEMAS",
+    "description": "Módulo de gestão de fábrica de ração e formulação nutricional.",
+    "id": "1e2f3a45",
+    "created_at": "2026-08-15T01:06:00.000000"
+  },
+  {
+    "term": "TMS",
+    "phonetic_variations": [
+      "tms",
+      "t m s",
+      "têemeésse",
+      "sistema tms",
+      "roteirizador"
+    ],
+    "expansion": "Transportation Management System",
+    "category": "LOGISTICA",
+    "description": "Sistema de gestão e otimização de rotas e frotas para entrega de ração nos silos.",
+    "id": "2f3a4b56",
+    "created_at": "2026-08-15T01:06:00.000000"
   },
   {
     "term": "Silos e Ração",
@@ -83,7 +133,9 @@
       "sensor de racao",
       "sensor do silo",
       "nivel de racao",
-      "silo de racao"
+      "silo de racao",
+      "telemetria de silo",
+      "sensores de silos"
     ],
     "expansion": "Monitoramento de Nível de Silos de Ração",
     "category": "EQUIPAMENTOS",
@@ -92,11 +144,29 @@
     "created_at": "2026-08-14T22:47:18.174189"
   },
   {
+    "term": "FAL",
+    "phonetic_variations": [
+      "FAU",
+      "fau",
+      "fao",
+      "fal",
+      "folha de lote",
+      "ficha de lote",
+      "ficha de acompanhamento"
+    ],
+    "expansion": "Ficha de Acompanhamento de Lote",
+    "category": "ZOOTECNIA",
+    "description": "Documento e registro diário com mortalidade, consumo de ração e peso das aves.",
+    "id": "21d8730a",
+    "created_at": "2026-08-14T22:47:18.174119"
+  },
+  {
     "term": "IEP",
     "phonetic_variations": [
       "iep",
       "i e p",
-      "indice de eficiencia produtiva"
+      "indice de eficiencia produtiva",
+      "índice de eficiência produtiva"
     ],
     "expansion": "Índice de Eficiência Produtiva",
     "category": "ZOOTECNIA",
@@ -109,12 +179,102 @@
     "phonetic_variations": [
       "conversao alimentar",
       "ca",
-      "c a"
+      "c.a.",
+      "c a",
+      "taxa de conversao"
     ],
     "expansion": "Taxa de Conversão Alimentar (CA)",
     "category": "ZOOTECNIA",
     "description": "Quilogramas de ração consumida por quilograma de peso vivo produzido.",
     "id": "9b8cbe88",
     "created_at": "2026-08-14T22:47:18.174203"
+  },
+  {
+    "term": "Mortalidade",
+    "phonetic_variations": [
+      "mhotilidade",
+      "hotelidade",
+      "motilidade",
+      "mortalidade das aves",
+      "perda de lote"
+    ],
+    "expansion": "Mortalidade Diária do Aviário",
+    "category": "ZOOTECNIA",
+    "description": "Contagem de perdas diárias no lote avícola.",
+    "id": "c2b9e1ac",
+    "created_at": "2026-08-14T22:47:18.174173"
+  },
+  {
+    "term": "Vazio Sanitário",
+    "phonetic_variations": [
+      "vazio sanitario",
+      "intervalo sanitário",
+      "vazio de lote",
+      "intervalo de lote"
+    ],
+    "expansion": "Período de Vazio Sanitário",
+    "category": "ZOOTECNIA",
+    "description": "Período de desinfecção, descanso e preparação do aviário entre lotes sucessivos.",
+    "id": "58a103bf",
+    "created_at": "2026-08-14T22:47:18.174181"
+  },
+  {
+    "term": "Pintainhos",
+    "phonetic_variations": [
+      "pintinho",
+      "pintinhos",
+      "pintainho",
+      "alojamento de pintos",
+      "alojamento"
+    ],
+    "expansion": "Alojamento de Pintainhos de 1 Dia",
+    "category": "ZOOTECNIA",
+    "description": "Chegada e recepção do lote de aves no aviário com aquecimento e forragem.",
+    "id": "3a4b5c67",
+    "created_at": "2026-08-15T01:06:00.000000"
+  },
+  {
+    "term": "Apanha e Abate",
+    "phonetic_variations": [
+      "apanha",
+      "abate",
+      "previsao de abate",
+      "apanha de frangos",
+      "carregamento"
+    ],
+    "expansion": "Programação de Apanha e Abate de Frangos",
+    "category": "LOGISTICA",
+    "description": "Operação de captura, pesagem final e transporte de aves para o frigorífico.",
+    "id": "4b5c6d78",
+    "created_at": "2026-08-15T01:06:00.000000"
+  },
+  {
+    "term": "Hermes",
+    "phonetic_variations": [
+      "hermes",
+      "érmes",
+      "agente hermes",
+      "copiloto hermes"
+    ],
+    "expansion": "Hermes Voice Memory & Reasoning Agent",
+    "category": "TECNOLOGIA",
+    "description": "Agente cognitivo com RAG híbrido, memória vetorial e grafo de conhecimento.",
+    "id": "5c6d7e89",
+    "created_at": "2026-08-15T01:06:00.000000"
+  },
+  {
+    "term": "James",
+    "phonetic_variations": [
+      "james",
+      "djeimes",
+      "jeimes",
+      "mordomo james",
+      "mordomo virtual"
+    ],
+    "expansion": "James (Mordomo de Transcrição de Voz)",
+    "category": "TECNOLOGIA",
+    "description": "Módulo de recepção, transcrição e revisão léxica de áudios do WhatsApp.",
+    "id": "6d7e8f90",
+    "created_at": "2026-08-15T01:06:00.000000"
   }
 ]
