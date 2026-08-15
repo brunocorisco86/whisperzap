@@ -9,15 +9,18 @@ from src.memory.router import router as memory_router
 from src.contacts.router import router as contacts_router
 from src.web.router import router as web_router, STATIC_DIR
 from src.memory.database import init_db
+from src.scheduler.cron_service import start_scheduler, stop_scheduler
 from fastapi.staticfiles import StaticFiles
 import os
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Executa a inicialização do banco de dados na partida."""
+    """Executa a inicialização do banco de dados e rotinas de agendamento em background."""
     init_db()
+    start_scheduler()
     yield
+    stop_scheduler()
 
 
 app = FastAPI(
