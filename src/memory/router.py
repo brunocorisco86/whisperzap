@@ -208,26 +208,92 @@ async def get_full_graph():
 
 
 @router.get("/messages")
-async def list_recent_messages(limit: int = Query(default=20, le=100), db: Session = Depends(get_db)):
-    """Lista as mensagens e notas de áudio mais recentes processadas."""
+async def list_recent_messages(
+    limit: int = Query(default=50, le=200),
+    speaker: str | None = Query(default=None, description="Filtrar por remetente"),
+    intent: str | None = Query(default=None, description="Filtrar por intenção"),
+    sentiment: str | None = Query(default=None, description="Filtrar por sentimento"),
+    search: str | None = Query(default=None, description="Busca textual livre"),
+    db: Session = Depends(get_db),
+):
+    """Lista mensagens e notas de áudio enriquecidas com transcrições, metadados e tarefas."""
     from src.memory.models import MessageRecord
 
-    records = db.query(MessageRecord).order_by(MessageRecord.created_at.desc()).limit(limit).all()
+    query = db.query(MessageRecord)
+    if speaker:
+        query = query.filter(MessageRecord.speaker.ilike(f"%{speaker.strip()}%"))
+    if intent:
+        query = query.filter(MessageRecord.intent == intent.upper())
+    if sentiment:
+        query = query.filter(MessageRecord.sentiment == sentiment.upper())
+    if search:
+        search_term = f"%{search.strip()}%"
+        query = query.filter(
+            (MessageRecord.revised_text.ilike(search_term))
+            | (MessageRecord.raw_text.ilike(search_term))
+            | (MessageRecord.summary.ilike(search_term))
+            | (MessageRecord.speaker.ilike(search_term))
+        )
+
+    records = query.order_by(MessageRecord.created_at.desc()).limit(limit).all()
     return [
         {
             "id": r.id,
             "speaker": r.speaker,
-            "intent": r.intent,
-            "urgency": r.urgency,
+            "intent": r.intent or "NOTE",
+            "urgency": r.urgency or "MEDIUM",
+            "sentiment": r.sentiment or "NEUTRAL",
+            "sentiment_score": round(r.sentiment_score or 0.0, 2),
             "summary": r.summary,
             "revised_text": r.revised_text,
-            "raw_text": r.raw_text,
+            "raw_text": r.raw_text or r.revised_text,
+            "audio_duration_s": r.audio_duration_s,
+            "audio_filename": r.audio_filename,
+            "meta_info": r.meta_info_json if isinstance(r.meta_info_json, dict) else {},
             "created_at": r.created_at.strftime("%d/%m/%Y %H:%M") if r.created_at else None,
+            "created_at_iso": r.created_at.isoformat() if r.created_at else None,
+            "tasks": [
+                {
+                    "id": t.id,
+                    "title": t.title,
+                    "assignee": t.assignee,
+                    "due_date": t.due_date,
+                    "priority": t.priority,
+                    "status": t.status,
+                }
+                for t in r.tasks
+            ],
+            "entities": [
+                {
+                    "name": e.name,
+                    "category": e.category,
+                    "details": e.details,
+                }
+                for e in r.entities
+            ],
             "tasks_count": len(r.tasks),
             "entities_count": len(r.entities),
         }
         for r in records
     ]
+
+
+@router.delete("/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_message(message_id: str, db: Session = Depends(get_db)):
+    """Exclui uma mensagem e seus artefatos dependentes da memória."""
+    from src.memory.models import EmbeddingRecord, EntityRecord, MessageRecord, TaskRecord
+
+    msg = db.query(MessageRecord).filter(MessageRecord.id == message_id).first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="Mensagem não encontrada")
+
+    # Remove dependentes
+    db.query(EmbeddingRecord).filter(EmbeddingRecord.message_id == message_id).delete()
+    db.query(TaskRecord).filter(TaskRecord.message_id == message_id).delete()
+    db.query(EntityRecord).filter(EntityRecord.message_id == message_id).delete()
+    db.delete(msg)
+    db.commit()
+    return None
 
 
 @router.get("/stats", response_model=MemoryStats)

@@ -162,8 +162,31 @@
     <!-- Tab 4: Messages & Voice Transcriptions -->
     <section id="tab-messages" class="tab-content">
       <div class="section-toolbar">
-        <h2>🎙️ Feed de Mensagens de Voz & Transcrições do James</h2>
-        <button class="btn btn-secondary btn-sm" id="btn-refresh-messages">🔄 Atualizar</button>
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="msg-search" placeholder="Buscar por remetente, transcrição, tarefa ou resumo...">
+        </div>
+        <div class="filter-group">
+          <select id="msg-filter-intent">
+            <option value="">Todas as Intenções</option>
+            <option value="TASK">📋 Tarefa (TASK)</option>
+            <option value="IDEA">💡 Ideia (IDEA)</option>
+            <option value="DECISION">⚖️ Decisão (DECISION)</option>
+            <option value="PROBLEM">🚨 Problema (PROBLEM)</option>
+            <option value="EVENT">📅 Evento (EVENT)</option>
+            <option value="NOTE">📝 Nota (NOTE)</option>
+          </select>
+          <select id="msg-filter-sentiment">
+            <option value="">Todos os Sentimentos</option>
+            <option value="POSITIVE">😊 Positivo (POSITIVE)</option>
+            <option value="CONFIDENT">💪 Confiante (CONFIDENT)</option>
+            <option value="NEUTRAL">😐 Neutro (NEUTRAL)</option>
+            <option value="URGENT">🚨 Urgente (URGENT)</option>
+            <option value="ANXIOUS">😰 Ansioso (ANXIOUS)</option>
+            <option value="FRUSTRATED">😤 Frustrado (FRUSTRATED)</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" id="btn-refresh-messages">🔄 Atualizar</button>
+        </div>
       </div>
 
       <div class="messages-feed" id="messages-container">

@@ -1037,42 +1037,179 @@ select:focus {
 .messages-feed {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.2rem;
 }
 
 .message-item {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 1.25rem;
+  border-radius: var(--radius-lg);
+  padding: 1.4rem;
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: 1rem;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.message-item:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
 }
 
 .message-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  font-size: 0.82rem;
-  color: var(--text-muted);
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
-.message-speaker {
+.message-speaker-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.message-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-primary), #0284c7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-weight: 700;
+  font-size: 0.95rem;
+  color: #fff;
+  text-transform: uppercase;
+}
+
+.message-speaker-name {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.message-speaker-name a {
+  color: #25d366;
+  text-decoration: none;
+  font-size: 0.85rem;
+  transition: opacity 0.15s;
+}
+
+.message-speaker-name a:hover {
+  opacity: 0.8;
+}
+
+.message-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.message-transcription-box {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.message-transcription-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 0.5rem;
+}
+
+.transcription-tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s, background 0.15s;
+}
+
+.transcription-tab-btn.active {
   color: var(--color-primary);
+  background: rgba(14, 165, 233, 0.12);
 }
 
 .message-text {
-  font-size: 0.92rem;
+  font-size: 0.94rem;
   color: var(--text-primary);
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.message-raw-text {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  font-style: italic;
   line-height: 1.5;
 }
 
 .message-summary {
-  font-size: 0.83rem;
-  color: var(--color-accent);
-  background: var(--bg-surface-elevated);
-  padding: 0.5rem 0.75rem;
+  font-size: 0.86rem;
+  color: #38bdf8;
+  background: rgba(14, 165, 233, 0.08);
+  border-left: 3px solid var(--color-primary);
+  padding: 0.6rem 0.85rem;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.message-meta-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 0.75rem;
+}
+
+.message-tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
+.message-task-mini {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0.4rem 0.75rem;
   border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+}
+
+.message-entities-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.message-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
 }

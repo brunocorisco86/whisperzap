@@ -28,6 +28,10 @@ const dictFilterCategory = document.getElementById('dict-filter-category');
 const tasksSearchInput = document.getElementById('tasks-search');
 const tasksFilterStatus = document.getElementById('tasks-filter-status');
 const tasksFilterPriority = document.getElementById('tasks-filter-priority');
+const msgSearchInput = document.getElementById('msg-search');
+const msgFilterIntent = document.getElementById('msg-filter-intent');
+const msgFilterSentiment = document.getElementById('msg-filter-sentiment');
+const btnRefreshMessages = document.getElementById('btn-refresh-messages');
 
 // Modals
 const modalContact = document.getElementById('modal-contact');
@@ -184,6 +188,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnTriggerHarvest = document.getElementById('btn-trigger-harvest');
   if (btnTriggerHarvest) {
     btnTriggerHarvest.addEventListener('click', triggerHarvest);
+  }
+
+  // Messages Tab Filter Listeners
+  if (msgSearchInput) {
+    msgSearchInput.addEventListener('input', renderMessages);
+  }
+  if (msgFilterIntent) {
+    msgFilterIntent.addEventListener('change', renderMessages);
+  }
+  if (msgFilterSentiment) {
+    msgFilterSentiment.addEventListener('change', renderMessages);
+  }
+  if (btnRefreshMessages) {
+    btnRefreshMessages.addEventListener('click', () => {
+      loadMessages();
+      showToast('Feed de mensagens atualizado!');
+    });
   }
 
   // Carrega dados do grafo
@@ -602,38 +623,214 @@ function renderTasks() {
 function renderMessages() {
   if (!messagesContainer) return;
 
-  if (allMessages.length === 0) {
+  const searchTerm = msgSearchInput ? msgSearchInput.value.toLowerCase().trim() : '';
+  const filterIntent = msgFilterIntent ? msgFilterIntent.value.toUpperCase() : '';
+  const filterSentiment = msgFilterSentiment ? msgFilterSentiment.value.toUpperCase() : '';
+
+  const filtered = allMessages.filter(m => {
+    const speaker = (m.speaker || '').toLowerCase();
+    const revised = (m.revised_text || '').toLowerCase();
+    const raw = (m.raw_text || '').toLowerCase();
+    const summary = (m.summary || '').toLowerCase();
+
+    const matchSearch = !searchTerm || speaker.includes(searchTerm) || revised.includes(searchTerm) || raw.includes(searchTerm) || summary.includes(searchTerm);
+    const matchIntent = !filterIntent || (m.intent && m.intent.toUpperCase() === filterIntent);
+    const matchSentiment = !filterSentiment || (m.sentiment && m.sentiment.toUpperCase() === filterSentiment);
+
+    return matchSearch && matchIntent && matchSentiment;
+  });
+
+  if (filtered.length === 0) {
     messagesContainer.innerHTML = `
       <div class="empty-state" style="text-align: center; padding: 3rem; color: var(--text-muted);">
-        <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">Nenhuma mensagem de áudio ou texto processada ainda</p>
-        <small>As notas de voz enviadas no WhatsApp aparecerão aqui em tempo real.</small>
+        <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">Nenhuma mensagem encontrada</p>
+        <small>As notas de voz enviadas no WhatsApp aparecerão aqui em tempo real com análise semântica e métricas.</small>
       </div>
     `;
     return;
   }
 
-  messagesContainer.innerHTML = allMessages.map(m => {
+  messagesContainer.innerHTML = filtered.map(m => {
+    const initials = (m.speaker || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     const urgencyColor = m.urgency === 'URGENT' ? '#ef4444' : m.urgency === 'HIGH' ? '#f59e0b' : '#10b981';
-    return `
-      <div class="message-item">
-        <div class="message-header">
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <span class="message-speaker">${m.speaker || 'Desconhecido'}</span>
-            ${m.urgency ? `<span class="badge" style="font-size: 0.75rem; background: rgba(255,255,255,0.08); color: ${urgencyColor};">${m.urgency}</span>` : ''}
-            ${m.intent ? `<span class="badge badge-executive" style="font-size: 0.7rem;">${m.intent}</span>` : ''}
+
+    // Mapeamento de Sentimento
+    const sentimentConfig = {
+      'POSITIVE': { emoji: '😊', label: 'Positivo', color: '#10b981' },
+      'CONFIDENT': { emoji: '💪', label: 'Confiante', color: '#06b6d4' },
+      'NEUTRAL': { emoji: '😐', label: 'Neutro', color: '#94a3b8' },
+      'URGENT': { emoji: '🚨', label: 'Urgente', color: '#ef4444' },
+      'ANXIOUS': { emoji: '😰', label: 'Ansioso', color: '#f59e0b' },
+      'FRUSTRATED': { emoji: '😤', label: 'Frustrado', color: '#e11d48' },
+    };
+    const sent = sentimentConfig[m.sentiment] || sentimentConfig['NEUTRAL'];
+
+    // Telefone / WhatsApp
+    let phoneClean = '';
+    if (m.meta_info && m.meta_info.remoteJid) {
+      phoneClean = m.meta_info.remoteJid.replace(/[^0-9]/g, '');
+    } else if (m.speaker && /^\d+$/.test(m.speaker.replace(/[^0-9]/g, ''))) {
+      phoneClean = m.speaker.replace(/[^0-9]/g, '');
+    }
+    const waLink = phoneClean.length >= 10 ? `https://wa.me/${phoneClean}` : null;
+
+    // Tarefas
+    const tasksHtml = (m.tasks && m.tasks.length > 0) ? `
+      <div class="message-tasks-list">
+        <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.2rem;">📋 Tarefas Acionáveis Extraídas:</div>
+        ${m.tasks.map(t => `
+          <div class="message-task-mini">
+            <span style="display: flex; align-items: center; gap: 0.4rem;">
+              <span style="color: ${t.priority === 'URGENT' ? '#ef4444' : t.priority === 'HIGH' ? '#f59e0b' : '#10b981'}; font-weight: 700;">●</span>
+              <span>${t.title}</span>
+              ${t.assignee ? `<small style="color: var(--text-muted);">(${t.assignee})</small>` : ''}
+            </span>
+            <span class="badge" style="font-size: 0.7rem; background: rgba(255,255,255,0.06);">${t.status}</span>
           </div>
-          <span style="font-size: 0.8rem; color: var(--text-muted);">${m.created_at || ''}</span>
+        `).join('')}
+      </div>
+    ` : '';
+
+    // Entidades
+    const entitiesHtml = (m.entities && m.entities.length > 0) ? `
+      <div class="message-entities-chips">
+        ${m.entities.map(e => `
+          <span class="message-chip" title="Categoria: ${e.category}">
+            🏷️ ${e.name}
+          </span>
+        `).join('')}
+      </div>
+    ` : '';
+
+    return `
+      <div class="message-item" id="msg-card-${m.id}">
+        <!-- Header -->
+        <div class="message-header">
+          <div class="message-speaker-info">
+            <div class="message-avatar">${initials}</div>
+            <div>
+              <div class="message-speaker-name">
+                <span>${m.speaker || 'Desconhecido'}</span>
+                ${waLink ? `<a href="${waLink}" target="_blank" title="Abrir conversa no WhatsApp">💬 WhatsApp</a>` : ''}
+              </div>
+              <small style="color: var(--text-muted); font-size: 0.78rem;">${m.created_at || 'Data desconhecida'}</small>
+            </div>
+          </div>
+
+          <div class="message-badges">
+            <span class="badge badge-executive" style="font-size: 0.72rem;">${m.intent}</span>
+            <span class="badge" style="font-size: 0.72rem; background: rgba(255,255,255,0.06); color: ${urgencyColor};">${m.urgency}</span>
+            <span class="badge" style="font-size: 0.72rem; background: rgba(255,255,255,0.06); color: ${sent.color};" title="Score emocional: ${m.sentiment_score || 0.0}">
+              ${sent.emoji} ${sent.label} (${m.sentiment_score > 0 ? '+' : ''}${m.sentiment_score || 0.0})
+            </span>
+          </div>
         </div>
-        <div class="message-text">"${m.revised_text || m.raw_text}"</div>
-        ${m.summary ? `<div class="message-summary">💡 <b>Resumo:</b> ${m.summary}</div>` : ''}
-        <div style="display: flex; gap: 0.75rem; margin-top: 0.4rem; font-size: 0.75rem; color: var(--text-muted);">
-          ${m.tasks_count ? `<span>📋 <b>${m.tasks_count}</b> tarefa(s) extraída(s)</span>` : ''}
-          ${m.entities_count ? `<span>🏷️ <b>${m.entities_count}</b> entidade(s)</span>` : ''}
+
+        <!-- Resumo -->
+        ${m.summary ? `<div class="message-summary">💡 <b>Resumo Executivo:</b> ${m.summary}</div>` : ''}
+
+        <!-- Transcription Box (Abas Revisado vs Bruto) -->
+        <div class="message-transcription-box">
+          <div class="message-transcription-tabs">
+            <button class="transcription-tab-btn active" id="btn-tab-revised-${m.id}" onclick="toggleTranscriptionTab('${m.id}', 'revised')">
+              ✨ Texto Revisado (Gemini 3.1 Flash-Lite)
+            </button>
+            <button class="transcription-tab-btn" id="btn-tab-raw-${m.id}" onclick="toggleTranscriptionTab('${m.id}', 'raw')">
+              🎙️ Transcrição Bruta (Whisper)
+            </button>
+          </div>
+
+          <div class="message-text" id="text-revised-${m.id}">"${m.revised_text || m.raw_text || 'Sem texto disponível'}"</div>
+          <div class="message-raw-text" id="text-raw-${m.id}" style="display: none;">"${m.raw_text || m.revised_text || 'Sem transcrição bruta'}"</div>
+        </div>
+
+        <!-- Tarefas Extraídas -->
+        ${tasksHtml}
+
+        <!-- Entidades Identificadas -->
+        ${entitiesHtml}
+
+        <!-- Rodapé e Ações -->
+        <div class="message-meta-bar">
+          <div style="display: flex; gap: 0.75rem; align-items: center;">
+            ${m.audio_duration_s ? `<span>⏱️ <b>${m.audio_duration_s}s</b> de áudio</span>` : ''}
+            <span>🤖 <b>Gemini 3.1 Flash-Lite</b></span>
+          </div>
+
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button class="btn btn-secondary btn-sm" onclick="copyMessageText('${encodeURIComponent(m.revised_text || m.raw_text || '')}')" title="Copiar texto revisado">
+              📋 Copiar
+            </button>
+            ${waLink ? `
+              <a href="${waLink}" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration: none;" title="Responder no WhatsApp">
+                💬 Responder
+              </a>
+            ` : ''}
+            <button class="btn btn-secondary btn-sm" style="color: var(--color-danger);" onclick="deleteMessage('${m.id}')" title="Excluir mensagem da memória">
+              🗑️ Excluir
+            </button>
+          </div>
         </div>
       </div>
     `;
   }).join('');
 }
+
+// Alterna entre abas de texto revisado e texto bruto no feed
+window.toggleTranscriptionTab = function(msgId, tabType) {
+  const btnRevised = document.getElementById(`btn-tab-revised-${msgId}`);
+  const btnRaw = document.getElementById(`btn-tab-raw-${msgId}`);
+  const textRevised = document.getElementById(`text-revised-${msgId}`);
+  const textRaw = document.getElementById(`text-raw-${msgId}`);
+
+  if (!btnRevised || !btnRaw || !textRevised || !textRaw) return;
+
+  if (tabType === 'revised') {
+    btnRevised.classList.add('active');
+    btnRaw.classList.remove('active');
+    textRevised.style.display = 'block';
+    textRaw.style.display = 'none';
+  } else {
+    btnRaw.classList.add('active');
+    btnRevised.classList.remove('active');
+    textRaw.style.display = 'block';
+    textRevised.style.display = 'none';
+  }
+};
+
+// Copia o texto revisado para a área de transferência
+window.copyMessageText = function(encodedText) {
+  const text = decodeURIComponent(encodedText);
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('Texto copiado para a área de transferência!');
+  }).catch(err => {
+    console.error('Erro ao copiar:', err);
+    showToast('Erro ao copiar texto', true);
+  });
+};
+
+// Exclui uma mensagem da memória
+window.deleteMessage = async function(messageId) {
+  if (!confirm('Deseja realmente excluir esta mensagem da memória? Esta ação não pode ser desfeita.')) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/v1/memory/messages/${messageId}`, {
+      method: 'DELETE'
+    });
+    if (res.ok || res.status === 204) {
+      showToast('Mensagem excluída com sucesso!');
+      await loadMessages();
+      await loadStats();
+    } else {
+      showToast('Erro ao excluir mensagem', true);
+    }
+  } catch (err) {
+    console.error('Erro ao excluir mensagem:', err);
+    showToast('Falha na comunicação com o servidor', true);
+  }
+};
 
 function renderDictionary() {
   const searchTerm = dictSearchInput.value.toLowerCase().trim();

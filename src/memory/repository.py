@@ -79,7 +79,27 @@ class MemoryRepository:
                 context=str(data.meta_info) if data.meta_info else None,
                 include_dictionary=True,
             )
-            extracted = await semantic_extractor.extract(extraction_req)
+            try:
+                extracted = await semantic_extractor.extract(extraction_req)
+            except Exception as extract_err:
+                logger.warning(f"Extração semântica com IA falhou ({extract_err}). Usando fallback heurístico.")
+                from src.ai_gateway.schemas import SemanticExtractionResponse
+                extracted = SemanticExtractionResponse(
+                    intent="NOTE",
+                    summary=data.revised_text[:120] if data.revised_text else "",
+                    sentiment="NEUTRAL",
+                    sentiment_score=0.0,
+                    tasks=[],
+                    entities=[],
+                    triples=[],
+                    decisions=[],
+                    ideas=[],
+                    topics=[],
+                    urgency="MEDIUM",
+                    provider="fallback",
+                    model="fallback",
+                    processing_time_ms=0.0,
+                )
 
             # Importa dinamicamente contact_service para evitar circular import
             from src.contacts.service import contact_service
