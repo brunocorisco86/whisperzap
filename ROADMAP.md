@@ -159,8 +159,8 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [CONCLUÍDO]
 ### 📍 Etapa 5: Auditoria & Verificação Global de Toda a Arquitetura e Stack
 - [x] **5.1** Teste de conectividade e túnel de rede: Raspberry Pi ➔ VPS Hostinger (Health Check & AI Gateway validados).
 - [ ] **5.2** Teste de transcrição de áudio real do WhatsApp processado na VPS e devolvido pelo **James** no chat.
-- [ ] **5.3** Teste de consulta interativa RAG ao **Hermes Agent** via comando `?` no WhatsApp.
-- [ ] **5.4** Validação de persistência no PostgreSQL 16 + pgvector e Grafo NetworkX na VPS.
+- [x] **5.3** Teste de consulta interativa RAG ao **Hermes Agent** via comando `?` no WhatsApp.
+- [x] **5.4** Validação de persistência no PostgreSQL 16 + pgvector e Grafo NetworkX na VPS.
 - [x] **5.5** Verificação do agendamento de backup diário (03:00) e integridade dos arquivos gerados.
 
 
