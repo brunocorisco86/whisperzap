@@ -18,7 +18,7 @@
         "conditions": {
           "string": [
             {
-              "value1": "={{ $json.body?.text || $json.body?.message || $json.body?.data?.message?.conversation || '' }}",
+              "value1": "={{ $json.body?.data?.message?.conversation || $json.body?.data?.message?.extendedTextMessage?.text || $json.body?.text || $json.body?.message || '' }}",
               "operation": "regex",
               "value2": "^(\\?|/hermes|hermes,)"
             }
@@ -37,7 +37,7 @@
         "url": "={{ $env.HERMES_API_URL || 'http://host.docker.internal:8000' }}/api/v1/memory/query",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"query\": \"{{ ($json.body?.text || $json.body?.message || $json.body?.data?.message?.conversation || '').replace(/^(\\?|\\/hermes|hermes,)\\s*/i, '') }}\",\n  \"top_k\": 5,\n  \"include_graph\": true\n}",
+        "jsonBody": "={\n  \"query\": \"{{ ($json.body?.data?.message?.conversation || $json.body?.data?.message?.extendedTextMessage?.text || $json.body?.text || $json.body?.message || '').replace(/^(\\?|\\/hermes|hermes,)\\s*/i, '') }}\",\n  \"top_k\": 5,\n  \"include_graph\": true\n}",
         "options": {}
       },
       "name": "Agente Hermes (POST /api/v1/memory/query)",

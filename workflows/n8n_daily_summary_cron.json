@@ -21,7 +21,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.HERMES_API_URL || 'http://localhost:8000' }}/api/v1/memory/daily/generate",
+        "url": "={{ $env.HERMES_API_URL || 'http://host.docker.internal:8000' }}/api/v1/memory/daily/generate",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "{}",
@@ -36,29 +36,19 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.WHATSAPP_API_ENDPOINT || 'http://localhost:8080/message/sendText/default' }}",
+        "url": "={{ $env.WHATSAPP_API_ENDPOINT || 'http://evolution-api:8080/message/sendText/hermes' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $env.WHATSAPP_API_TOKEN }}"
+              "value": "={{ $env.WHATSAPP_API_TOKEN || 'seu_token_whatsapp_aqui' }}"
             }
           ]
         },
         "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "number",
-              "value": "={{ $env.ADMIN_WHATSAPP_NUMBER || '5544999999999' }}"
-            },
-            {
-              "name": "text",
-              "value": "={{ $json.whatsapp_text }}"
-            }
-          ]
-        },
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $env.ADMIN_WHATSAPP_NUMBER || '5544999999999' }}\",\n  \"text\": \"{{ $json.whatsapp_text }}\"\n}",
         "options": {}
       },
       "name": "Envia Resumo Diário (WhatsApp)",
