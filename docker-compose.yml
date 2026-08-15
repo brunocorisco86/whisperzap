@@ -1,0 +1,85 @@
+version: "3.8"
+
+services:
+  # ==============================================================================
+  # Banco de Dados Relacional e Vetorial (PostgreSQL 16 + pgvector)
+  # ==============================================================================
+  hermes-db:
+    image: pgvector/pgvector:pg16
+    container_name: hermes-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hermes_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hermes_secret_password}
+      POSTGRES_DB: ${POSTGRES_DB:-hermes_voice_memory}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hermes_admin} -d ${POSTGRES_DB:-hermes_voice_memory}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hermes-network
+
+  # ==============================================================================
+  # API Backend FastAPI (Speech-to-Text, AI Gateway, Memória, Agente Hermes)
+  # ==============================================================================
+  hermes-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hermes-api
+    restart: unless-stopped
+    depends_on:
+      hermes-db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-hermes_admin}:${POSTGRES_PASSWORD:-hermes_secret_password}@hermes-db:5432/${POSTGRES_DB:-hermes_voice_memory}
+      ENVIRONMENT: production
+      API_TITLE: "Hermes Voice Memory API (Production)"
+    volumes:
+      - hermes_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - hermes-network
+
+  # ==============================================================================
+  # Reverse Proxy & HTTPS Automático (Caddy)
+  # ==============================================================================
+  caddy:
+    image: caddy:2-alpine
+    container_name: hermes-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - hermes-api
+    networks:
+      - hermes-network
+
+volumes:
+  postgres_data:
+    name: hermes_postgres_data
+  hermes_data:
+    name: hermes_app_data
+  caddy_data:
+    name: hermes_caddy_data
+  caddy_config:
+    name: hermes_caddy_config
+
+networks:
+  hermes-network:
+    name: hermes_mesh_network
+    driver: bridge

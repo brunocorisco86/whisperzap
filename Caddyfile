@@ -1,0 +1,49 @@
+# ==============================================================================
+# Caddyfile — Reverse Proxy com HTTPS Automático para Hermes Voice Memory
+# ==============================================================================
+
+{
+    # Configuração de e-mail opcional para Let's Encrypt (definido via .env)
+    email {$ACME_EMAIL:admin@homelab.local}
+    # Modo de administração desabilitado para maior segurança
+    admin off
+}
+
+# Bloco principal: responde no domínio configurado ou no IP local / Tailscale
+{$HERMES_DOMAIN::80} {
+    # Compressão de respostas HTTP para menor tráfego e latência
+    encode zstd gzip
+
+    # Cabeçalhos de Segurança
+    header {
+        # Previne clickjacking
+        X-Frame-Options "DENY"
+        # Previne MIME-type sniffing
+        X-Content-Type-Options "nosniff"
+        # Previne vazamento de referer
+        Referrer-Policy "strict-origin-when-cross-origin"
+        # HSTS (Strict-Transport-Security) para HTTPS
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        # Remove assinatura do servidor
+        -Server
+    }
+
+    # Redirecionamento e proxy reverso para o backend FastAPI
+    reverse_proxy hermes-api:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+
+        # Health check ativo para failover
+        health_uri /health
+        health_interval 15s
+        health_timeout 5s
+    }
+
+    # Logs de acesso estruturados em JSON
+    log {
+        output stdout
+        format json
+    }
+}

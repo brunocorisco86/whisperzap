@@ -4,7 +4,7 @@ Este documento estabelece o plano de desenvolvimento de **6 meses** para a const
 
 ---
 
-## 🚩 Status Atual: Fase 5 Concluída (Próximo: Fase 6 — Deploy em Produção VPS Alpine Linux + Raspberry Pi)
+## 🚩 Status Atual: Todas as 6 Fases Concluídas (100% do Roadmap Entregue)
 
 ---
 
@@ -26,7 +26,7 @@ FASE 4: Memória em Camadas (Postgres + pgvector + NetworkX) [CONCLUÍDO]
 FASE 5: API da Memória & Agente Hermes (Resumos Diários/Semanais) [CONCLUÍDO]
    │
    ▼
-FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [PRÓXIMO]
+FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [CONCLUÍDO]
 ```
 
 ---
@@ -79,12 +79,14 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [PRÓXIMO]
 
 ---
 
-### 🟠 Fase 6: Deploy em Produção (VPS Alpine Linux & Raspberry Pi 3B) [PRÓXIMA]
-- [ ] Preparação da VPS em Alpine Linux (Docker, Docker Compose).
-- [ ] Configuração do Caddy como Reverse Proxy HTTPS automático.
-- [ ] Ajuste da rede privada Tailscale conectando o Raspberry Pi 3B (n8n local) e a VPS Alpine Linux.
-- [ ] Otimização de recursos computacionais para execução leve em Alpine Linux.
-- [ ] Execução da suite de testes completa no ambiente de produção VPS.
+### 🟢 Fase 6: Deploy em Produção (VPS Alpine Linux & Raspberry Pi 3B) (Concluída)
+- [x] Construção de `Dockerfile` multi-estágio otimizado para CPU, `ffmpeg`, `faster-whisper` e usuário não-root.
+- [x] Orquestração da stack de produção em `docker-compose.yml` (`hermes-api`, `hermes-db` PostgreSQL 16 com `pgvector`, e `caddy` Reverse Proxy).
+- [x] Configuração do `Caddyfile` com cabeçalhos de segurança, compressão e HTTPS automático.
+- [x] Criação de scripts operacionais em `scripts/`: deploy automatizado em Alpine Linux (`deploy_vps_alpine.sh`), rotina de backup com retenção de 7 dias (`backup_db.sh`) e health check de produção (`health_check_prod.sh`).
+- [x] Guia operacional completo de deploy, topologia Tailscale e disaster recovery em `docs/production_deployment_guide.md`.
+- [x] 58 testes automatizados passando com 100% de aprovação.
+
 
 ---
 

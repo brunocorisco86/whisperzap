@@ -1,0 +1,17 @@
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.coverage
+htmlcov/
+.git
+.gitignore
+.env
+data/hermes.db
+data/hermes_graph.json
+test_results/
+docs/
+*.log
+.DS_Store

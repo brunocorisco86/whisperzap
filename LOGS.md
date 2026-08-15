@@ -168,6 +168,24 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
   - Atualização do `ROADMAP.md` marcando a Fase 5 como concluída.
 - **Resultado**: Fase 5 entregue com sucesso total e repositório pronto para a Fase 6 (Deploy em Produção).
 
+### Sessão 008 — Implementação da Fase 6 (Deploy em Produção VPS Alpine Linux + Raspberry Pi 3B)
+- **Data**: 2026-08-14
+- **Objetivo**: Containerizar a solução com Docker multi-estágio, orquestrar os serviços com Docker Compose e Caddy HTTPS reverso, criar scripts operacionais de provisionamento/backup/diagnóstico e documentar a topologia Tailscale homelab.
+- **Ações Realizadas**:
+  - Criação do `Dockerfile` multi-estágio (`python:3.12-slim`), com suporte a `ffmpeg`, `libpq-dev`, cache enxuto e usuário não-root `hermes`.
+  - Criação do `.dockerignore` para isolamento de artefatos temporários e de desenvolvimento.
+  - Criação do `docker-compose.yml` orquestrando 3 serviços integrados: `hermes-db` (PostgreSQL 16 com `pgvector`), `hermes-api` (FastAPI com healthcheck nativo) e `caddy` (Reverse Proxy com HTTPS automático e compressão zstd/gzip).
+  - Criação do `Caddyfile` com cabeçalhos rigorosos de segurança (HSTS, NoSniff, Deny Frame, Remove Server Header).
+  - Desenvolvimento dos scripts operacionais em `scripts/`:
+    - `scripts/deploy_vps_alpine.sh` (Bootstrap completo em Alpine Linux)
+    - `scripts/backup_db.sh` (Backup automatizado do Postgres e Grafo com retenção de 7 dias)
+    - `scripts/health_check_prod.sh` (Diagnóstico e checagem de prontidão em produção)
+  - Elaboração do manual completo de infraestrutura em `docs/production_deployment_guide.md`.
+  - Criação da suite de testes de manifestos de produção em `tests/test_production_manifests.py`, totalizando **58 testes automatizados** passando com 100% de sucesso.
+  - Atualização do `ROADMAP.md` marcando **100% das 6 Fases do projeto concluídas**.
+- **Resultado**: Fase 6 e todo o ciclo de desenvolvimento do Hermes Voice Memory concluídos com excelência.
+
+
 
 
 

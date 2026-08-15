@@ -5,36 +5,36 @@
   "nodes": [
     {
       "category": "PERSON",
-      "mentions": 39,
+      "mentions": 47,
       "id": "Bruno"
     },
     {
       "category": "PERSON",
-      "mentions": 38,
+      "mentions": 47,
       "details": "Contato de trabalho",
       "id": "João"
     },
     {
       "category": "EQUIPMENT",
-      "mentions": 45,
+      "mentions": 62,
       "details": "Armazenamento de ração",
       "id": "Silo 3"
     },
     {
       "category": "LOCATION",
-      "mentions": 72,
+      "mentions": 99,
       "details": "Cooperativa",
       "id": "C.Vale"
     },
     {
       "category": "SYSTEM",
-      "mentions": 45,
+      "mentions": 62,
       "details": "Ficha de Acompanhamento de Lote",
       "id": "FAL"
     },
     {
       "category": "PERSON",
-      "mentions": 13,
+      "mentions": 17,
       "role": "EXECUTIVE",
       "phone": "44999990000",
       "company": "C.Vale",
@@ -43,12 +43,12 @@
     },
     {
       "category": "PROJECT",
-      "mentions": 13,
+      "mentions": 18,
       "id": "Expansão"
     },
     {
       "category": "PERSON",
-      "mentions": 7,
+      "mentions": 9,
       "role": "FAMILY_CORE",
       "phone": "44988881111",
       "company": null,
@@ -57,12 +57,12 @@
     },
     {
       "category": "PROJECT",
-      "mentions": 7,
+      "mentions": 10,
       "id": "Pessoal"
     },
     {
       "category": "PERSON",
-      "mentions": 7,
+      "mentions": 9,
       "role": "COLLEAGUE",
       "phone": "44977772222",
       "company": "Mtech",
@@ -71,17 +71,17 @@
     },
     {
       "category": "LOCATION",
-      "mentions": 7,
+      "mentions": 9,
       "id": "Mtech"
     },
     {
       "category": "PROJECT",
-      "mentions": 28,
+      "mentions": 36,
       "id": "TMS"
     },
     {
       "category": "PERSON",
-      "mentions": 14,
+      "mentions": 19,
       "role": "EXECUTIVE",
       "phone": "44999991234",
       "company": "C.Vale",
@@ -90,12 +90,12 @@
     },
     {
       "category": "PROJECT",
-      "mentions": 21,
+      "mentions": 27,
       "id": "Silos"
     },
     {
       "category": "PERSON",
-      "mentions": 7,
+      "mentions": 9,
       "role": "EXECUTIVE",
       "phone": "44999991234",
       "company": "C.Vale Matriz",
@@ -104,17 +104,17 @@
     },
     {
       "category": "LOCATION",
-      "mentions": 7,
+      "mentions": 9,
       "id": "C.Vale Matriz"
     },
     {
       "category": "PROJECT",
-      "mentions": 7,
+      "mentions": 9,
       "id": "Agrocenter"
     },
     {
       "category": "PERSON",
-      "mentions": 7,
+      "mentions": 9,
       "role": "STAKEHOLDER",
       "phone": "44988885678",
       "company": "Consultoria",
@@ -123,17 +123,17 @@
     },
     {
       "category": "LOCATION",
-      "mentions": 7,
+      "mentions": 9,
       "id": "Consultoria"
     },
     {
       "category": "PROJECT",
-      "mentions": 7,
+      "mentions": 9,
       "id": "Sanidade"
     },
     {
       "category": "PERSON",
-      "mentions": 7,
+      "mentions": 9,
       "role": "EXECUTIVE",
       "phone": "44999991234",
       "company": null,
@@ -142,7 +142,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 7,
+      "mentions": 9,
       "role": "SERVICE_VENDOR",
       "phone": "44911112222",
       "company": null,
@@ -151,217 +151,338 @@
     },
     {
       "category": "PERSON",
-      "mentions": 2,
+      "mentions": 5,
       "id": "user"
     },
     {
       "category": "PERSON",
-      "mentions": 2,
+      "mentions": 4,
       "id": "Carlos Gestor"
     },
     {
       "category": "PERSON",
-      "mentions": 2,
+      "mentions": 4,
       "id": "Carlos"
+    },
+    {
+      "category": "PERSON",
+      "mentions": 1,
+      "role": "EXECUTIVE",
+      "phone": "5544999990001",
+      "company": "C.Vale",
+      "weight": 1.0,
+      "id": "Roberto Diretor"
+    },
+    {
+      "category": "PROJECT",
+      "mentions": 1,
+      "id": "Telemetria Silos"
+    },
+    {
+      "category": "PROJECT",
+      "mentions": 1,
+      "id": "Automação e Sensores"
+    },
+    {
+      "category": "PERSON",
+      "mentions": 1,
+      "role": "FAMILY_CORE",
+      "phone": "5544999990003",
+      "company": "Família",
+      "weight": 0.95,
+      "id": "Paula Esposa"
+    },
+    {
+      "category": "LOCATION",
+      "mentions": 1,
+      "id": "Família"
+    },
+    {
+      "category": "PERSON",
+      "mentions": 1,
+      "id": "5544999990001"
+    },
+    {
+      "category": "PERSON",
+      "mentions": 1,
+      "id": "5544999990002"
     }
   ],
   "links": [
     {
       "relation": "DELEGATED_TO",
-      "weight": 38.0,
+      "weight": 46.0,
       "source": "Bruno",
       "target": "João"
     },
     {
       "relation": "MENTIONED",
-      "weight": 39.0,
+      "weight": 47.0,
       "source": "Bruno",
       "target": "Silo 3"
     },
     {
       "relation": "MENTIONED",
-      "weight": 39.0,
+      "weight": 47.0,
       "source": "Bruno",
       "target": "C.Vale"
     },
     {
       "relation": "MENTIONED",
-      "weight": 39.0,
+      "weight": 47.0,
       "source": "Bruno",
       "target": "FAL"
     },
     {
       "relation": "ASSIGNED_WITH",
-      "weight": 38.0,
+      "weight": 47.0,
       "source": "João",
       "target": "Silo 3"
     },
     {
       "relation": "ASSIGNED_WITH",
-      "weight": 38.0,
+      "weight": 47.0,
       "source": "João",
       "target": "C.Vale"
     },
     {
       "relation": "ASSIGNED_WITH",
-      "weight": 38.0,
+      "weight": 47.0,
       "source": "João",
       "target": "FAL"
     },
     {
       "relation": "CO_OCCURRED",
-      "weight": 45.0,
+      "weight": 62.0,
       "source": "Silo 3",
       "target": "C.Vale"
     },
     {
       "relation": "CO_OCCURRED",
-      "weight": 45.0,
+      "weight": 62.0,
       "source": "Silo 3",
       "target": "FAL"
     },
     {
       "relation": "CO_OCCURRED",
-      "weight": 45.0,
+      "weight": 62.0,
       "source": "C.Vale",
       "target": "FAL"
     },
     {
       "relation": "AFFILIATED_AS_EXECUTIVE",
-      "weight": 13.0,
+      "weight": 17.0,
       "source": "Diretor Geral",
       "target": "C.Vale"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 13.0,
+      "weight": 17.0,
       "source": "Diretor Geral",
       "target": "Expansão"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 7.0,
+      "weight": 9.0,
       "source": "Maria Esposa",
       "target": "Pessoal"
     },
     {
       "relation": "AFFILIATED_AS_COLLEAGUE",
-      "weight": 7.0,
+      "weight": 9.0,
       "source": "Lucas Colega",
       "target": "Mtech"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 7.0,
+      "weight": 9.0,
       "source": "Lucas Colega",
       "target": "TMS"
     },
     {
       "relation": "AFFILIATED_AS_EXECUTIVE",
-      "weight": 14.0,
+      "weight": 19.0,
       "source": "João Silva",
       "target": "C.Vale"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 14.0,
+      "weight": 18.0,
       "source": "João Silva",
       "target": "Silos"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 14.0,
+      "weight": 18.0,
       "source": "João Silva",
       "target": "TMS"
     },
     {
+      "relation": "WORKS_ON",
+      "weight": 1.0,
+      "source": "João Silva",
+      "target": "Automação e Sensores"
+    },
+    {
       "relation": "AFFILIATED_AS_EXECUTIVE",
-      "weight": 7.0,
+      "weight": 9.0,
       "source": "João Silva Gestor",
       "target": "C.Vale Matriz"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 7.0,
+      "weight": 9.0,
       "source": "João Silva Gestor",
       "target": "Silos"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 7.0,
+      "weight": 9.0,
       "source": "João Silva Gestor",
       "target": "TMS"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 7.0,
+      "weight": 9.0,
       "source": "João Silva Gestor",
       "target": "Agrocenter"
     },
     {
       "relation": "AFFILIATED_AS_STAKEHOLDER",
-      "weight": 7.0,
+      "weight": 9.0,
       "source": "Dra. Camila",
       "target": "Consultoria"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 7.0,
+      "weight": 9.0,
       "source": "Dra. Camila",
       "target": "Sanidade"
     },
     {
       "relation": "MENTIONED",
-      "weight": 2.0,
+      "weight": 5.0,
       "source": "user",
       "target": "Silo 3"
     },
     {
       "relation": "MENTIONED",
-      "weight": 2.0,
+      "weight": 5.0,
       "source": "user",
       "target": "C.Vale"
     },
     {
       "relation": "MENTIONED",
-      "weight": 2.0,
+      "weight": 5.0,
       "source": "user",
       "target": "FAL"
     },
     {
       "relation": "MENTIONED",
-      "weight": 2.0,
+      "weight": 4.0,
       "source": "Carlos Gestor",
       "target": "Silo 3"
     },
     {
       "relation": "MENTIONED",
-      "weight": 2.0,
+      "weight": 4.0,
       "source": "Carlos Gestor",
       "target": "C.Vale"
     },
     {
       "relation": "MENTIONED",
-      "weight": 2.0,
+      "weight": 4.0,
       "source": "Carlos Gestor",
       "target": "FAL"
     },
     {
       "relation": "MENTIONED",
-      "weight": 2.0,
+      "weight": 4.0,
       "source": "Carlos",
       "target": "Silo 3"
     },
     {
       "relation": "MENTIONED",
-      "weight": 2.0,
+      "weight": 4.0,
       "source": "Carlos",
       "target": "C.Vale"
     },
     {
       "relation": "MENTIONED",
-      "weight": 2.0,
+      "weight": 4.0,
       "source": "Carlos",
+      "target": "FAL"
+    },
+    {
+      "relation": "AFFILIATED_AS_EXECUTIVE",
+      "weight": 1.0,
+      "source": "Roberto Diretor",
+      "target": "C.Vale"
+    },
+    {
+      "relation": "WORKS_ON",
+      "weight": 1.0,
+      "source": "Roberto Diretor",
+      "target": "Telemetria Silos"
+    },
+    {
+      "relation": "WORKS_ON",
+      "weight": 1.0,
+      "source": "Roberto Diretor",
+      "target": "Expansão"
+    },
+    {
+      "relation": "AFFILIATED_AS_FAMILY_CORE",
+      "weight": 1.0,
+      "source": "Paula Esposa",
+      "target": "Família"
+    },
+    {
+      "relation": "WORKS_ON",
+      "weight": 1.0,
+      "source": "Paula Esposa",
+      "target": "Pessoal"
+    },
+    {
+      "relation": "MENTIONED",
+      "weight": 1.0,
+      "source": "5544999990001",
+      "target": "Silo 3"
+    },
+    {
+      "relation": "MENTIONED",
+      "weight": 1.0,
+      "source": "5544999990001",
+      "target": "C.Vale"
+    },
+    {
+      "relation": "MENTIONED",
+      "weight": 1.0,
+      "source": "5544999990001",
+      "target": "FAL"
+    },
+    {
+      "relation": "MENTIONED",
+      "weight": 1.0,
+      "source": "5544999990002",
+      "target": "João"
+    },
+    {
+      "relation": "MENTIONED",
+      "weight": 1.0,
+      "source": "5544999990002",
+      "target": "Silo 3"
+    },
+    {
+      "relation": "MENTIONED",
+      "weight": 1.0,
+      "source": "5544999990002",
+      "target": "C.Vale"
+    },
+    {
+      "relation": "MENTIONED",
+      "weight": 1.0,
+      "source": "5544999990002",
       "target": "FAL"
     }
   ]
