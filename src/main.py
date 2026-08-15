@@ -7,7 +7,10 @@ from src.transcriber.router import router as transcriber_router
 from src.dictionary.router import router as dictionary_router
 from src.memory.router import router as memory_router
 from src.contacts.router import router as contacts_router
+from src.web.router import router as web_router, STATIC_DIR
 from src.memory.database import init_db
+from fastapi.staticfiles import StaticFiles
+import os
 
 
 @asynccontextmanager
@@ -36,7 +39,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Monta arquivos estáticos do frontend web
+if os.path.exists(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
 # Inclusão dos roteadores de microsserviços
+app.include_router(web_router)
 app.include_router(transcriber_router)
 app.include_router(ai_router)
 app.include_router(dictionary_router)

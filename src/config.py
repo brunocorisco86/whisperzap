@@ -56,9 +56,12 @@ class Settings(BaseSettings):
     GRAPH_PERSISTENCE_PATH: str = "data/hermes_graph.json"
     DICTIONARY_PERSISTENCE_PATH: str = "data/lexical_dictionary.json"
 
-    # WhatsApp / n8n
+    # WhatsApp / Evolution API & n8n
     N8N_WEBHOOK_URL: str = "http://localhost:5678/webhook/voice-received"
     WHATSAPP_API_TOKEN: str = ""
+    EVOLUTION_API_URL: str = "http://192.168.1.99:8080"
+    EVOLUTION_API_KEY: str = "B8F7D6E5C4B3A2918071625344352617"
+    EVOLUTION_INSTANCE: str = "hermes"
 
 
 settings = Settings()

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hermes Control Hub — Copiloto de Voz & Memória</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛️</text></svg>">
+</head>
+<body>
+
+  <!-- Top Navbar -->
+  <header class="navbar">
+    <div class="nav-brand">
+      <span class="brand-icon">🏛️</span>
+      <div class="brand-text">
+        <h1>HERMES CONTROL HUB</h1>
+        <span class="brand-subtitle">Voice Memory & Knowledge Graph System</span>
+      </div>
+    </div>
+
+    <div class="nav-status-group">
+      <div class="status-badge status-online" id="status-vps">
+        <span class="dot"></span>
+        <span>VPS Hostinger :8005</span>
+      </div>
+      <div class="status-badge status-online" id="status-db">
+        <span class="dot"></span>
+        <span id="stat-graph-nodes">... nós no Grafo</span>
+      </div>
+      <button class="btn btn-secondary btn-sm" id="btn-refresh-all" title="Recarregar Dados da VPS">
+        🔄 Atualizar
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="container">
+    
+    <!-- Tab Navigation -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="tab-contacts">
+        👥 Contatos & Grafo Social (<span id="count-contacts">0</span>)
+      </button>
+      <button class="tab-btn" data-tab="tab-dictionary">
+        📖 Dicionário Léxico & Fonemas (<span id="count-dict">0</span>)
+      </button>
+      <button class="tab-btn" data-tab="tab-query">
+        🧠 Testar Consulta Hermes RAG
+      </button>
+      <button class="tab-btn" data-tab="tab-infra">
+        ⚙️ Infra & Topologia
+      </button>
+    </nav>
+
+    <!-- Tab 1: Contacts & Roles -->
+    <section id="tab-contacts" class="tab-content active">
+      <div class="section-toolbar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="contact-search" placeholder="Buscar por nome, cargo, empresa ou telefone...">
+        </div>
+        <div class="filter-group">
+          <select id="contact-filter-role">
+            <option value="">Todos os Papéis</option>
+            <option value="FAMILY_CORE">Família (FAMILY_CORE)</option>
+            <option value="EXECUTIVE">Diretoria / Gestão (EXECUTIVE)</option>
+            <option value="COLLEAGUE">Colegas / Parceiros (COLLEAGUE)</option>
+            <option value="STAKEHOLDER">Consultores (STAKEHOLDER)</option>
+            <option value="SERVICE_VENDOR">Fornecedores (SERVICE_VENDOR)</option>
+          </select>
+          <button class="btn btn-primary" id="btn-open-new-contact">
+            + Novo Contato
+          </button>
+        </div>
+      </div>
+
+      <!-- Contacts Grid -->
+      <div class="contacts-grid" id="contacts-container">
+        <!-- Rendered via JS -->
+      </div>
+    </section>
+
+    <!-- Tab 2: Lexical Dictionary -->
+    <section id="tab-dictionary" class="tab-content">
+      <div class="section-toolbar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="dict-search" placeholder="Buscar termo oficial ou variação fonética...">
+        </div>
+        <div class="filter-group">
+          <select id="dict-filter-category">
+            <option value="">Todas as Categorias</option>
+            <option value="AGRONEGOCIO">Agronegócio & C.Vale</option>
+            <option value="ZOOTECNIA">Zootecnia & Avicultura</option>
+            <option value="SISTEMAS">Sistemas & Mtech</option>
+            <option value="LOGISTICA">Logística & Silos</option>
+            <option value="TECNOLOGIA">Tecnologia & IA</option>
+          </select>
+          <button class="btn btn-primary" id="btn-open-new-term">
+            + Novo Termo
+          </button>
+        </div>
+      </div>
+
+      <div class="dictionary-grid" id="dictionary-container">
+        <!-- Rendered via JS -->
+      </div>
+    </section>
+
+    <!-- Tab 3: Live Query & Memory Test -->
+    <section id="tab-query" class="tab-content">
+      <div class="card query-card">
+        <div class="card-header">
+          <h2>💬 Testador de Inteligência do Agente Hermes</h2>
+          <p class="text-muted">Faça perguntas diretas para testar a recuperação de memórias, tarefas e o Grafo de Conhecimento em tempo real.</p>
+        </div>
+        
+        <div class="query-input-group">
+          <input type="text" id="query-input" placeholder="Ex: Qual o telefone da Debora? Ou: Quais os pilares de entrega de ração?" autocomplete="off">
+          <button class="btn btn-primary" id="btn-run-query">
+            ⚡ Perguntar
+          </button>
+        </div>
+
+        <div class="quick-prompts">
+          <span>Sugestões rápidas:</span>
+          <button class="btn-chip" onclick="setQuery('Qual o telefone e role da Debora Patel Conter?')">Debora Esposa</button>
+          <button class="btn-chip" onclick="setQuery('Quais os dados do Roberto Diretor e João Silva na C.Vale?')">Roberto & João C.Vale</button>
+          <button class="btn-chip" onclick="setQuery('Quais são os 3 pilares para resolver a entrega de ração?')">Logística de Ração</button>
+          <button class="btn-chip" onclick="setQuery('O que é FAL e como funciona no lote avícola?')">FAL Zootecnia</button>
+        </div>
+
+        <!-- Query Result -->
+        <div class="query-result-box" id="query-result-box" style="display: none;">
+          <div class="result-header">
+            <h3>🤖 Resposta do Hermes Agent</h3>
+            <span class="badge badge-info" id="query-time">...</span>
+          </div>
+          <div class="result-body markdown-body" id="query-answer">
+            <!-- Rendered Answer -->
+          </div>
+          <div class="result-meta" id="query-meta">
+            <!-- Metadata: Graph Connections, Citations -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 4: Infrastructure & Topology -->
+    <section id="tab-infra" class="tab-content">
+      <div class="infra-grid">
+        <div class="card stat-card">
+          <div class="stat-icon">☁️</div>
+          <div class="stat-info">
+            <span class="stat-title">VPS Hostinger (Produção)</span>
+            <span class="stat-value">179.197.73.80</span>
+            <span class="stat-desc">FastAPI :8005 • PostgreSQL 16 + pgvector • Gemini 3.1 Flash Lite</span>
+          </div>
+        </div>
+
+        <div class="card stat-card">
+          <div class="stat-icon">🏠</div>
+          <div class="stat-info">
+            <span class="stat-title">Homelab Raspberry Pi 3B (peixe)</span>
+            <span class="stat-value">192.168.1.99</span>
+            <span class="stat-desc">Evolution API :8080 • n8n :5678 • WhatsApp Status: OPEN</span>
+          </div>
+        </div>
+
+        <div class="card stat-card">
+          <div class="stat-icon">🔒</div>
+          <div class="stat-info">
+            <span class="stat-title">Tailscale Mesh VPN</span>
+            <span class="stat-value">100.106.3.81</span>
+            <span class="stat-desc">Conexão segura ponto a ponto entre VPS e Homelab</span>
+          </div>
+        </div>
+
+        <div class="card stat-card">
+          <div class="stat-icon">💾</div>
+          <div class="stat-info">
+            <span class="stat-title">Backups Diários</span>
+            <span class="stat-value">03:00 UTC</span>
+            <span class="stat-desc">Dumps automáticos compactados com rotação de 7 dias</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Topology Diagram Box -->
+      <div class="card mt-4">
+        <div class="card-header">
+          <h2>🗺️ Mapa de Fluxo de Dados</h2>
+        </div>
+        <div class="topology-flow">
+          <div class="flow-step">
+            <span class="step-num">1</span>
+            <strong>WhatsApp</strong>
+            <p>Recebe voz e comandos</p>
+          </div>
+          <div class="flow-arrow">➔</div>
+          <div class="flow-step">
+            <span class="step-num">2</span>
+            <strong>Evolution API</strong>
+            <p>Raspberry Pi :8080</p>
+          </div>
+          <div class="flow-arrow">➔</div>
+          <div class="flow-step">
+            <span class="step-num">3</span>
+            <strong>n8n Orquestrador</strong>
+            <p>Raspberry Pi :5678</p>
+          </div>
+          <div class="flow-arrow">➔</div>
+          <div class="flow-step">
+            <span class="step-num">4</span>
+            <strong>Hermes API + Whisper</strong>
+            <p>VPS Hostinger :8005</p>
+          </div>
+          <div class="flow-arrow">➔</div>
+          <div class="flow-step">
+            <span class="step-num">5</span>
+            <strong>Grafo & pgvector</strong>
+            <p>Persistência & RAG</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal: Contact Create / Edit -->
+  <div class="modal-overlay" id="modal-contact">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-contact-title">Novo Contato</h3>
+        <button class="modal-close" id="btn-close-contact-modal">&times;</button>
+      </div>
+      <form id="form-contact">
+        <input type="hidden" id="contact-id">
+        
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label for="contact-name">Nome Completo *</label>
+            <input type="text" id="contact-name" required placeholder="Ex: Debora Patel Conter">
+          </div>
+          <div class="form-group flex-1">
+            <label for="contact-nickname">Apelido</label>
+            <input type="text" id="contact-nickname" placeholder="Ex: Débora / Esposa">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="contact-phone">Telefone / WhatsApp *</label>
+            <input type="text" id="contact-phone" required placeholder="Ex: (44) 99921-4934">
+          </div>
+          <div class="form-group flex-1">
+            <label for="contact-role">Papel / Role Hierárquico *</label>
+            <select id="contact-role" required>
+              <option value="FAMILY_CORE">Família (FAMILY_CORE) - Peso 0.95</option>
+              <option value="EXECUTIVE">Diretoria / Gestão (EXECUTIVE) - Peso 1.00</option>
+              <option value="COLLEAGUE">Colegas / TI (COLLEAGUE) - Peso 0.70</option>
+              <option value="STAKEHOLDER">Consultores / Especialistas (STAKEHOLDER) - Peso 0.85</option>
+              <option value="SERVICE_VENDOR">Fornecedores (SERVICE_VENDOR) - Peso 0.50</option>
+              <option value="UNKNOWN">Não Classificado (UNKNOWN) - Peso 0.40</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="contact-company">Empresa / Afiliação</label>
+            <input type="text" id="contact-company" placeholder="Ex: C.Vale / Mtech / Família">
+          </div>
+          <div class="form-group flex-1">
+            <label for="contact-projects">Projetos / Tags (separados por vírgula)</label>
+            <input type="text" id="contact-projects" placeholder="Ex: Pessoal, Silos, TMS">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="contact-notes">Observações / Detalhes de Contexto</label>
+          <textarea id="contact-notes" rows="2" placeholder="Ex: Esposa do Bruno / Liderança de Projeto"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-contact">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-contact">💾 Salvar na VPS</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Term Create / Edit -->
+  <div class="modal-overlay" id="modal-term">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-term-title">Novo Termo do Dicionário Léxico</h3>
+        <button class="modal-close" id="btn-close-term-modal">&times;</button>
+      </div>
+      <form id="form-term">
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="term-name">Termo Oficial *</label>
+            <input type="text" id="term-name" required placeholder="Ex: C.Vale, FAL, TMS, BRIM">
+          </div>
+          <div class="form-group flex-1">
+            <label for="term-category">Categoria *</label>
+            <select id="term-category" required>
+              <option value="AGRONEGOCIO">AGRONEGOCIO</option>
+              <option value="ZOOTECNIA">ZOOTECNIA</option>
+              <option value="SISTEMAS">SISTEMAS</option>
+              <option value="LOGISTICA">LOGISTICA</option>
+              <option value="EQUIPAMENTOS">EQUIPAMENTOS</option>
+              <option value="TECNOLOGIA">TECNOLOGIA</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="term-expansion">Significado / Expansão Completa</label>
+          <input type="text" id="term-expansion" placeholder="Ex: Cooperativa Agroindustrial C.Vale">
+        </div>
+
+        <div class="form-group">
+          <label for="term-variations">Variações Fonéticas de Áudio (separadas por vírgula) *</label>
+          <input type="text" id="term-variations" required placeholder="Ex: Sevala, sevala, Sevale, cvale, sivale">
+          <small class="text-muted">Estas palavras serão substituídas automaticamente pelo termo oficial quando ditadas no áudio.</small>
+        </div>
+
+        <div class="form-group">
+          <label for="term-description">Descrição de Uso</label>
+          <textarea id="term-description" rows="2" placeholder="Ex: Cooperativa agroindustrial de integração avícola e grãos."></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-term">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-term">💾 Salvar Termo na VPS</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast">
+    <span class="toast-icon">✨</span>
+    <span class="toast-message" id="toast-message">Ação realizada com sucesso</span>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

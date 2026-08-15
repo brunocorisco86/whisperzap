@@ -1,7 +1,8 @@
-"""Router FastAPI para o Módulo de Contatos e Papéis."""
-
+import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+
+logger = logging.getLogger(__name__)
 from sqlalchemy.orm import Session
 from src.contacts.models import ContactRecord
 from src.contacts.schemas import (
@@ -88,3 +89,39 @@ async def delete_contact(contact_id: str, db: Session = Depends(get_db)):
     db.delete(rec)
     db.commit()
     return None
+
+
+@router.get("/avatar/{phone}")
+async def get_contact_avatar(phone: str):
+    """Consulta a foto de perfil do WhatsApp via Evolution API."""
+    import re
+    import httpx
+    from src.config import settings
+
+    digits = re.sub(r"\D", "", phone.strip())
+    if not digits:
+        return {"phone": phone, "profile_picture_url": None}
+
+    # Se não tem DDI (55), adiciona
+    if len(digits) in (10, 11) and not digits.startswith("55"):
+        digits = f"55{digits}"
+
+    url = f"{settings.EVOLUTION_API_URL.rstrip('/')}/chat/fetchProfilePictureUrl/{settings.EVOLUTION_INSTANCE}"
+    headers = {
+        "apikey": settings.EVOLUTION_API_KEY,
+        "Content-Type": "application/json",
+    }
+    payload = {"number": digits}
+
+    try:
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            res = await client.post(url, headers=headers, json=payload)
+            if res.status_code == 200:
+                data = res.json()
+                picture_url = data.get("profilePictureUrl") or data.get("url")
+                return {"phone": digits, "profile_picture_url": picture_url}
+    except Exception as e:
+        logger.warning(f"Erro ao buscar foto na Evolution API para {digits}: {e}")
+
+    return {"phone": digits, "profile_picture_url": None}
+

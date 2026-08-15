@@ -22,7 +22,7 @@
     },
     {
       "category": "LOCATION",
-      "mentions": 297,
+      "mentions": 301,
       "details": "Cooperativa",
       "id": "C.Vale"
     },
@@ -34,7 +34,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 51,
+      "mentions": 53,
       "role": "EXECUTIVE",
       "phone": "44999990000",
       "company": "C.Vale",
@@ -43,17 +43,17 @@
     },
     {
       "category": "PROJECT",
-      "mentions": 57,
+      "mentions": 59,
       "id": "Expansão"
     },
     {
       "category": "PROJECT",
-      "mentions": 32,
+      "mentions": 33,
       "id": "Pessoal"
     },
     {
       "category": "PERSON",
-      "mentions": 26,
+      "mentions": 27,
       "role": "COLLEAGUE",
       "phone": "44977772222",
       "company": "Mtech",
@@ -62,17 +62,17 @@
     },
     {
       "category": "LOCATION",
-      "mentions": 26,
+      "mentions": 27,
       "id": "Mtech"
     },
     {
       "category": "PROJECT",
-      "mentions": 104,
+      "mentions": 108,
       "id": "TMS"
     },
     {
       "category": "PERSON",
-      "mentions": 58,
+      "mentions": 60,
       "role": "EXECUTIVE",
       "phone": "44999991234",
       "company": "C.Vale",
@@ -81,12 +81,12 @@
     },
     {
       "category": "PROJECT",
-      "mentions": 78,
+      "mentions": 81,
       "id": "Silos"
     },
     {
       "category": "PERSON",
-      "mentions": 26,
+      "mentions": 27,
       "role": "EXECUTIVE",
       "phone": "44999991234",
       "company": "C.Vale Matriz",
@@ -95,17 +95,17 @@
     },
     {
       "category": "LOCATION",
-      "mentions": 26,
+      "mentions": 27,
       "id": "C.Vale Matriz"
     },
     {
       "category": "PROJECT",
-      "mentions": 26,
+      "mentions": 27,
       "id": "Agrocenter"
     },
     {
       "category": "PERSON",
-      "mentions": 26,
+      "mentions": 27,
       "role": "STAKEHOLDER",
       "phone": "44988885678",
       "company": "Consultoria",
@@ -114,17 +114,17 @@
     },
     {
       "category": "LOCATION",
-      "mentions": 26,
+      "mentions": 27,
       "id": "Consultoria"
     },
     {
       "category": "PROJECT",
-      "mentions": 26,
+      "mentions": 27,
       "id": "Sanidade"
     },
     {
       "category": "PERSON",
-      "mentions": 26,
+      "mentions": 27,
       "role": "EXECUTIVE",
       "phone": "44999991234",
       "company": null,
@@ -133,7 +133,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 26,
+      "mentions": 27,
       "role": "SERVICE_VENDOR",
       "phone": "44911112222",
       "company": null,
@@ -204,6 +204,15 @@
       "company": "Família",
       "weight": 1.0,
       "id": "Debora Patel Conter"
+    },
+    {
+      "category": "PERSON",
+      "mentions": 1,
+      "role": "FAMILY_CORE",
+      "phone": "44988881111",
+      "company": null,
+      "weight": 0.95,
+      "id": "Maria Esposa"
     }
   ],
   "links": [
@@ -230,6 +239,12 @@
       "weight": 115.0,
       "source": "Bruno",
       "target": "FAL"
+    },
+    {
+      "relation": "SPOUSE_OF",
+      "weight": 50.0,
+      "source": "Bruno",
+      "target": "Debora Patel Conter"
     },
     {
       "relation": "ASSIGNED_WITH",
@@ -269,43 +284,43 @@
     },
     {
       "relation": "AFFILIATED_AS_EXECUTIVE",
-      "weight": 51.0,
+      "weight": 53.0,
       "source": "Diretor Geral",
       "target": "C.Vale"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 51.0,
+      "weight": 53.0,
       "source": "Diretor Geral",
       "target": "Expansão"
     },
     {
       "relation": "AFFILIATED_AS_COLLEAGUE",
-      "weight": 26.0,
+      "weight": 27.0,
       "source": "Lucas Colega",
       "target": "Mtech"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 26.0,
+      "weight": 27.0,
       "source": "Lucas Colega",
       "target": "TMS"
     },
     {
       "relation": "AFFILIATED_AS_EXECUTIVE",
-      "weight": 58.0,
+      "weight": 60.0,
       "source": "João Silva",
       "target": "C.Vale"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 52.0,
+      "weight": 54.0,
       "source": "João Silva",
       "target": "Silos"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 52.0,
+      "weight": 54.0,
       "source": "João Silva",
       "target": "TMS"
     },
@@ -317,37 +332,37 @@
     },
     {
       "relation": "AFFILIATED_AS_EXECUTIVE",
-      "weight": 26.0,
+      "weight": 27.0,
       "source": "João Silva Gestor",
       "target": "C.Vale Matriz"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 26.0,
+      "weight": 27.0,
       "source": "João Silva Gestor",
       "target": "Silos"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 26.0,
+      "weight": 27.0,
       "source": "João Silva Gestor",
       "target": "TMS"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 26.0,
+      "weight": 27.0,
       "source": "João Silva Gestor",
       "target": "Agrocenter"
     },
     {
       "relation": "AFFILIATED_AS_STAKEHOLDER",
-      "weight": 26.0,
+      "weight": 27.0,
       "source": "Dra. Camila",
       "target": "Consultoria"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 26.0,
+      "weight": 27.0,
       "source": "Dra. Camila",
       "target": "Sanidade"
     },
@@ -472,12 +487,6 @@
       "target": "FAL"
     },
     {
-      "relation": "SPOUSE_OF",
-      "weight": 50.0,
-      "source": "Bruno",
-      "target": "Debora Patel Conter"
-    },
-    {
       "relation": "AFFILIATED_AS_FAMILY_CORE",
       "weight": 50.0,
       "source": "Debora Patel Conter",
@@ -487,6 +496,12 @@
       "relation": "WORKS_ON",
       "weight": 50.0,
       "source": "Debora Patel Conter",
+      "target": "Pessoal"
+    },
+    {
+      "relation": "WORKS_ON",
+      "weight": 1.0,
+      "source": "Maria Esposa",
       "target": "Pessoal"
     }
   ]
