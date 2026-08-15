@@ -256,17 +256,54 @@ class MemoryRepository:
                 for sr in search_results
             ]
 
-            # 2. Extração de conexões no Grafo de Conhecimento
+            # 2. Extração de conexões e metadados no Grafo de Conhecimento
             related_entities = []
             if include_graph:
                 # Procura nós no grafo que combinam com palavras da query ou das fontes
-                query_tokens = [w.lower() for w in query.split() if len(w) > 3]
+                query_tokens = [w.lower() for w in query.split() if len(w) >= 3]
                 all_nodes = knowledge_graph.list_nodes()
                 for node in all_nodes:
                     node_name = node.get("name", "")
-                    if any(t in node_name.lower() for t in query_tokens):
+                    node_details = str(node.get("details", "")).lower()
+                    node_role = str(node.get("role", "")).lower()
+                    node_phone = str(node.get("phone", "")).lower()
+
+                    matches = (
+                        any(t in node_name.lower() for t in query_tokens)
+                        or any(t in node_details for t in query_tokens)
+                        or any(t in node_role for t in query_tokens)
+                        or any(t in node_phone for t in query_tokens)
+                    )
+
+                    if matches:
+                        # Adiciona metadados estruturados do próprio nó
+                        node_parts = [f"Entidade: {node_name}"]
+                        if node.get("role"):
+                            node_parts.append(f"Cargo/Role: {node.get('role')}")
+                        if node.get("phone"):
+                            node_parts.append(f"Telefone: {node.get('phone')}")
+                        if node.get("company"):
+                            node_parts.append(f"Empresa: {node.get('company')}")
+                        if node.get("details"):
+                            node_parts.append(f"Detalhes: {node.get('details')}")
+                        related_entities.append(" | ".join(node_parts))
+
                         neighborhood = knowledge_graph.get_neighborhood(node_name, depth=1)
                         if neighborhood.get("found"):
+                            for n_node in neighborhood.get("nodes", []):
+                                n_id = n_node.get("id")
+                                if n_id and n_id != node_name and (n_node.get("phone") or n_node.get("role") or n_node.get("details")):
+                                    parts = [f"Contato Vinculado: {n_id}"]
+                                    if n_node.get("role"):
+                                        parts.append(f"Role: {n_node.get('role')}")
+                                    if n_node.get("phone"):
+                                        parts.append(f"Telefone: {n_node.get('phone')}")
+                                    if n_node.get("company"):
+                                        parts.append(f"Empresa: {n_node.get('company')}")
+                                    if n_node.get("details"):
+                                        parts.append(f"Detalhes: {n_node.get('details')}")
+                                    related_entities.append(" | ".join(parts))
+
                             conn_strs = [
                                 f"{edge.get('source')} -[{edge.get('relation')}]-> {edge.get('target')}"
                                 for edge in neighborhood.get("edges", [])
