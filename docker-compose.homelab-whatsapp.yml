@@ -84,7 +84,7 @@ services:
       GENERIC_TIMEZONE: America/Sao_Paulo
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
       N8N_SECURE_COOKIE: "false"
-      NODE_OPTIONS: "--max-old-space-size=256"
+      NODE_OPTIONS: "--max-old-space-size=450"
       HERMES_API_URL: ${HERMES_API_URL:-http://179.197.73.80:8005}
       WHATSAPP_API_ENDPOINT: http://evolution-api:8080/message/sendText/hermes
       WHATSAPP_MEDIA_ENDPOINT: http://evolution-api:8080/chat/getBase64FromMediaMessage/hermes
