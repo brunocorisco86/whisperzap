@@ -163,6 +163,29 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [CONCLUÍDO]
 - [x] **5.4** Validação de persistência no PostgreSQL 16 + pgvector e Grafo NetworkX na VPS.
 - [x] **5.5** Verificação do agendamento de backup diário (03:00) e integridade dos arquivos gerados.
 
+---
+
+## 📊 Fase 7: Analytics, Métricas & Dashboard Executivo [ROADMAP / EM PLANEJAMENTO]
+
+- [ ] **7.1 Backend Analítico Multiescala (`src/analytics/`)**:
+  - Endpoint agregador `GET /api/v1/analytics/dashboard?period=day|week|month|custom`.
+  - Agrupamento temporal otimizado (dia, semana, mês) para contatos únicos, volume de mensagens e tamanho médio.
+  - Pipeline de NLP em Python para WordMap semântico (limpeza de stopwords, TF-IDF e clusters de tópicos).
+  - KPIs avançados: taxa de acionabilidade de tarefas (% conversion), índice de esforço de áudio e sentimento predominante.
+- [ ] **7.2 Frontend do Dashboard no Control Hub (`src/web/`)**:
+  - Nova aba `#tab-analytics` com navegação reativa.
+  - Toolbar com filtros por período (`Hoje`, `7D`, `30D`, `Mês Atual`) e granularidade (`Dia`, `Semana`, `Mês`).
+  - 5 Hero KPI Cards no topo.
+  - 5 Gráficos interativos com **Chart.js**:
+    1. *Pessoas Únicas por Período* (Área com gradiente);
+    2. *Top 10 Interlocutores por Volume* (Barras horizontais com categorias);
+    3. *Tamanho Médio e Duração das Mensagens* (Dual Axis barras/linha);
+    4. *WordMap / Nuvem Semântica de Termos e Tópicos* (Canvas interativo);
+    5. *Heatmap de Horários de Pico* (Matriz 24h x 7 dias).
+- [ ] **7.3 Validação e Testes Automatizados**:
+  - Testes unitários de agregação e tokenização (`tests/test_analytics.py`).
+  - Deploy e validação com dados reais na VPS Hostinger.
+
 
 
 
