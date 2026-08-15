@@ -161,6 +161,7 @@ function getRoleBadgeClass(role) {
   const r = (role || '').toUpperCase();
   if (r === 'FAMILY_CORE') return 'badge-family';
   if (r === 'EXECUTIVE') return 'badge-executive';
+  if (r === 'PRODUCER_COOPERATED') return 'badge-producer';
   if (r === 'COLLEAGUE') return 'badge-colleague';
   if (r === 'STAKEHOLDER') return 'badge-stakeholder';
   if (r === 'SERVICE_VENDOR') return 'badge-vendor';
@@ -172,6 +173,7 @@ function getRoleLabel(role) {
   const map = {
     'FAMILY_CORE': 'Família',
     'EXECUTIVE': 'Diretoria / Gestão',
+    'PRODUCER_COOPERATED': 'Produtor Rural / Associado',
     'COLLEAGUE': 'Colega / Parceiro',
     'STAKEHOLDER': 'Consultoria / Stakeholder',
     'SERVICE_VENDOR': 'Fornecedor',

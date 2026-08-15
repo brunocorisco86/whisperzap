@@ -369,6 +369,12 @@ select:focus {
   border: 1px solid rgba(236, 72, 153, 0.3);
 }
 
+.badge-producer {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
 .badge-executive {
   background: rgba(59, 130, 246, 0.15);
   color: #60a5fa;

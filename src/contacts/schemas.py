@@ -11,6 +11,7 @@ class ContactRole(str, Enum):
 
     EXECUTIVE = "EXECUTIVE"  # Gestores diretos, diretores, líderes (peso 1.0)
     FAMILY_CORE = "FAMILY_CORE"  # Cônjuge, mãe, pai, filhos (peso 0.95)
+    PRODUCER_COOPERATED = "PRODUCER_COOPERATED"  # Produtores rurais, cooperados, associados e integrados (peso 0.90)
     STAKEHOLDER = "STAKEHOLDER"  # Clientes chave, parceiros de projetos estratégicos (peso 0.85)
     COLLEAGUE = "COLLEAGUE"  # Colegas de trabalho, equipe, pares operacionais (peso 0.70)
     FAMILY_EXTENDED = "FAMILY_EXTENDED"  # Sogros, parentes, tios (peso 0.60)
@@ -21,6 +22,7 @@ class ContactRole(str, Enum):
 ROLE_WEIGHTS: dict[ContactRole, float] = {
     ContactRole.EXECUTIVE: 1.00,
     ContactRole.FAMILY_CORE: 0.95,
+    ContactRole.PRODUCER_COOPERATED: 0.90,
     ContactRole.STAKEHOLDER: 0.85,
     ContactRole.COLLEAGUE: 0.70,
     ContactRole.FAMILY_EXTENDED: 0.60,
@@ -49,6 +51,14 @@ ROLE_SYNONYMS: dict[str, ContactRole] = {
     "PAI": ContactRole.FAMILY_CORE,
     "FILHO": ContactRole.FAMILY_CORE,
     "FILHA": ContactRole.FAMILY_CORE,
+    "PRODUCER_COOPERATED": ContactRole.PRODUCER_COOPERATED,
+    "PRODUTOR": ContactRole.PRODUCER_COOPERATED,
+    "PRODUTOR RURAL": ContactRole.PRODUCER_COOPERATED,
+    "ASSOCIADO": ContactRole.PRODUCER_COOPERATED,
+    "COOPERADO": ContactRole.PRODUCER_COOPERATED,
+    "INTEGRADO": ContactRole.PRODUCER_COOPERATED,
+    "AVICULTOR": ContactRole.PRODUCER_COOPERATED,
+    "GRANJEIRO": ContactRole.PRODUCER_COOPERATED,
     "STAKEHOLDER": ContactRole.STAKEHOLDER,
     "CLIENTE": ContactRole.STAKEHOLDER,
     "PARCEIRO": ContactRole.STAKEHOLDER,
