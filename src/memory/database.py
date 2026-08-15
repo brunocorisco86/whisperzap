@@ -42,6 +42,16 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+def set_database_url(new_url: str):
+    """Reconfigura dinamicamente o engine e SessionLocal (usado pelo isolamento de testes)."""
+    global DATABASE_URL, engine, SessionLocal
+    DATABASE_URL = new_url
+    c_args = {"check_same_thread": False} if new_url.startswith("sqlite") else {}
+    engine = create_engine(new_url, connect_args=c_args, echo=False)
+    SessionLocal.configure(bind=engine)
+    return engine
+
+
 def init_db() -> None:
     """Inicializa as tabelas do banco de dados se não existirem e adiciona novas colunas."""
     from sqlalchemy import text
