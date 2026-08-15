@@ -97,37 +97,71 @@ async def delete_contact(contact_id: str, db: Session = Depends(get_db)):
     return None
 
 
+@router.get("/profile/{phone}")
 @router.get("/avatar/{phone}")
-async def get_contact_avatar(phone: str):
-    """Consulta a foto de perfil do WhatsApp via Evolution API."""
+async def get_contact_profile(phone: str, db: Session = Depends(get_db)):
+    """Consulta foto de perfil e pushName do WhatsApp via Evolution API e persiste."""
     import re
     import httpx
     from src.config import settings
 
     digits = re.sub(r"\D", "", phone.strip())
     if not digits:
-        return {"phone": phone, "profile_picture_url": None}
+        return {"phone": phone, "name": None, "profile_picture_url": None}
 
     # Se não tem DDI (55), adiciona
     if len(digits) in (10, 11) and not digits.startswith("55"):
         digits = f"55{digits}"
 
-    url = f"{settings.EVOLUTION_API_URL.rstrip('/')}/chat/fetchProfilePictureUrl/{settings.EVOLUTION_INSTANCE}"
     headers = {
         "apikey": settings.EVOLUTION_API_KEY,
         "Content-Type": "application/json",
     }
-    payload = {"number": digits}
 
+    picture_url = None
+    push_name = None
+
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        # 1. Busca foto de perfil
+        try:
+            url_pic = f"{settings.EVOLUTION_API_URL.rstrip('/')}/chat/fetchProfilePictureUrl/{settings.EVOLUTION_INSTANCE}"
+            res_pic = await client.post(url_pic, headers=headers, json={"number": digits})
+            if res_pic.status_code == 200:
+                data_pic = res_pic.json()
+                picture_url = data_pic.get("profilePictureUrl") or data_pic.get("url")
+        except Exception as e:
+            logger.warning(f"Erro ao buscar foto na Evolution API para {digits}: {e}")
+
+        # 2. Busca pushName do contato no WhatsApp
+        try:
+            url_contacts = f"{settings.EVOLUTION_API_URL.rstrip('/')}/chat/findContacts/{settings.EVOLUTION_INSTANCE}"
+            res_contacts = await client.post(url_contacts, headers=headers, json={"where": {"remoteJid": f"{digits}@s.whatsapp.net"}})
+            if res_contacts.status_code == 200:
+                data_contacts = res_contacts.json()
+                if isinstance(data_contacts, list) and len(data_contacts) > 0:
+                    push_name = data_contacts[0].get("pushName")
+                    if not picture_url:
+                        picture_url = data_contacts[0].get("profilePicUrl")
+        except Exception as e:
+            logger.warning(f"Erro ao buscar pushName na Evolution API para {digits}: {e}")
+
+    # Atualiza banco SQL se encontrado
     try:
-        async with httpx.AsyncClient(timeout=6.0) as client:
-            res = await client.post(url, headers=headers, json=payload)
-            if res.status_code == 200:
-                data = res.json()
-                picture_url = data.get("profilePictureUrl") or data.get("url")
-                return {"phone": digits, "profile_picture_url": picture_url}
+        rec = db.query(ContactRecord).filter(
+            (ContactRecord.phone_number == digits) | (ContactRecord.phone_number == phone.strip())
+        ).first()
+        if rec:
+            if picture_url:
+                rec.avatar_url = picture_url
+            if push_name and (rec.name.startswith("55") or rec.name.startswith("audio_") or rec.name == digits):
+                rec.name = push_name
+            db.commit()
     except Exception as e:
-        logger.warning(f"Erro ao buscar foto na Evolution API para {digits}: {e}")
+        logger.warning(f"Erro ao persistir perfil do WhatsApp para {digits}: {e}")
 
-    return {"phone": digits, "profile_picture_url": None}
+    return {
+        "phone": digits,
+        "name": push_name,
+        "profile_picture_url": picture_url,
+    }
 

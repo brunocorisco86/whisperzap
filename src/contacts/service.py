@@ -49,6 +49,7 @@ def record_to_response(
         role=role_val,
         company=rec.company,
         projects=rec.projects_json or [],
+        avatar_url=rec.avatar_url,
         custom_weight=rec.custom_weight,
         notes=rec.notes,
         effective_weight=calculate_effective_weight(rec),

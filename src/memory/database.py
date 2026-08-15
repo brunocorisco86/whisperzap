@@ -58,6 +58,11 @@ def init_db() -> None:
                 conn.commit()
             except Exception:
                 pass
+            try:
+                conn.execute(text("ALTER TABLE contacts ADD COLUMN avatar_url VARCHAR(500)"))
+                conn.commit()
+            except Exception:
+                pass
         logger.info(f"Banco de dados inicializado com sucesso usando: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL}")
     except Exception as e:
         logger.error(f"Erro ao inicializar banco de dados: {e}")

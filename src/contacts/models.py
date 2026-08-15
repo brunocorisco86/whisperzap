@@ -21,6 +21,7 @@ class ContactRecord(Base):
     role = Column(String(50), default="UNKNOWN", index=True)
     company = Column(String(150), nullable=True, index=True)
     projects_json = Column(JSON, default=list)  # Lista de strings com projetos vinculados
+    avatar_url = Column(String(500), nullable=True)  # URL da foto de perfil do WhatsApp
     custom_weight = Column(Float, nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utc_now)

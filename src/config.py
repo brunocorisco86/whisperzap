@@ -59,8 +59,8 @@ class Settings(BaseSettings):
     # WhatsApp / Evolution API & n8n
     N8N_WEBHOOK_URL: str = "http://localhost:5678/webhook/voice-received"
     WHATSAPP_API_TOKEN: str = ""
-    EVOLUTION_API_URL: str = "http://192.168.1.99:8080"
-    EVOLUTION_API_KEY: str = "B8F7D6E5C4B3A2918071625344352617"
+    EVOLUTION_API_URL: str = "http://100.106.3.81:8080"
+    EVOLUTION_API_KEY: str = "8c114ae397eb273edfe82e05728be8b4e17cc25649d7e26df40c438c67c368b0"
     EVOLUTION_INSTANCE: str = "hermes"
 
 

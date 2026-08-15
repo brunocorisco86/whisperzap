@@ -92,6 +92,7 @@ class ContactBase(BaseModel):
     role: ContactRole = Field(default=ContactRole.UNKNOWN, description="Papel ou categoria de relacionamento")
     company: Optional[str] = Field(default=None, description="Empresa, cooperativa ou contexto organizacional")
     projects: list[str] = Field(default_factory=list, description="Projetos ou temas vinculados a este contato")
+    avatar_url: Optional[str] = Field(default=None, description="URL da foto de perfil do WhatsApp")
     custom_weight: Optional[float] = Field(
         default=None, ge=0.0, le=1.0, description="Peso manual customizado de 0.0 a 1.0 (opcional)"
     )
@@ -108,6 +109,7 @@ class ContactUpdate(BaseModel):
     role: Optional[ContactRole] = None
     company: Optional[str] = None
     projects: Optional[list[str]] = None
+    avatar_url: Optional[str] = None
     custom_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     notes: Optional[str] = None
 

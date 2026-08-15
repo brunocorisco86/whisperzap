@@ -611,7 +611,7 @@ function renderDictionary() {
   }).join('');
 }
 
-// --- WhatsApp Avatar Fetcher ---
+// --- WhatsApp Avatar & Profile Fetcher ---
 
 async function fetchWhatsAppAvatar(phone) {
   const avatarEl = document.getElementById(`avatar-${phone}`);
@@ -620,21 +620,28 @@ async function fetchWhatsAppAvatar(phone) {
   }
 
   try {
-    const res = await fetch(`/api/v1/contacts/avatar/${phone}`);
+    const res = await fetch(`/api/v1/contacts/profile/${phone}`);
     if (res.ok) {
       const data = await res.json();
-      if (data.profile_picture_url) {
-        if (avatarEl) {
-          avatarEl.innerHTML = `<img src="${data.profile_picture_url}" alt="Foto WhatsApp">`;
-        }
-        showToast('Foto do perfil carregada via WhatsApp!');
+      let msg = '';
+      if (data.profile_picture_url && avatarEl) {
+        avatarEl.innerHTML = `<img src="${data.profile_picture_url}" alt="Foto WhatsApp">`;
+        msg += '📸 Foto';
+      }
+      if (data.name) {
+        msg += (msg ? ' e ' : '') + `👤 Nome: "${data.name}"`;
+      }
+
+      if (msg) {
+        showToast(`Perfil sincronizado do WhatsApp: ${msg}!`);
+        loadContacts();
         return;
       }
     }
-    showToast('Foto não encontrada no WhatsApp deste número.', true);
+    showToast('Foto ou nome público não disponíveis para este número no WhatsApp.', true);
     if (avatarEl) avatarEl.textContent = '👤';
   } catch (err) {
-    console.error('Erro ao buscar foto:', err);
+    console.error('Erro ao buscar perfil do WhatsApp:', err);
     showToast('Erro ao comunicar com a Evolution API', true);
   }
 }
