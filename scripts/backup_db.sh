@@ -15,13 +15,13 @@ echo "💾 [$(date)] Iniciando rotina de backup do Hermes Voice Memory..."
 
 # 1. Backup do Banco PostgreSQL
 DB_CONTAINER="hermes-db"
-DB_USER="${POSTGRES_USER:-hermes_admin}"
+DB_USER="${POSTGRES_USER:-postgres}"
 DB_NAME="${POSTGRES_DB:-hermes_voice_memory}"
 DUMP_FILE="$BACKUP_DIR/hermes_db_$TIMESTAMP.sql.gz"
 
 if docker ps --format '{{.Names}}' | grep -q "^$DB_CONTAINER$"; then
     echo "📦 Extraindo dump do PostgreSQL via Docker ($DB_NAME)..."
-    docker exec -t "$DB_CONTAINER" pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$DUMP_FILE"
+    docker exec "$DB_CONTAINER" pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$DUMP_FILE"
     echo "✅ Backup do PostgreSQL salvo em: $DUMP_FILE ($(du -h "$DUMP_FILE" | cut -f1))"
 else
     echo "⚠️ Container $DB_CONTAINER não está em execução. Verificando fallback SQLite local..."
