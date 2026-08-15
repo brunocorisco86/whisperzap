@@ -153,7 +153,7 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [CONCLUÍDO]
 - [x] **4.1** Clonar e sincronizar o repositório no Raspberry Pi em `/opt/whisperzap`.
 - [x] **4.2** Configurar variáveis de ambiente no Raspberry Pi apontando `HERMES_API_URL` para a VPS (`http://179.197.73.80:8005` ou Tailscale `http://100.106.3.81:8005`).
 - [x] **4.3** Subir a stack Docker Homelab (`hermes-evolution-api`, `hermes-n8n`, `redis`, `postgres`).
-- [ ] **4.4** Conectar o WhatsApp na Evolution API via QR Code no Raspberry Pi (`http://192.168.1.99:8080`).
+- [x] **4.4** Conectar o WhatsApp na Evolution API via QR Code no Raspberry Pi (`http://192.168.1.99:8080`).
 - [ ] **4.5** Importar e ativar o **Master Orchestrator** no n8n do Raspberry Pi (`http://192.168.1.99:5678`).
 
 ### 📍 Etapa 5: Auditoria & Verificação Global de Toda a Arquitetura e Stack
