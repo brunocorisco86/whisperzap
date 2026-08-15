@@ -11,6 +11,8 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛️</text></svg>">
   <!-- Vis.js Network for Interactive Graph -->
   <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <!-- Chart.js for Analytics Dashboard -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -55,6 +57,9 @@
       </button>
       <button class="tab-btn" data-tab="tab-messages">
         🎙️ Áudios & Transcrições
+      </button>
+      <button class="tab-btn" data-tab="tab-analytics">
+        📊 Analytics & Dashboard
       </button>
       <button class="tab-btn" data-tab="tab-dictionary">
         📖 Dicionário Léxico (<span id="count-dict">0</span>)
@@ -195,7 +200,158 @@
       </div>
     </section>
 
-    <!-- Tab 5: Lexical Dictionary & Active Learning Harvester -->
+    <!-- Tab 5: Analytics & Dashboard Executivo -->
+    <section id="tab-analytics" class="tab-content">
+      <!-- Toolbar Analítica -->
+      <div class="analytics-toolbar">
+        <div class="analytics-controls">
+          <div class="filter-item">
+            <label for="analytics-period">📅 Período:</label>
+            <select id="analytics-period" class="form-select">
+              <option value="today">Hoje (Hoje)</option>
+              <option value="7d">Últimos 7 dias (7D)</option>
+              <option value="30d" selected>Últimos 30 dias (30D)</option>
+              <option value="month">Mês Atual (Mês)</option>
+              <option value="all">Todo o Histórico (Tudo)</option>
+            </select>
+          </div>
+
+          <div class="filter-item">
+            <label for="analytics-groupby">⏱️ Agrupamento:</label>
+            <select id="analytics-groupby" class="form-select">
+              <option value="day" selected>Por Dia</option>
+              <option value="week">Por Semana</option>
+              <option value="month">Por Mês</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <button class="btn btn-secondary btn-sm" id="btn-refresh-analytics">
+            🔄 Atualizar Dashboard
+          </button>
+        </div>
+      </div>
+
+      <!-- 5 Hero KPI Cards -->
+      <div class="kpi-grid">
+        <div class="kpi-card" id="kpi-card-senders">
+          <div class="kpi-icon">👥</div>
+          <div class="kpi-body">
+            <div class="kpi-title">Pessoas em Contato</div>
+            <div class="kpi-value" id="kpi-val-senders">--</div>
+            <div class="kpi-sub" id="kpi-sub-senders">Calculando...</div>
+          </div>
+        </div>
+
+        <div class="kpi-card" id="kpi-card-messages">
+          <div class="kpi-icon">💬</div>
+          <div class="kpi-body">
+            <div class="kpi-title">Total de Interações</div>
+            <div class="kpi-value" id="kpi-val-messages">--</div>
+            <div class="kpi-sub" id="kpi-sub-messages">Calculando...</div>
+          </div>
+        </div>
+
+        <div class="kpi-card" id="kpi-card-duration">
+          <div class="kpi-icon">⏱️</div>
+          <div class="kpi-body">
+            <div class="kpi-title">Duração Média de Áudio</div>
+            <div class="kpi-value" id="kpi-val-duration">--</div>
+            <div class="kpi-sub" id="kpi-sub-duration">Calculando...</div>
+          </div>
+        </div>
+
+        <div class="kpi-card" id="kpi-card-actionability">
+          <div class="kpi-icon">🎯</div>
+          <div class="kpi-body">
+            <div class="kpi-title">Taxa de Ação (% Tarefas)</div>
+            <div class="kpi-value" id="kpi-val-actionability">--</div>
+            <div class="kpi-sub" id="kpi-sub-actionability">Calculando...</div>
+          </div>
+        </div>
+
+        <div class="kpi-card" id="kpi-card-sentiment">
+          <div class="kpi-icon">😊</div>
+          <div class="kpi-body">
+            <div class="kpi-title">Saúde do Sentimento</div>
+            <div class="kpi-value" id="kpi-val-sentiment">--</div>
+            <div class="kpi-sub" id="kpi-sub-sentiment">Calculando...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resumo Executivo -->
+      <div class="analytics-summary-banner" id="analytics-summary-box">
+        💡 <b>Resumo da Comunicação:</b> <span id="analytics-summary-text">Carregando inteligência executiva...</span>
+      </div>
+
+      <!-- Grid 2x2 de Gráficos -->
+      <div class="analytics-charts-grid">
+        <!-- Gráfico 1: Série Temporal -->
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h3>📈 Pessoas em Contato & Volume no Período</h3>
+            <span class="chart-tag">Linha / Área</span>
+          </div>
+          <div class="chart-canvas-wrapper">
+            <canvas id="chart-analytics-timeseries"></canvas>
+          </div>
+        </div>
+
+        <!-- Gráfico 2: Top Interlocutores -->
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h3>📊 Top 10 Interlocutores por Volume</h3>
+            <span class="chart-tag">Barras Horizontais</span>
+          </div>
+          <div class="chart-canvas-wrapper">
+            <canvas id="chart-analytics-senders"></canvas>
+          </div>
+        </div>
+
+        <!-- Gráfico 3: Tamanho Médio e Duração -->
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h3>⏱️ Tamanho Médio das Mensagens & Áudio</h3>
+            <span class="chart-tag">Dual Axis</span>
+          </div>
+          <div class="chart-canvas-wrapper">
+            <canvas id="chart-analytics-size"></canvas>
+          </div>
+        </div>
+
+        <!-- Gráfico 4: Heatmap 24x7 -->
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h3>🔥 Matriz de Horários de Pico (24h x 7d)</h3>
+            <span class="chart-tag">Mapa de Calor</span>
+          </div>
+          <div id="analytics-heatmap-container" class="heatmap-grid-wrapper">
+            <!-- Rendered via JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Bloco Full-Width: WordMap Semântico -->
+      <div class="chart-card" style="margin-top: 1.25rem;">
+        <div class="chart-card-header">
+          <h3>☁️ WordMap & Nuvem Semântica de Termos e Tópicos</h3>
+          <div class="wordmap-legend">
+            <span class="legend-chip legend-zootecnia">🌾 Zootecnia / Silos</span>
+            <span class="legend-chip legend-logistica">🚚 Logística</span>
+            <span class="legend-chip legend-gestao">👔 Gestão</span>
+            <span class="legend-chip legend-pessoal">🏠 Pessoal</span>
+            <span class="legend-chip legend-geral">💬 Geral</span>
+          </div>
+        </div>
+        <div class="wordmap-cloud-box" id="analytics-wordmap-container">
+          <!-- Rendered via JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 6: Lexical Dictionary & Active Learning Harvester -->
     <section id="tab-dictionary" class="tab-content">
       <div class="section-toolbar">
         <div class="search-box">

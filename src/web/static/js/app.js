@@ -66,6 +66,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       loadTasks();
     } else if (targetId === 'tab-messages') {
       loadMessages();
+    } else if (targetId === 'tab-analytics') {
+      loadAnalyticsDashboard();
     } else if (targetId === 'tab-sentiment') {
       loadDailySentiments();
       populateSentimentSpeakers();
@@ -88,6 +90,14 @@ document.addEventListener('DOMContentLoaded', () => {
   if (tasksSearchInput) tasksSearchInput.addEventListener('input', renderTasks);
   if (tasksFilterStatus) tasksFilterStatus.addEventListener('change', renderTasks);
   if (tasksFilterPriority) tasksFilterPriority.addEventListener('change', renderTasks);
+
+  // Analytics Listeners
+  const analyticsPeriodSelect = document.getElementById('analytics-period');
+  const analyticsGroupBySelect = document.getElementById('analytics-groupby');
+  const btnRefreshAnalytics = document.getElementById('btn-refresh-analytics');
+  if (analyticsPeriodSelect) analyticsPeriodSelect.addEventListener('change', loadAnalyticsDashboard);
+  if (analyticsGroupBySelect) analyticsGroupBySelect.addEventListener('change', loadAnalyticsDashboard);
+  if (btnRefreshAnalytics) btnRefreshAnalytics.addEventListener('click', loadAnalyticsDashboard);
 
   // Global Refresh
   document.getElementById('btn-refresh-all').addEventListener('click', () => {
@@ -1567,6 +1577,395 @@ function renderSentimentTimeline(data) {
 
         ${highlightsHtml ? `<div style="margin-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.4rem;">${highlightsHtml}</div>` : ''}
       </div>
+    `;
+  }).join('');
+}
+
+// ==========================================================================
+// Analytics & Dashboard Executivo (Chart.js & NLP WordMap)
+// ==========================================================================
+
+let chartTimeseriesInstance = null;
+let chartSendersInstance = null;
+let chartSizeInstance = null;
+
+async function loadAnalyticsDashboard() {
+  const periodSelect = document.getElementById('analytics-period');
+  const groupSelect = document.getElementById('analytics-groupby');
+
+  const period = periodSelect ? periodSelect.value : '30d';
+  const groupBy = groupSelect ? groupSelect.value : 'day';
+
+  try {
+    const res = await fetch(`/api/v1/analytics/dashboard?period=${period}&group_by=${groupBy}`);
+    if (!res.ok) throw new Error('Falha na requisição analítica');
+
+    const data = await res.json();
+    renderHeroKPIs(data);
+    renderTimeseriesChart(data);
+    renderTopSendersChart(data);
+    renderMessageSizeChart(data);
+    renderHeatmapGrid(data.heatmap || []);
+    renderWordMapCloud(data.wordmap || []);
+
+    const summaryEl = document.getElementById('analytics-summary-text');
+    if (summaryEl) {
+      summaryEl.textContent = data.summary_text || 'Sem dados suficientes para gerar resumo.';
+    }
+  } catch (err) {
+    console.error('Erro ao carregar Dashboard Analítico:', err);
+    showToast('Erro ao carregar métricas analíticas', true);
+  }
+}
+window.loadAnalyticsDashboard = loadAnalyticsDashboard;
+
+function renderHeroKPIs(data) {
+  const setKpi = (idVal, idSub, kpi) => {
+    const valEl = document.getElementById(idVal);
+    const subEl = document.getElementById(idSub);
+    if (!valEl || !subEl || !kpi) return;
+
+    valEl.textContent = kpi.value !== undefined ? kpi.value : '--';
+    
+    let trendBadge = '';
+    if (kpi.trend_pct !== null && kpi.trend_pct !== undefined) {
+      const isUp = kpi.trend_direction === 'UP';
+      const color = isUp ? '#10b981' : '#ef4444';
+      const arrow = isUp ? '↑' : '↓';
+      trendBadge = ` <span style="color: ${color}; font-weight: 700;">${arrow} ${Math.abs(kpi.trend_pct)}%</span>`;
+    }
+    subEl.innerHTML = (kpi.subtitle || '') + trendBadge;
+  };
+
+  setKpi('kpi-val-senders', 'kpi-sub-senders', data.kpi_unique_senders);
+  setKpi('kpi-val-messages', 'kpi-sub-messages', data.kpi_total_messages);
+  setKpi('kpi-val-duration', 'kpi-sub-duration', data.kpi_audio_duration);
+  setKpi('kpi-val-actionability', 'kpi-sub-actionability', data.kpi_actionability_rate);
+  setKpi('kpi-val-sentiment', 'kpi-sub-sentiment', data.kpi_sentiment_health);
+}
+
+function renderTimeseriesChart(data) {
+  const canvas = document.getElementById('chart-analytics-timeseries');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  if (chartTimeseriesInstance) {
+    chartTimeseriesInstance.destroy();
+  }
+
+  const labels = (data.timeseries || []).map(p => p.period_label);
+  const sendersData = (data.timeseries || []).map(p => p.unique_senders);
+  const messagesData = (data.timeseries || []).map(p => p.total_messages);
+  const audioData = (data.timeseries || []).map(p => p.audio_messages);
+
+  const ctx = canvas.getContext('2d');
+  chartTimeseriesInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Total Mensagens',
+          data: messagesData,
+          borderColor: '#0ea5e9',
+          backgroundColor: 'rgba(14, 165, 233, 0.15)',
+          fill: true,
+          tension: 0.35,
+          borderWidth: 2,
+          pointRadius: 4,
+          pointBackgroundColor: '#0ea5e9',
+        },
+        {
+          label: 'Áudios (Voz)',
+          data: audioData,
+          borderColor: '#10b981',
+          backgroundColor: 'transparent',
+          borderDash: [4, 4],
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#10b981',
+        },
+        {
+          label: 'Pessoas Distintas',
+          data: sendersData,
+          borderColor: '#f59e0b',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#f59e0b',
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          labels: { color: '#94a3b8', font: { family: 'Inter', size: 11 } }
+        },
+        tooltip: {
+          backgroundColor: '#0f172a',
+          titleColor: '#38bdf8',
+          bodyColor: '#f8fafc',
+          borderColor: '#334155',
+          borderWidth: 1
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
+          ticks: { color: '#64748b', font: { size: 11 } }
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
+          ticks: { color: '#64748b', font: { size: 11 }, precision: 0 }
+        }
+      }
+    }
+  });
+}
+
+function renderTopSendersChart(data) {
+  const canvas = document.getElementById('chart-analytics-senders');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  if (chartSendersInstance) {
+    chartSendersInstance.destroy();
+  }
+
+  const senders = (data.top_senders || []).slice(0, 10);
+  const labels = senders.map(s => s.speaker);
+  const msgCounts = senders.map(s => s.total_messages);
+  const audioCounts = senders.map(s => s.audio_count);
+
+  const ctx = canvas.getContext('2d');
+  chartSendersInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Total de Mensagens',
+          data: msgCounts,
+          backgroundColor: 'rgba(14, 165, 233, 0.75)',
+          borderRadius: 4,
+        },
+        {
+          label: 'Mensagens de Áudio',
+          data: audioCounts,
+          backgroundColor: 'rgba(16, 185, 129, 0.75)',
+          borderRadius: 4,
+        }
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: { color: '#94a3b8', font: { family: 'Inter', size: 11 } }
+        },
+        tooltip: {
+          backgroundColor: '#0f172a',
+          titleColor: '#38bdf8',
+          bodyColor: '#f8fafc',
+          borderColor: '#334155',
+          borderWidth: 1,
+          callbacks: {
+            afterBody: function(items) {
+              const idx = items[0].dataIndex;
+              const sender = senders[idx];
+              if (!sender) return '';
+              const roleLabel = sender.role ? `\nCargo: ${sender.role}` : '';
+              const tasksLabel = `\nTarefas geradas: ${sender.tasks_count}`;
+              const durLabel = sender.total_duration_s ? `\nDuração áudios: ${Math.round(sender.total_duration_s)}s` : '';
+              return roleLabel + tasksLabel + durLabel;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
+          ticks: { color: '#64748b', font: { size: 11 }, precision: 0 }
+        },
+        y: {
+          grid: { display: false },
+          ticks: { color: '#f8fafc', font: { size: 11, weight: '600' } }
+        }
+      }
+    }
+  });
+}
+
+function renderMessageSizeChart(data) {
+  const canvas = document.getElementById('chart-analytics-size');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  if (chartSizeInstance) {
+    chartSizeInstance.destroy();
+  }
+
+  const labels = (data.timeseries || []).map(p => p.period_label);
+  const audioDuration = (data.timeseries || []).map(p => p.avg_audio_duration_s);
+  const textChars = (data.timeseries || []).map(p => p.avg_chars);
+
+  const ctx = canvas.getContext('2d');
+  chartSizeInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Duração Média Áudio (seg)',
+          data: audioDuration,
+          backgroundColor: 'rgba(245, 158, 11, 0.65)',
+          yAxisID: 'yAudio',
+          borderRadius: 4,
+        },
+        {
+          type: 'line',
+          label: 'Tamanho Médio Texto (caracteres)',
+          data: textChars,
+          borderColor: '#a855f7',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          pointRadius: 4,
+          pointBackgroundColor: '#a855f7',
+          yAxisID: 'yText',
+          tension: 0.3,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          labels: { color: '#94a3b8', font: { family: 'Inter', size: 11 } }
+        },
+        tooltip: {
+          backgroundColor: '#0f172a',
+          titleColor: '#38bdf8',
+          bodyColor: '#f8fafc',
+          borderColor: '#334155',
+          borderWidth: 1
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
+          ticks: { color: '#64748b', font: { size: 11 } }
+        },
+        yAudio: {
+          type: 'linear',
+          position: 'left',
+          beginAtZero: true,
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
+          ticks: {
+            color: '#f59e0b',
+            callback: v => `${v}s`
+          }
+        },
+        yText: {
+          type: 'linear',
+          position: 'right',
+          beginAtZero: true,
+          grid: { display: false },
+          ticks: {
+            color: '#a855f7',
+            callback: v => `${v} char`
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderHeatmapGrid(cells) {
+  const container = document.getElementById('analytics-heatmap-container');
+  if (!container) return;
+
+  if (!cells || cells.length === 0) {
+    container.innerHTML = '<p class="text-muted" style="text-align:center; padding: 2rem;">Sem dados de horário registrados no período.</p>';
+    return;
+  }
+
+  const maxCount = Math.max(...cells.map(c => c.count), 1);
+  const dayNames = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+
+  // Agrupa por dia
+  const byDay = {};
+  cells.forEach(c => {
+    if (!byDay[c.day_of_week]) byDay[c.day_of_week] = [];
+    byDay[c.day_of_week].push(c);
+  });
+
+  // Cabeçalho de horas
+  let hoursHeader = '<div class="heatmap-hours-header">';
+  for (let h = 0; h < 24; h += 2) {
+    hoursHeader += `<div class="heatmap-hour-label" style="flex: 2;">${h}h</div>`;
+  }
+  hoursHeader += '</div>';
+
+  let rowsHtml = '';
+  for (let d = 0; d < 7; d++) {
+    const dayCells = byDay[d] || [];
+    dayCells.sort((a, b) => a.hour - b.hour);
+
+    let cellsHtml = '';
+    dayCells.forEach(cell => {
+      const opacity = cell.count === 0 ? 0.04 : Math.min(0.2 + (cell.count / maxCount) * 0.8, 1.0);
+      const bg = cell.count === 0 ? 'rgba(255,255,255,0.03)' : `rgba(14, 165, 233, ${opacity})`;
+      const title = `${dayNames[d]} às ${cell.hour}:00 - ${cell.count} mensagem(ns)`;
+      cellsHtml += `<div class="heatmap-cell" style="background: ${bg};" title="${title}"></div>`;
+    });
+
+    rowsHtml += `
+      <div class="heatmap-row">
+        <div class="heatmap-day-label">${dayNames[d].substring(0, 3)}</div>
+        ${cellsHtml}
+      </div>
+    `;
+  }
+
+  container.innerHTML = hoursHeader + rowsHtml;
+}
+
+function renderWordMapCloud(wordItems) {
+  const container = document.getElementById('analytics-wordmap-container');
+  if (!container) return;
+
+  if (!wordItems || wordItems.length === 0) {
+    container.innerHTML = '<p class="text-muted" style="text-align:center; padding: 2rem;">Nenhum termo relevante identificado no período.</p>';
+    return;
+  }
+
+  const categoryStyles = {
+    'ZOOTECNIA': 'legend-zootecnia',
+    'LOGISTICA': 'legend-logistica',
+    'GESTAO': 'legend-gestao',
+    'PESSOAL': 'legend-pessoal',
+    'GERAL': 'legend-geral',
+  };
+
+  container.innerHTML = wordItems.map(item => {
+    const chipClass = categoryStyles[item.category] || 'legend-geral';
+    // Tamanho proporcional entre 0.85rem e 1.65rem
+    const fontSize = 0.85 + (item.weight_pct / 100) * 0.75;
+
+    return `
+      <span class="word-cloud-tag ${chipClass}" style="font-size: ${fontSize.toFixed(2)}rem;" title="Termo: '${item.word}' • ${item.count} menções no período">
+        <span>${item.word}</span>
+        <span class="word-tag-count">${item.count}</span>
+      </span>
     `;
   }).join('');
 }

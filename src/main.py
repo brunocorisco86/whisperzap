@@ -7,6 +7,7 @@ from src.transcriber.router import router as transcriber_router
 from src.dictionary.router import router as dictionary_router
 from src.memory.router import router as memory_router
 from src.contacts.router import router as contacts_router
+from src.analytics.router import router as analytics_router
 from src.web.router import router as web_router, STATIC_DIR
 from src.memory.database import init_db
 from src.scheduler.cron_service import start_scheduler, stop_scheduler
@@ -53,6 +54,7 @@ app.include_router(ai_router)
 app.include_router(dictionary_router)
 app.include_router(memory_router)
 app.include_router(contacts_router)
+app.include_router(analytics_router)
 
 
 
