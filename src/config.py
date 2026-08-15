@@ -21,15 +21,15 @@ class Settings(BaseSettings):
 
     # AI Gateway
     AI_PROVIDER: Literal["gemini", "openrouter", "mock"] = "gemini"
-    AI_DEFAULT_MODEL: str = "gemini-2.5-flash-lite"
+    AI_DEFAULT_MODEL: str = "gemini-3.1-flash-lite"
     GEMINI_API_KEY: str = ""
     OPENROUTER_API_KEY: str = ""
 
     # Model Router
-    MODEL_REVISE: str = "gemini-2.5-flash-lite"
-    MODEL_EXTRACT: str = "gemini-2.5-flash-lite"
-    MODEL_SUMMARIZE: str = "gemini-2.5-flash"
-    MODEL_WEEKLY: str = "gemini-2.5-pro"
+    MODEL_REVISE: str = "gemini-3.1-flash-lite"
+    MODEL_EXTRACT: str = "gemini-3.1-flash-lite"
+    MODEL_SUMMARIZE: str = "gemini-3.1-flash-lite"
+    MODEL_WEEKLY: str = "gemini-3.1-flash-lite"
 
     AI_LOG_PROMPTS: bool = False
     AI_LOG_RESPONSES: bool = False

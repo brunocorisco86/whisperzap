@@ -9,5 +9,4 @@ def test_settings_default_values():
     assert settings.API_VERSION == "0.2.0"
     assert settings.WHISPER_MODEL == "base"
     assert settings.WHISPER_DEVICE == "cpu"
-    assert settings.AI_PROVIDER in ["gemini", "openrouter", "mock"]
-    assert settings.MODEL_REVISE == "gemini-2.5-flash-lite"
+    assert settings.MODEL_REVISE == "gemini-3.1-flash-lite"

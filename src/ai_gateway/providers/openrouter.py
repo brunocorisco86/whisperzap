@@ -12,9 +12,10 @@ class OpenRouterProvider(BaseLLMProvider):
 
     BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-    def __init__(self, api_key: str, model_name: str = "google/gemini-2.5-flash-lite"):
-        super().__init__(model_name=model_name)
+    def __init__(self, api_key: str, model_name: str = "google/gemini-flash-1.5"):
         self.api_key = api_key
+        self.model_name = model_name
+        self.base_url = "https://openrouter.ai/api/v1"
 
     @property
     def provider_name(self) -> str:

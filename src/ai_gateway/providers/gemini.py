@@ -12,9 +12,10 @@ class GeminiProvider(BaseLLMProvider):
 
     BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
-    def __init__(self, api_key: str, model_name: str = "gemini-2.5-flash-lite"):
-        super().__init__(model_name=model_name)
+    def __init__(self, api_key: str, model_name: str = "gemini-3.1-flash-lite"):
         self.api_key = api_key
+        self.model_name = model_name
+        self.base_url = "https://generativelanguage.googleapis.com/v1beta/models"
 
     @property
     def provider_name(self) -> str:
