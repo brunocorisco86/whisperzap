@@ -4,6 +4,7 @@ import json
 import logging
 import math
 from datetime import datetime, timezone
+from typing import Any, Optional, List
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
@@ -516,14 +517,19 @@ class MemoryRepository:
         priority: str | None = None,
         assignee: str | None = None,
         db: Session | None = None,
-    ) -> list[TaskRecord]:
-        """Lista tarefas filtradas por status, prioridade ou responsável."""
+    ) -> list[Any]:
+        """Lista tarefas filtradas por status, prioridade ou responsável com ancoragem do solicitante."""
         should_close = False
         if db is None:
             db = SessionLocal()
             should_close = True
 
         try:
+            from src.contacts.models import ContactRecord
+            from src.memory.models import TaskResponse
+
+            contacts_map = {c.name.lower(): c for c in db.query(ContactRecord).all()}
+
             query = db.query(TaskRecord)
             if status:
                 query = query.filter(TaskRecord.status == status.upper())
@@ -532,12 +538,49 @@ class MemoryRepository:
             if assignee:
                 query = query.filter(TaskRecord.assignee.ilike(f"%{assignee}%"))
 
-            return query.order_by(TaskRecord.created_at.desc()).all()
+            records = query.order_by(TaskRecord.created_at.desc()).all()
+            responses = []
+            for r in records:
+                msg = r.message
+                speaker_name = msg.speaker if msg else "user"
+                contact_match = contacts_map.get(speaker_name.lower()) if speaker_name else None
+
+                sender_phone = ""
+                if contact_match and contact_match.phone_number:
+                    sender_phone = contact_match.phone_number
+                elif msg and isinstance(msg.meta_info, dict) and msg.meta_info.get("remoteJid"):
+                    sender_phone = msg.meta_info.get("remoteJid", "").split("@")[0]
+                elif speaker_name and speaker_name.replace("+", "").isdigit():
+                    sender_phone = speaker_name
+
+                sender_role = contact_match.role if contact_match else (contact_match.category if contact_match else None)
+                msg_summary = msg.summary if msg else None
+                source_snippet = (msg.revised_text[:140] + "...") if msg and len(msg.revised_text) > 140 else (msg.revised_text if msg else None)
+
+                responses.append(
+                    TaskResponse(
+                        id=r.id,
+                        message_id=r.message_id,
+                        title=r.title,
+                        assignee=r.assignee,
+                        due_date=r.due_date,
+                        priority=r.priority,
+                        status=r.status,
+                        created_at=r.created_at,
+                        completed_at=r.completed_at,
+                        speaker=speaker_name,
+                        sender_phone=sender_phone,
+                        sender_role=sender_role,
+                        message_summary=msg_summary,
+                        source_text_snippet=source_snippet,
+                    )
+                )
+            return responses
         finally:
             if should_close:
                 db.close()
 
-    def update_task(self, task_id: str, updates: TaskUpdate, db: Session | None = None) -> TaskRecord | None:
+    def update_task(self, task_id: str, updates: TaskUpdate, db: Session | None = None) -> Any | None:
         """Atualiza dados e status de uma tarefa."""
         should_close = False
         if db is None:
@@ -545,6 +588,9 @@ class MemoryRepository:
             should_close = True
 
         try:
+            from src.contacts.models import ContactRecord
+            from src.memory.models import TaskResponse
+
             task = db.query(TaskRecord).filter(TaskRecord.id == task_id).first()
             if not task:
                 return None
@@ -564,7 +610,33 @@ class MemoryRepository:
 
             db.commit()
             db.refresh(task)
-            return task
+
+            msg = task.message
+            speaker_name = msg.speaker if msg else "user"
+            contact_match = db.query(ContactRecord).filter(ContactRecord.name.ilike(speaker_name)).first() if speaker_name else None
+
+            sender_phone = ""
+            if contact_match and contact_match.phone_number:
+                sender_phone = contact_match.phone_number
+            elif msg and isinstance(msg.meta_info, dict) and msg.meta_info.get("remoteJid"):
+                sender_phone = msg.meta_info.get("remoteJid", "").split("@")[0]
+
+            return TaskResponse(
+                id=task.id,
+                message_id=task.message_id,
+                title=task.title,
+                assignee=task.assignee,
+                due_date=task.due_date,
+                priority=task.priority,
+                status=task.status,
+                created_at=task.created_at,
+                completed_at=task.completed_at,
+                speaker=speaker_name,
+                sender_phone=sender_phone,
+                sender_role=contact_match.role if contact_match else None,
+                message_summary=msg.summary if msg else None,
+                source_text_snippet=msg.revised_text[:140] if msg else None,
+            )
         finally:
             if should_close:
                 db.close()

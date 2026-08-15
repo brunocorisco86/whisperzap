@@ -580,7 +580,9 @@ function renderTasks() {
   const filtered = allTasks.filter(t => {
     const matchSearch = (
       t.title.toLowerCase().includes(searchTerm) ||
-      (t.assignee && t.assignee.toLowerCase().includes(searchTerm))
+      (t.assignee && t.assignee.toLowerCase().includes(searchTerm)) ||
+      (t.speaker && t.speaker.toLowerCase().includes(searchTerm)) ||
+      (t.message_summary && t.message_summary.toLowerCase().includes(searchTerm))
     );
     const matchStatus = !filterStatus || t.status === filterStatus;
     const matchPriority = !filterPriority || t.priority === filterPriority;
@@ -591,6 +593,7 @@ function renderTasks() {
     tasksContainer.innerHTML = `
       <div class="empty-state" style="text-align: center; padding: 3rem; color: var(--text-muted);">
         <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">Nenhuma tarefa encontrada</p>
+        <small>Tarefas acionáveis extraídas de notas de voz aparecerão aqui com a ancoragem de quem solicitou.</small>
       </div>
     `;
     return;
@@ -599,21 +602,72 @@ function renderTasks() {
   tasksContainer.innerHTML = filtered.map(t => {
     const isDone = t.status === 'DONE';
     const priorityColor = t.priority === 'URGENT' ? '#ef4444' : t.priority === 'HIGH' ? '#f59e0b' : '#10b981';
+    const speakerName = t.speaker || 'Desconhecido';
+    const initials = speakerName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
+
+    // Telefone / WhatsApp do solicitante
+    const phoneClean = (t.sender_phone || '').replace(/[^0-9]/g, '');
+    const waLink = phoneClean.length >= 10 ? `https://wa.me/${phoneClean}` : null;
+
+    // Rótulo amigável do papel
+    const roleLabels = {
+      'PRODUCER_COOPERATED': '🌾 Produtor Rural',
+      'FAMILY_CORE': '🏠 Família',
+      'EXECUTIVE': '👔 Diretoria / Gestão',
+      'COLLEAGUE': '🤝 Colega / Parceiro',
+      'STAKEHOLDER': '💼 Consultor',
+      'SERVICE_VENDOR': '🚚 Fornecedor',
+      'UNKNOWN': '👤 Contato',
+    };
+    const roleBadge = t.sender_role ? (roleLabels[t.sender_role] || t.sender_role) : null;
 
     return `
       <div class="task-card ${isDone ? 'task-done' : ''}">
-        <div class="task-info">
-          <div class="task-title">${t.title}</div>
-          <div class="task-meta">
-            <span class="badge" style="background: rgba(255,255,255,0.08); color: ${priorityColor};">${t.priority}</span>
-            ${t.assignee ? `<span>👤 ${t.assignee}</span>` : ''}
-            ${t.due_date ? `<span>📅 ${t.due_date}</span>` : ''}
+        <!-- Topo: Título da Tarefa e Solicitante (Gatilho) -->
+        <div class="task-top-row">
+          <div style="flex: 1;">
+            <div class="task-title">${t.title}</div>
+          </div>
+
+          <!-- Box de Ancoragem do Solicitante (Gatilho) -->
+          <div class="task-requester-box" title="Pessoa que enviou o áudio / gerou o gatilho desta tarefa">
+            <div class="task-requester-avatar">${initials}</div>
+            <div>
+              <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1;">Gatilho de:</div>
+              <div class="task-requester-name">${speakerName}</div>
+            </div>
+            ${roleBadge ? `<span class="badge" style="font-size: 0.68rem; background: rgba(255,255,255,0.06);">${roleBadge}</span>` : ''}
           </div>
         </div>
-        <div>
-          <button class="btn btn-secondary btn-sm" onclick="toggleTaskStatus('${t.id}', '${isDone ? 'PENDING' : 'DONE'}')">
-            ${isDone ? '🔄 Reabrir' : '✅ Concluir'}
-          </button>
+
+        <!-- Contexto da Mensagem de Origem -->
+        ${(t.message_summary || t.source_text_snippet) ? `
+          <div class="task-source-context" title="Contexto original da conversa de onde esta tarefa surgiu">
+            💡 <b>Contexto da Conversa:</b> "${t.message_summary || t.source_text_snippet}"
+          </div>
+        ` : ''}
+
+        <!-- Rodapé: Metadados e Ações -->
+        <div class="task-footer-row">
+          <div class="task-meta-items">
+            <span class="badge" style="background: rgba(255,255,255,0.08); color: ${priorityColor}; font-weight: 700;">
+              ● ${t.priority}
+            </span>
+            ${t.assignee ? `<span>🎯 <b>Responsável:</b> ${t.assignee}</span>` : ''}
+            ${t.due_date ? `<span>📅 <b>Prazo:</b> ${t.due_date}</span>` : ''}
+            ${t.created_at ? `<span>⏱️ ${typeof t.created_at === 'string' ? t.created_at.substring(0, 10) : ''}</span>` : ''}
+          </div>
+
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            ${waLink ? `
+              <a href="${waLink}" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration: none; color: #25d366;" title="Falar com ${speakerName} no WhatsApp">
+                💬 WhatsApp
+              </a>
+            ` : ''}
+            <button class="btn btn-secondary btn-sm" onclick="toggleTaskStatus('${t.id}', '${isDone ? 'PENDING' : 'DONE'}')">
+              ${isDone ? '🔄 Reabrir Tarefa' : '✅ Concluir Tarefa'}
+            </button>
+          </div>
         </div>
       </div>
     `;

@@ -115,17 +115,17 @@
   {
     "term": "TMS",
     "phonetic_variations": [
+      "sistema tms",
       "t.m.s.",
       "tem esse",
-      "roteirizador",
-      "têmessi",
-      "temesse",
-      "t m s",
       "têemeésse",
-      "sistema tms",
       "t em s",
+      "roteirizador",
+      "t em esse",
+      "t m s",
       "tms",
-      "t em esse"
+      "temesse",
+      "têmessi"
     ],
     "expansion": "Transportation Management System",
     "category": "LOGISTICA",

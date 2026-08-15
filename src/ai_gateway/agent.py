@@ -83,17 +83,22 @@ class HermesAgentService:
             tasks_context=tasks_context,
         )
 
-        llm_response = await self.provider.generate_text(
-            prompt=user_prompt,
-            system_instruction=HERMES_AGENT_SYSTEM_PROMPT,
-            temperature=0.2,
-        )
+        try:
+            llm_response = await self.provider.generate_text(
+                prompt=user_prompt,
+                system_instruction=HERMES_AGENT_SYSTEM_PROMPT,
+                temperature=0.2,
+            )
+            answer_text = llm_response.strip()
+        except Exception as exc:
+            logger.warning(f"Chamada LLM para consulta Hermes falhou ({exc}). Gerando resposta estruturada direta.")
+            answer_text = f"Com base nas memórias registradas:\n{retrieved_context}\nEntidades conectadas: {graph_context}"
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
 
         return HermesQueryResponse(
             query=query,
-            answer=llm_response.strip(),
+            answer=answer_text,
             sources=sources,
             related_entities=related_entities,
             pending_tasks_mentioned=pending_tasks,

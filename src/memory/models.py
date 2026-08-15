@@ -200,6 +200,13 @@ class TaskResponse(BaseModel):
     created_at: datetime
     completed_at: Optional[datetime] = None
 
+    # Ancoragem de Origem / Gatilho
+    speaker: Optional[str] = None
+    sender_phone: Optional[str] = None
+    sender_role: Optional[str] = None
+    message_summary: Optional[str] = None
+    source_text_snippet: Optional[str] = None
+
 
 
 class TaskUpdate(BaseModel):
