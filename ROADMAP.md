@@ -130,8 +130,8 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [CONCLUÍDO]
 - [x] **1.1** Iniciar o servidor da API localmente (`uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload`).
 - [x] **1.2** Abrir o Swagger UI no navegador em `http://localhost:8000/docs`.
 - [x] **1.3** Testar o endpoint `POST /transcribe` enviando um arquivo de áudio real de `assets/AudioSample/`.
-- [ ] **1.4** Testar `POST /api/v1/memory/messages` enviando uma instrução de voz simulada.
-- [ ] **1.5** Testar `POST /api/v1/memory/query` fazendo uma pergunta em linguagem natural para o Hermes.
+- [x] **1.4** Testar `POST /api/v1/memory/messages` enviando uma instrução de voz simulada.
+- [x] **1.5** Testar `POST /api/v1/memory/query` fazendo uma pergunta em linguagem natural para o Hermes.
 - [ ] **1.6** Visualizar o Resumo Diário (`/api/v1/memory/daily`) e Relatório Semanal (`/api/v1/memory/weekly`).
 
 ### 📍 Etapa 2: Conexão com WhatsApp & n8n (Homelab / Raspberry Pi)
