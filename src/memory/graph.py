@@ -57,6 +57,15 @@ class KnowledgeGraph:
                 self.graph.nodes[name_clean][k] = v
         self._save()
 
+    def remove_node(self, name: str) -> bool:
+        """Remove um nó do grafo e persiste."""
+        name_clean = name.strip()
+        if self.graph.has_node(name_clean):
+            self.graph.remove_node(name_clean)
+            self._save()
+            return True
+        return False
+
     def add_edge(self, source: str, target: str, relation: str = "RELATED_TO", weight: float = 1.0) -> None:
         """Adiciona ou incrementa uma aresta direcionada entre duas entidades."""
         src_clean = source.strip()

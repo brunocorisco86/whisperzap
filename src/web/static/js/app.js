@@ -214,7 +214,7 @@ function renderContacts() {
 
   contactsContainer.innerHTML = filtered.map(c => {
     const rawDigits = (c.phone_number || '').replace(/\D/g, '');
-    const cleanPhone = rawDigits.length in [10, 11] && !rawDigits.startsWith('55') ? `55${rawDigits}` : rawDigits;
+    const cleanPhone = (rawDigits.length === 10 || rawDigits.length === 11) && !rawDigits.startsWith('55') ? `55${rawDigits}` : rawDigits;
     const whatsappLink = cleanPhone ? `https://wa.me/${cleanPhone}` : '#';
     const initials = getInitials(c.name);
     const badgeClass = getRoleBadgeClass(c.role);

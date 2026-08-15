@@ -82,10 +82,16 @@ async def update_contact(contact_id: str, payload: ContactUpdate, db: Session = 
 @router.delete("/{contact_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_contact(contact_id: str, db: Session = Depends(get_db)):
     """Remove um contato cadastrado."""
-    rec = db.query(ContactRecord).filter(ContactRecord.id == contact_id).first()
+    from src.memory.graph import knowledge_graph
+    rec = db.query(ContactRecord).filter(
+        (ContactRecord.id == contact_id)
+        | (ContactRecord.name == contact_id)
+        | (ContactRecord.phone_number == contact_id)
+    ).first()
     if not rec:
         raise HTTPException(status_code=404, detail="Contato não encontrado")
 
+    knowledge_graph.remove_node(rec.name)
     db.delete(rec)
     db.commit()
     return None
