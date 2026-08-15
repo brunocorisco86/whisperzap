@@ -44,7 +44,6 @@ ENV PYTHONPATH=/app
 
 # Copia o código da aplicação
 COPY --chown=hermes:hermes src /app/src
-COPY --chown=hermes:hermes assets /app/assets
 
 USER hermes
 
