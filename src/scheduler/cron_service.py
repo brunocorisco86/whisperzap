@@ -54,6 +54,19 @@ async def _background_scheduler_loop():
                     except Exception as e:
                         logger.error(f"❌ [Cron 18:00] Erro ao consolidar sentimentos: {e}")
 
+            # 3. Rotina Semanal de Domingo às 23:00 -> Agente 'Zeladora' (Faxina no Grafo)
+            if now.weekday() == 6 and hour == 23 and minute < 5:
+                key = f"janitor_{today_str}"
+                if _last_executed_hour.get("janitor") != key:
+                    logger.info("🧹 [Cron Domingo 23:00] Agente 'Zeladora' iniciando faxina semanal no Grafo de Conhecimento...")
+                    _last_executed_hour["janitor"] = key
+                    try:
+                        from src.memory.janitor import graph_janitor_service
+                        report = graph_janitor_service.clean_graph()
+                        logger.info(f"✅ [Cron Domingo 23:00] Zeladora finalizou a faxina: {report.summary}")
+                    except Exception as e:
+                        logger.error(f"❌ [Cron Domingo 23:00] Erro na faxina da Zeladora: {e}")
+
         except Exception as exc:
             logger.error(f"Aviso no loop do Background Scheduler: {exc}")
 

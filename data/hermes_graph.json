@@ -5,7 +5,7 @@
   "nodes": [
     {
       "category": "PERSON",
-      "mentions": 238,
+      "mentions": 244,
       "role": "UNKNOWN",
       "phone": "",
       "company": "",
@@ -14,7 +14,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 230,
+      "mentions": 235,
       "details": "Contato de trabalho",
       "role": "UNKNOWN",
       "phone": "",
@@ -24,72 +24,72 @@
     },
     {
       "category": "EQUIPMENT",
-      "mentions": 296,
+      "mentions": 301,
       "details": "Armazenamento de ração",
       "id": "Silo 3"
     },
     {
       "category": "LOCATION",
-      "mentions": 541,
+      "mentions": 551,
       "details": "Cooperativa",
       "id": "C.Vale"
     },
     {
       "category": "SYSTEM",
-      "mentions": 296,
+      "mentions": 301,
       "details": "Ficha de Acompanhamento de Lote",
       "id": "FAL"
     },
     {
       "category": "PROJECT",
-      "mentions": 111,
+      "mentions": 113,
       "id": "Expansão"
     },
     {
       "category": "PROJECT",
-      "mentions": 59,
+      "mentions": 60,
       "id": "Pessoal"
     },
     {
       "category": "LOCATION",
-      "mentions": 62,
+      "mentions": 63,
       "details": "Mtech Systems",
       "id": "Mtech"
     },
     {
       "category": "PROJECT",
-      "mentions": 222,
+      "mentions": 226,
       "details": "Transportation Management System",
       "id": "TMS"
     },
     {
       "category": "PROJECT",
-      "mentions": 160,
+      "mentions": 163,
       "id": "Silos"
     },
     {
       "category": "LOCATION",
-      "mentions": 52,
+      "mentions": 53,
       "id": "C.Vale Matriz"
     },
     {
       "category": "PROJECT",
-      "mentions": 52,
+      "mentions": 53,
       "id": "Agrocenter"
     },
     {
       "category": "LOCATION",
-      "mentions": 54,
+      "mentions": 55,
       "id": "Consultoria"
     },
     {
       "category": "PROJECT",
-      "mentions": 54,
+      "mentions": 55,
       "id": "Sanidade"
     },
     {
       "category": "PERSON",
-      "mentions": 142,
+      "mentions": 153,
       "id": "Carlos"
     },
     {
@@ -109,8 +109,8 @@
     },
     {
       "category": "EQUIPMENT",
-      "mentions": 21,
-      "details": "Sensores IoT de pesagem e nível de ração",
+      "mentions": 22,
+      "details": "Sensores IoT de monitoramento de nível de ração",
       "id": "Sensores de Silos"
     },
     {
@@ -144,7 +144,7 @@
       "id": "Relatório de ração da C.Vale"
     },
     {
-      "mentions": 18,
+      "mentions": 19,
       "category": "PERSON",
       "role": "UNKNOWN",
       "phone": "",
@@ -160,7 +160,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 17,
+      "mentions": 18,
       "role": "FAMILY_CORE",
       "phone": "44988881111",
       "company": "",
@@ -169,7 +169,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 17,
+      "mentions": 18,
       "role": "COLLEAGUE",
       "phone": "44977772222",
       "company": "Mtech",
@@ -178,7 +178,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 34,
+      "mentions": 36,
       "role": "EXECUTIVE",
       "phone": "44999991234",
       "company": "C.Vale",
@@ -187,7 +187,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 17,
+      "mentions": 18,
       "role": "EXECUTIVE",
       "phone": "44999991234",
       "company": "C.Vale Matriz",
@@ -196,7 +196,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 17,
+      "mentions": 18,
       "role": "STAKEHOLDER",
       "phone": "44988885678",
       "company": "Consultoria",
@@ -205,7 +205,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 17,
+      "mentions": 18,
       "role": "EXECUTIVE",
       "phone": "44999991234",
       "company": null,
@@ -214,7 +214,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 17,
+      "mentions": 18,
       "role": "SERVICE_VENDOR",
       "phone": "44911112222",
       "company": null,
@@ -223,7 +223,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 43,
+      "mentions": 46,
       "role": "UNKNOWN",
       "phone": "",
       "company": "",
@@ -233,9 +233,9 @@
     },
     {
       "category": "PERSON",
-      "mentions": 54,
+      "mentions": 59,
       "role": "UNKNOWN",
-      "phone": "554499999006",
+      "phone": "554499999000",
       "company": "",
       "weight": 0.4,
       "id": "Participante_0"
@@ -248,7 +248,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 42,
+      "mentions": 46,
       "role": "UNKNOWN",
       "phone": "554499999001",
       "company": "",
@@ -257,7 +257,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 43,
+      "mentions": 47,
       "role": "UNKNOWN",
       "phone": "554499999005",
       "company": "",
@@ -283,7 +283,7 @@
     },
     {
       "category": "EQUIPMENT",
-      "mentions": 100,
+      "mentions": 110,
       "details": null,
       "id": "Silo 04"
     }
@@ -291,25 +291,25 @@
   "links": [
     {
       "relation": "DELEGATED_TO",
-      "weight": 210.0,
+      "weight": 214.0,
       "source": "Bruno",
       "target": "João"
     },
     {
       "relation": "MENTIONED",
-      "weight": 207.0,
+      "weight": 211.0,
       "source": "Bruno",
       "target": "Silo 3"
     },
     {
       "relation": "MENTIONED",
-      "weight": 207.0,
+      "weight": 211.0,
       "source": "Bruno",
       "target": "C.Vale"
     },
     {
       "relation": "MENTIONED",
-      "weight": 207.0,
+      "weight": 211.0,
       "source": "Bruno",
       "target": "FAL"
     },
@@ -321,43 +321,43 @@
     },
     {
       "relation": "ASSIGNED_WITH",
-      "weight": 216.0,
+      "weight": 220.0,
       "source": "João",
       "target": "Silo 3"
     },
     {
       "relation": "ASSIGNED_WITH",
-      "weight": 216.0,
+      "weight": 220.0,
       "source": "João",
       "target": "C.Vale"
     },
     {
       "relation": "ASSIGNED_WITH",
-      "weight": 216.0,
+      "weight": 220.0,
       "source": "João",
       "target": "FAL"
     },
     {
       "relation": "CO_OCCURRED",
-      "weight": 296.0,
+      "weight": 301.0,
       "source": "Silo 3",
       "target": "C.Vale"
     },
     {
       "relation": "CO_OCCURRED",
-      "weight": 296.0,
+      "weight": 301.0,
       "source": "Silo 3",
       "target": "FAL"
     },
     {
       "relation": "CO_OCCURRED",
-      "weight": 296.0,
+      "weight": 301.0,
       "source": "C.Vale",
       "target": "FAL"
     },
     {
       "relation": "CO_OCCURRED",
-      "weight": 13.0,
+      "weight": 14.0,
       "source": "C.Vale",
       "target": "Carlos Gestor"
     },
@@ -405,25 +405,25 @@
     },
     {
       "relation": "MENTIONED",
-      "weight": 42.0,
+      "weight": 43.0,
       "source": "Carlos",
       "target": "Silo 3"
     },
     {
       "relation": "MENTIONED",
-      "weight": 42.0,
+      "weight": 43.0,
       "source": "Carlos",
       "target": "C.Vale"
     },
     {
       "relation": "MENTIONED",
-      "weight": 42.0,
+      "weight": 43.0,
       "source": "Carlos",
       "target": "FAL"
     },
     {
       "relation": "MANAGES",
-      "weight": 200.0,
+      "weight": 220.0,
       "source": "Carlos",
       "target": "Silo 04"
     },
@@ -441,7 +441,7 @@
     },
     {
       "relation": "RESPONSIBLE_FOR",
-      "weight": 19.0,
+      "weight": 20.0,
       "source": "Usuário",
       "target": "Sensores de Silos"
     },
@@ -453,7 +453,7 @@
     },
     {
       "relation": "BELONGS_TO",
-      "weight": 9.0,
+      "weight": 10.0,
       "source": "relatório de ração",
       "target": "C.Vale"
     },
@@ -495,7 +495,7 @@
     },
     {
       "relation": "MENTIONED",
-      "weight": 21.0,
+      "weight": 22.0,
       "source": "user",
       "target": "Sensores de Silos"
     },
@@ -549,79 +549,79 @@
     },
     {
       "relation": "WORKS_ON",
-      "weight": 17.0,
+      "weight": 18.0,
       "source": "Maria Esposa",
       "target": "Pessoal"
     },
     {
       "relation": "AFFILIATED_AS_COLLEAGUE",
-      "weight": 17.0,
+      "weight": 18.0,
       "source": "Lucas Colega",
       "target": "Mtech"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 17.0,
+      "weight": 18.0,
       "source": "Lucas Colega",
       "target": "TMS"
     },
     {
       "relation": "AFFILIATED_AS_EXECUTIVE",
-      "weight": 34.0,
+      "weight": 36.0,
       "source": "João Silva",
       "target": "C.Vale"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 34.0,
+      "weight": 36.0,
       "source": "João Silva",
       "target": "Silos"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 34.0,
+      "weight": 36.0,
       "source": "João Silva",
       "target": "TMS"
     },
     {
       "relation": "AFFILIATED_AS_EXECUTIVE",
-      "weight": 17.0,
+      "weight": 18.0,
       "source": "João Silva Gestor",
       "target": "C.Vale Matriz"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 17.0,
+      "weight": 18.0,
       "source": "João Silva Gestor",
       "target": "Silos"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 17.0,
+      "weight": 18.0,
       "source": "João Silva Gestor",
       "target": "TMS"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 17.0,
+      "weight": 18.0,
       "source": "João Silva Gestor",
       "target": "Agrocenter"
     },
     {
       "relation": "AFFILIATED_AS_STAKEHOLDER",
-      "weight": 17.0,
+      "weight": 18.0,
       "source": "Dra. Camila",
       "target": "Consultoria"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 17.0,
+      "weight": 18.0,
       "source": "Dra. Camila",
       "target": "Sanidade"
     },
     {
       "relation": "ASSIGNED_WITH",
-      "weight": 34.0,
+      "weight": 36.0,
       "source": "Carlos Gestor",
       "target": "C.Vale"
     },
@@ -633,7 +633,7 @@
     },
     {
       "relation": "RESPONSIBLE_FOR",
-      "weight": 8.0,
+      "weight": 9.0,
       "source": "Carlos Gestor",
       "target": "relatório de ração"
     },
@@ -657,13 +657,13 @@
     },
     {
       "relation": "MENTIONED",
-      "weight": 40.0,
+      "weight": 44.0,
       "source": "Participante_0",
       "target": "Silo 04"
     },
     {
       "relation": "DELEGATED_TO",
-      "weight": 40.0,
+      "weight": 44.0,
       "source": "Participante_0",
       "target": "Carlos"
     },
@@ -687,13 +687,13 @@
     },
     {
       "relation": "MENTIONED",
-      "weight": 30.0,
+      "weight": 33.0,
       "source": "Participante_1",
       "target": "Silo 04"
     },
     {
       "relation": "DELEGATED_TO",
-      "weight": 30.0,
+      "weight": 33.0,
       "source": "Participante_1",
       "target": "Carlos"
     },
@@ -723,13 +723,13 @@
     },
     {
       "relation": "MENTIONED",
-      "weight": 30.0,
+      "weight": 33.0,
       "source": "Participante_2",
       "target": "Silo 04"
     },
     {
       "relation": "DELEGATED_TO",
-      "weight": 30.0,
+      "weight": 33.0,
       "source": "Participante_2",
       "target": "Carlos"
     }

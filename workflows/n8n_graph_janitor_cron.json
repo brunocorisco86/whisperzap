@@ -1,0 +1,70 @@
+{
+  "name": "Hermes - Zeladora Faxina Semanal no Grafo (Cron Domingo 23h)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 23 * * 0"
+            }
+          ]
+        }
+      },
+      "id": "node-cron-janitor",
+      "name": "Cron Semanal (Domingos 23:00)",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://179.197.73.80:8005/api/v1/memory/graph/clean",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "dry_run",
+              "value": "false"
+            },
+            {
+              "name": "prune_isolated",
+              "value": "true"
+            },
+            {
+              "name": "deduplicate_aliases",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "node-trigger-janitor-api",
+      "name": "Dispara Zeladora na API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    }
+  ],
+  "connections": {
+    "Cron Semanal (Domingos 23:00)": {
+      "main": [
+        [
+          {
+            "node": "Dispara Zeladora na API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

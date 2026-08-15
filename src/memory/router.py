@@ -342,4 +342,39 @@ async def get_sentiment_timeline(
     )
 
 
+# ===================== Agente 'Zeladora' (Graph Janitor) =====================
+
+
+@router.post(
+    "/graph/clean",
+    summary="Executa a faxina no Grafo de Conhecimento com o Agente Zeladora",
+    tags=["graph", "janitor"],
+)
+async def clean_knowledge_graph(
+    dry_run: bool = Query(default=False, description="Se True, apenas simula as exclusões e fusões sem alterar o disco"),
+    min_edge_weight: float = Query(default=1.0, description="Peso mínimo para manter arestas no grafo"),
+    prune_isolated: bool = Query(default=True, description="Remove nós isolados (grau 0 e menções <= 1)"),
+    deduplicate_aliases: bool = Query(default=True, description="Desambigua e mescla nós quase-idênticos (aliases)"),
+):
+    """Executa a rotina de higienização do Grafo de Conhecimento, protegendo contatos oficiais e podando ruídos."""
+    from src.memory.janitor import graph_janitor_service
+    return graph_janitor_service.clean_graph(
+        dry_run=dry_run,
+        min_edge_weight=min_edge_weight,
+        prune_isolated=prune_isolated,
+        deduplicate_aliases=deduplicate_aliases,
+    )
+
+
+@router.get(
+    "/graph/janitor/logs",
+    summary="Consulta o histórico de faxinas realizadas pela Zeladora",
+    tags=["graph", "janitor"],
+)
+async def get_graph_janitor_logs():
+    """Retorna a lista de relatórios das últimas faxinas executadas pela Zeladora."""
+    from src.memory.janitor import graph_janitor_service
+    return graph_janitor_service.get_history()
+
+
 

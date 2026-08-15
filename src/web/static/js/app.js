@@ -134,6 +134,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const btnTriggerJanitor = document.getElementById('btn-trigger-janitor');
+  if (btnTriggerJanitor) {
+    btnTriggerJanitor.addEventListener('click', triggerGraphJanitor);
+  }
+
   const btnCloseNodeDetail = document.getElementById('btn-close-node-detail');
   if (btnCloseNodeDetail) {
     btnCloseNodeDetail.addEventListener('click', () => {
@@ -419,6 +424,39 @@ function showNodeDetails(nodeId) {
 
   panel.style.display = 'block';
 }
+
+async function triggerGraphJanitor() {
+  const btn = document.getElementById('btn-trigger-janitor');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '🧹 Fazendo Faxina...';
+  }
+
+  try {
+    const res = await fetch('/api/v1/memory/graph/clean', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!res.ok) throw new Error('Falha ao acionar a Zeladora');
+
+    const data = await res.json();
+    showToast(data.summary || 'Faxina concluída com sucesso!');
+
+    // Recarrega os nós no grafo e estatísticas
+    await loadGraphData();
+    await loadStats();
+  } catch (err) {
+    console.error('Erro na faxina da Zeladora:', err);
+    showToast('Erro ao executar a faxina no Grafo.', true);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🧹 Faxina da Zeladora';
+    }
+  }
+}
+window.triggerGraphJanitor = triggerGraphJanitor;
 
 // --- Renderers ---
 
