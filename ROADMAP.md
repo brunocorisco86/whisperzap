@@ -141,13 +141,13 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [CONCLUÍDO]
 - [x] **2.4** Ativar o fluxo de transcrição (`n8n_whatsapp_master_orchestrator.json`) e enviar um áudio de teste no WhatsApp.
 - [x] **2.5** Validar o disparo do comando `? pergunta` para o Agente Hermes diretamente no WhatsApp.
 
-### 📍 Etapa 3: Deploy em Produção (VPS Alpine Linux & Tailscale)
-- [ ] **3.1** Conectar na VPS via SSH e clonar o repositório em `/opt/whisperzap`.
-- [ ] **3.2** Configurar o arquivo `.env` de produção com chaves seguras e `GEMINI_API_KEY`.
-- [ ] **3.3** Executar o script automatizado `./scripts/deploy_vps_alpine.sh`.
-- [ ] **3.4** Conectar o Tailscale na VPS (`tailscale up`) e no Raspberry Pi para criar a rede mesh privada.
-- [ ] **3.5** Apontar o n8n para o IP Tailscale da VPS (`http://100.x.y.z:8000`).
-- [ ] **3.6** Agendar o Cron de backup diário às 03:00 (`scripts/backup_db.sh`).
+### 📍 Etapa 3: Deploy em Produção (VPS Alpine Linux & Tailscale) [CONCLUÍDA]
+- [x] **3.1** Conectar na VPS via SSH e clonar o repositório em `/opt/whisperzap`.
+- [x] **3.2** Configurar o arquivo `.env` de produção com chaves seguras e banco PostgreSQL.
+- [x] **3.3** Executar a stack de produção com Docker Compose (`hermes-db` PostgreSQL 16 + pgvector, `hermes-api` e `caddy`).
+- [x] **3.4** Conectar o Tailscale na VPS (`tailscale up` - IP `100.106.3.81`) para rede mesh privada.
+- [x] **3.5** Apontar o n8n para o endpoint da VPS (`http://179.197.73.80:8005` ou Tailscale).
+- [x] **3.6** Agendar o Cron de backup diário às 03:00 (`scripts/backup_db.sh`) com retenção de 7 dias.
 
 
 

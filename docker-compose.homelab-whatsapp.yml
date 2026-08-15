@@ -79,7 +79,7 @@ services:
       WEBHOOK_URL: http://localhost:5678/
       GENERIC_TIMEZONE: America/Sao_Paulo
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
-      HERMES_API_URL: http://host.docker.internal:8000
+      HERMES_API_URL: ${HERMES_API_URL:-http://179.197.73.80:8005}
       WHATSAPP_API_ENDPOINT: http://evolution-api:8080/message/sendText/hermes
       WHATSAPP_MEDIA_ENDPOINT: http://evolution-api:8080/chat/getBase64FromMediaMessage/hermes
       WHATSAPP_API_TOKEN: ${WHATSAPP_API_TOKEN:-seu_token_whatsapp_aqui}
