@@ -83,5 +83,63 @@ class MockProvider(BaseLLMProvider):
             }
             return json.dumps(mock_json, ensure_ascii=False)
 
+        # Se for um prompt de resumo diário
+        if "resumo diário" in (system_instruction or "").lower() or "plan_for_tomorrow" in prompt:
+            import json
+            mock_daily = {
+                "executive_summary": "Dia focado no alinhamento de infraestrutura, telemetria de silos e testes de voz.",
+                "key_events": [
+                    "Validação dos sensores de nível nos silos da C.Vale",
+                    "Integração da API de transcrição Whisper com Webhooks",
+                ],
+                "decisions": [
+                    "Adotar PostgreSQL com pgvector para armazenamento de memória vetorial",
+                ],
+                "issues_and_blockers": [
+                    "Ajuste fino de latência em áudios longos",
+                ],
+                "completed_tasks": [
+                    "Configuração do container de WhatsApp e n8n",
+                ],
+                "pending_tasks": [
+                    "Testar envio de áudio real ponta a ponta",
+                ],
+                "plan_for_tomorrow": [
+                    {
+                        "title": "Verificar telemetria dos silos e fluxo TMS",
+                        "assignee": "João Silva",
+                        "priority": "HIGH",
+                        "due_date": "Amanhã 09:00",
+                        "related_project": "Telemetria Silos",
+                    }
+                ],
+            }
+            return json.dumps(mock_daily, ensure_ascii=False)
+
+        # Se for um prompt de relatório semanal
+        if "semanal" in (system_instruction or "").lower() or "inteligência" in (system_instruction or "").lower() or "análise semanal" in prompt.lower() or "sunday_strategic_plan" in prompt:
+            import json
+            mock_weekly = {
+                "executive_summary": "Semana produtiva com entrega total das 6 fases do roadmap e stack homelab ativa.",
+                "active_projects": ["Telemetria Silos", "Hermes Voice Memory", "Expansão Homelab"],
+                "top_contacts": ["Roberto Diretor", "João Silva"],
+                "bottlenecks": ["Prazos de entrega de sensores"],
+                "tasks_metrics": {
+                    "total": 15,
+                    "completed": 10,
+                    "pending": 5,
+                },
+                "sunday_strategic_plan": [
+                    {
+                        "title": "Priorizar integração de sensores IoT e confirmação de pedidos",
+                        "assignee": "Usuário",
+                        "priority": "HIGH",
+                        "due_date": "Segunda-feira 08:00",
+                        "related_project": "Telemetria Silos",
+                    }
+                ],
+            }
+            return json.dumps(mock_weekly, ensure_ascii=False)
+
         return "Resposta simulada pelo MockProvider."
 
