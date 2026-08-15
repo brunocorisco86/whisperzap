@@ -147,6 +147,28 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
   - Criação de 11 novos testes automatizados (`tests/test_contact_parser.py`, `tests/test_contacts_service.py`, `tests/test_contacts_api.py`), totalizando 46 testes com 100% de aprovação.
 - **Resultado**: Sidequest 2 concluída com sucesso total.
 
+### Sessão 007 — Implementação da Fase 5 (API da Memória, Agente Hermes RAG, Relatórios Diários/Semanais e Automações n8n)
+- **Data**: 2026-08-14
+- **Objetivo**: Desenvolver o motor RAG Híbrido do Agente Hermes, os serviços de síntese diária e semanal com formatação de alto padrão para WhatsApp, e construir os workflows n8n para agendamento Cron e atendimento interativo.
+- **Ações Realizadas**:
+  - Implementação do serviço `HermesAgentService` (`src/ai_gateway/agent.py`) com inferência para Q&A com citação de fontes, Resumo Diário e Análise Semanal.
+  - Expansão dos schemas Pydantic (`src/ai_gateway/schemas.py`) e dos prompts especializados (`src/ai_gateway/prompts.py`).
+  - Implementação do método `query_hermes_rag` no repositório (`src/memory/repository.py`), combinando busca vetorial pgvector/cosseno, conexões de entidades do Grafo NetworkX e tarefas abertas.
+  - Implementação do pacote `src/reports/` com `daily_report_service` (`src/reports/daily.py`) e `weekly_report_service` (`src/reports/weekly.py`), incluindo geradores de texto legível e amigável para WhatsApp com emojis e destaques.
+  - Adição dos endpoints REST FastAPI em `src/memory/router.py`:
+    - `POST /api/v1/memory/query` (Consulta RAG Híbrido ao Hermes)
+    - `POST /api/v1/memory/daily/generate` e `GET /api/v1/memory/daily` (Resumo Diário & Plano para Amanhã)
+    - `POST /api/v1/memory/weekly/generate` e `GET /api/v1/memory/weekly` (Relatório Semanal & Plano de Domingo)
+  - Criação de 3 novos workflows n8n automatizados prontos em `workflows/`:
+    - `workflows/n8n_daily_summary_cron.json` (Cron 18:00 Seg-Sex)
+    - `workflows/n8n_weekly_plan_cron.json` (Cron 20:00 Domingos)
+    - `workflows/n8n_hermes_qa_whatsapp.json` (Webhook de consulta direta por WhatsApp)
+  - Criação do manual técnico em `docs/phase5_hermes_and_reports.md`.
+  - Adição de 7 novos testes unitários e de integração (`tests/test_hermes_agent.py`, `tests/test_daily_report.py`, `tests/test_weekly_report.py`, `tests/test_workflows_json.py`), atingindo 53 testes passando com 100% de sucesso.
+  - Atualização do `ROADMAP.md` marcando a Fase 5 como concluída.
+- **Resultado**: Fase 5 entregue com sucesso total e repositório pronto para a Fase 6 (Deploy em Produção).
+
+
 
 
 

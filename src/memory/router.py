@@ -1,7 +1,13 @@
-"""Router FastAPI para a Memória em Camadas e Grafo de Conhecimento."""
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+from src.ai_gateway.schemas import (
+    DailySummaryRequest,
+    DailySummaryResponse,
+    HermesQueryRequest,
+    HermesQueryResponse,
+    WeeklyReportRequest,
+    WeeklyReportResponse,
+)
 from src.memory.database import get_db
 from src.memory.graph import knowledge_graph
 from src.memory.models import (
@@ -13,8 +19,10 @@ from src.memory.models import (
     TaskUpdate,
 )
 from src.memory.repository import memory_repository
+from src.reports.daily import daily_report_service
+from src.reports.weekly import weekly_report_service
 
-router = APIRouter(prefix="/api/v1/memory", tags=["Memória em Camadas & Grafo"])
+router = APIRouter(prefix="/api/v1/memory", tags=["Memória em Camadas & Agente Hermes"])
 
 
 @router.post("/messages", status_code=status.HTTP_201_CREATED)
@@ -30,6 +38,70 @@ async def save_message(payload: MessageCreate, db: Session = Depends(get_db)):
         "entities_extracted": len(msg.entities),
         "created_at": msg.created_at,
     }
+
+
+@router.post("/query", response_model=HermesQueryResponse, summary="Consulta ao Agente Hermes com RAG Híbrido")
+async def query_hermes(payload: HermesQueryRequest, db: Session = Depends(get_db)):
+    """Permite ao Hermes ou usuários fazerem perguntas à memória com busca vetorial + grafo + tarefas."""
+    return await memory_repository.query_hermes_rag(
+        query=payload.query,
+        top_k=payload.top_k,
+        min_similarity=payload.min_similarity,
+        include_graph=payload.include_graph,
+        db=db,
+    )
+
+
+@router.post("/daily/generate", response_model=DailySummaryResponse, summary="Gera Resumo Diário e Plano para Amanhã")
+async def generate_daily_summary(
+    payload: DailySummaryRequest = DailySummaryRequest(), db: Session = Depends(get_db)
+):
+    """Gera o Resumo Diário das 18:00 com ações prioritárias para o dia seguinte."""
+    return await daily_report_service.generate_daily_report(
+        target_date=payload.date,
+        speaker_filter=payload.speaker_filter,
+        db=db,
+    )
+
+
+@router.get("/daily", response_model=DailySummaryResponse, summary="Consulta Resumo Diário por data")
+async def get_daily_summary(
+    date: str | None = Query(default=None, description="Data no formato YYYY-MM-DD (default: hoje)"),
+    speaker: str | None = Query(default=None, description="Filtro por remetente"),
+    db: Session = Depends(get_db),
+):
+    """Retorna o Resumo Diário formatado para uma data específica."""
+    return await daily_report_service.generate_daily_report(
+        target_date=date,
+        speaker_filter=speaker,
+        db=db,
+    )
+
+
+@router.post("/weekly/generate", response_model=WeeklyReportResponse, summary="Gera Relatório Semanal & Plano de Domingo")
+async def generate_weekly_report(
+    payload: WeeklyReportRequest = WeeklyReportRequest(), db: Session = Depends(get_db)
+):
+    """Gera a análise estratégica semanal e o plano de domingo à noite."""
+    return await weekly_report_service.generate_weekly_report(
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        db=db,
+    )
+
+
+@router.get("/weekly", response_model=WeeklyReportResponse, summary="Consulta Relatório Semanal")
+async def get_weekly_report(
+    start_date: str | None = Query(default=None, description="Data início YYYY-MM-DD"),
+    end_date: str | None = Query(default=None, description="Data fim YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """Retorna a análise semanal e métricas dos últimos 7 dias."""
+    return await weekly_report_service.generate_weekly_report(
+        start_date=start_date,
+        end_date=end_date,
+        db=db,
+    )
 
 
 @router.get("/tasks", response_model=list[TaskResponse])
@@ -82,3 +154,4 @@ async def get_entity_neighborhood(name: str, depth: int = Query(default=1, ge=1,
 async def get_memory_stats(db: Session = Depends(get_db)):
     """Retorna estatísticas globais da memória e grafo."""
     return memory_repository.get_stats(db=db)
+

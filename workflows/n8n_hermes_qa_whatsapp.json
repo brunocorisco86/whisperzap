@@ -1,0 +1,123 @@
+{
+  "name": "Hermes Voice Memory - Consulta Interativa WhatsApp (Q&A Hermes)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-text-received",
+        "options": {}
+      },
+      "name": "Webhook WhatsApp Mensagem Texto",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "id": "4e112d7c-a7a2-4bb0-80a1-000000000001"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body?.text || $json.body?.message || $json.body?.data?.message?.conversation || '' }}",
+              "operation": "regex",
+              "value2": "^(\\?|/hermes|hermes,)"
+            }
+          ]
+        }
+      },
+      "name": "Filtro: É Pergunta para o Hermes?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "id": "4e112d7c-a7a2-4bb0-80a1-000000000002"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.HERMES_API_URL || 'http://localhost:8000' }}/api/v1/memory/query",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query\": \"{{ ($json.body?.text || $json.body?.message || $json.body?.data?.message?.conversation || '').replace(/^(\\?|\\/hermes|hermes,)\\s*/i, '') }}\",\n  \"top_k\": 5,\n  \"include_graph\": true\n}",
+        "options": {}
+      },
+      "name": "Agente Hermes (POST /api/v1/memory/query)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [680, 200],
+      "id": "4e112d7c-a7a2-4bb0-80a1-000000000003"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WHATSAPP_API_ENDPOINT || 'http://localhost:8080/message/sendText/default' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.WHATSAPP_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Webhook WhatsApp Mensagem Texto').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp Mensagem Texto').item.json.body?.sender?.phone || '' }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.answer }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Envia Resposta Hermes (WhatsApp)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [900, 200],
+      "id": "4e112d7c-a7a2-4bb0-80a1-000000000004"
+    }
+  ],
+  "connections": {
+    "Webhook WhatsApp Mensagem Texto": {
+      "main": [
+        [
+          {
+            "node": "Filtro: É Pergunta para o Hermes?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtro: É Pergunta para o Hermes?": {
+      "main": [
+        [
+          {
+            "node": "Agente Hermes (POST /api/v1/memory/query)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agente Hermes (POST /api/v1/memory/query)": {
+      "main": [
+        [
+          {
+            "node": "Envia Resposta Hermes (WhatsApp)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

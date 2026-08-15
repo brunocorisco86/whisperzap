@@ -1,0 +1,99 @@
+{
+  "name": "Hermes Voice Memory - Resumo Diário & Plano para Amanhã (Cron 18:00)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 18 * * 1-5"
+            }
+          ]
+        }
+      },
+      "name": "Cron Diário (18:00 Seg-Sex)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300],
+      "id": "2e112d7c-a7a2-4bb0-80a1-000000000001"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.HERMES_API_URL || 'http://localhost:8000' }}/api/v1/memory/daily/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {}
+      },
+      "name": "Gera Resumo Diário (POST /api/v1/memory/daily/generate)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [480, 300],
+      "id": "2e112d7c-a7a2-4bb0-80a1-000000000002"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WHATSAPP_API_ENDPOINT || 'http://localhost:8080/message/sendText/default' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.WHATSAPP_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $env.ADMIN_WHATSAPP_NUMBER || '5544999999999' }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.whatsapp_text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Envia Resumo Diário (WhatsApp)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [720, 300],
+      "id": "2e112d7c-a7a2-4bb0-80a1-000000000003"
+    }
+  ],
+  "connections": {
+    "Cron Diário (18:00 Seg-Sex)": {
+      "main": [
+        [
+          {
+            "node": "Gera Resumo Diário (POST /api/v1/memory/daily/generate)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gera Resumo Diário (POST /api/v1/memory/daily/generate)": {
+      "main": [
+        [
+          {
+            "node": "Envia Resumo Diário (WhatsApp)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

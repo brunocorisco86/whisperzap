@@ -219,6 +219,81 @@ class MemoryRepository:
             if should_close:
                 db.close()
 
+    async def query_hermes_rag(
+        self,
+        query: str,
+        top_k: int = 5,
+        min_similarity: float = 0.0,
+        include_graph: bool = True,
+        db: Session | None = None,
+    ):
+        """Executa consulta com RAG Híbrido ao Agente Hermes combinando busca vetorial, grafo e tarefas."""
+        should_close = False
+        if db is None:
+            db = SessionLocal()
+            should_close = True
+
+        try:
+            from src.ai_gateway.agent import hermes_agent_service
+            from src.ai_gateway.schemas import MemorySourceCitation
+
+            # 1. Busca Semântica Vetorial
+            search_results = await self.search_memories(
+                query=query,
+                top_k=top_k,
+                min_similarity=min_similarity,
+                db=db,
+            )
+
+            sources: list[MemorySourceCitation] = [
+                MemorySourceCitation(
+                    message_id=sr.message_id,
+                    speaker=sr.speaker,
+                    text_snippet=sr.summary or sr.text[:140],
+                    similarity=sr.similarity,
+                    created_at=sr.created_at.strftime("%Y-%m-%d %H:%M") if sr.created_at else None,
+                )
+                for sr in search_results
+            ]
+
+            # 2. Extração de conexões no Grafo de Conhecimento
+            related_entities = []
+            if include_graph:
+                # Procura nós no grafo que combinam com palavras da query ou das fontes
+                query_tokens = [w.lower() for w in query.split() if len(w) > 3]
+                all_nodes = knowledge_graph.list_nodes()
+                for node in all_nodes:
+                    node_name = node.get("name", "")
+                    if any(t in node_name.lower() for t in query_tokens):
+                        neighborhood = knowledge_graph.get_neighborhood(node_name, depth=1)
+                        if neighborhood.get("found"):
+                            conn_strs = [
+                                f"{edge.get('source')} -[{edge.get('relation')}]-> {edge.get('target')}"
+                                for edge in neighborhood.get("edges", [])
+                            ]
+                            related_entities.extend(conn_strs)
+
+            # 3. Busca de tarefas pendentes relacionadas
+            pending_tasks_objs = self.list_tasks(status="PENDING", db=db)
+            related_tasks = []
+            for t in pending_tasks_objs:
+                t_tokens = [w.lower() for w in t.title.split() if len(w) > 3]
+                if any(tok in query.lower() for tok in t_tokens) or (t.assignee and t.assignee.lower() in query.lower()):
+                    assignee = f" (Resp: {t.assignee})" if t.assignee else ""
+                    due = f" [Prazo: {t.due_date}]" if t.due_date else ""
+                    related_tasks.append(f"{t.title}{assignee}{due} [Prioridade: {t.priority}]")
+
+            # 4. Chama o Agente Hermes para inferência e resposta estrita
+            return await hermes_agent_service.answer_hermes_query(
+                query=query,
+                sources=sources,
+                related_entities=list(set(related_entities)),
+                pending_tasks=related_tasks,
+            )
+        finally:
+            if should_close:
+                db.close()
+
     def list_tasks(
         self,
         status: str | None = None,

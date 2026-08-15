@@ -80,3 +80,101 @@ class SemanticExtractionResponse(BaseModel):
     model: str = Field(..., description="Modelo utilizado")
     processing_time_ms: float = Field(..., description="Tempo de processamento em ms")
 
+
+# ===================== Agente Hermes Q&A (RAG Híbrido) =====================
+
+
+class MemorySourceCitation(BaseModel):
+    """Citação de fonte de memória utilizada na resposta do Hermes."""
+
+    message_id: str = Field(..., description="ID da mensagem de origem")
+    speaker: str = Field(default="user", description="Remetente da mensagem")
+    text_snippet: str = Field(..., description="Trecho ou resumo relevante da mensagem")
+    similarity: float = Field(default=0.0, description="Similaridade semântica com a pergunta")
+    created_at: Optional[str] = Field(default=None, description="Data/hora em que a memória foi gravada")
+
+
+class HermesQueryRequest(BaseModel):
+    """Requisição de consulta contextual ao Agente Hermes."""
+
+    query: str = Field(..., description="Pergunta ou instrução em linguagem natural", examples=["Quais foram os problemas relatados sobre os sensores de silo?"])
+    top_k: int = Field(default=5, ge=1, le=20, description="Quantidade máxima de memórias a recuperar")
+    min_similarity: float = Field(default=0.0, ge=0.0, le=1.0, description="Similaridade mínima de cosseno")
+    include_graph: bool = Field(default=True, description="Se deve consultar conexões e entidades do Grafo de Conhecimento")
+
+
+class HermesQueryResponse(BaseModel):
+    """Resposta do Agente Hermes com RAG Híbrido e citação estrita de fontes."""
+
+    query: str = Field(..., description="Pergunta original")
+    answer: str = Field(..., description="Resposta contextualizada gerada pelo Agente Hermes")
+    sources: list[MemorySourceCitation] = Field(default_factory=list, description="Fontes/mensagens recuperadas e citadas")
+    related_entities: list[str] = Field(default_factory=list, description="Entidades conectadas identificadas no grafo")
+    pending_tasks_mentioned: list[str] = Field(default_factory=list, description="Tarefas abertas relacionadas ao tópico")
+    provider: str = Field(..., description="Provedor de LLM utilizado")
+    model: str = Field(..., description="Modelo de LLM utilizado")
+    processing_time_ms: float = Field(..., description="Tempo de processamento em ms")
+
+
+# ===================== Relatórios e Síntese =====================
+
+
+class DailySummaryRequest(BaseModel):
+    """Requisição para geração do Resumo Diário e Plano para Amanhã."""
+
+    date: Optional[str] = Field(default=None, description="Data no formato YYYY-MM-DD (default: hoje)")
+    speaker_filter: Optional[str] = Field(default=None, description="Filtrar por remetente específico")
+
+
+class DailyActionItem(BaseModel):
+    """Ação recomendada para o plano do dia seguinte."""
+
+    title: str = Field(..., description="Ação a ser executada")
+    assignee: Optional[str] = Field(default=None, description="Responsável")
+    priority: Literal["LOW", "MEDIUM", "HIGH", "URGENT"] = Field(default="MEDIUM", description="Prioridade")
+    due_date: Optional[str] = Field(default=None, description="Prazo")
+    related_project: Optional[str] = Field(default=None, description="Projeto ou área relacionada")
+
+
+class DailySummaryResponse(BaseModel):
+    """Resposta estruturada do Resumo Diário."""
+
+    date: str = Field(..., description="Data analisada (YYYY-MM-DD)")
+    executive_summary: str = Field(..., description="Visão geral executiva do dia")
+    key_events: list[str] = Field(default_factory=list, description="Principais acontecimentos")
+    decisions: list[str] = Field(default_factory=list, description="Decisões tomadas")
+    issues_and_blockers: list[str] = Field(default_factory=list, description="Problemas, bloqueios ou riscos identificados")
+    completed_tasks: list[str] = Field(default_factory=list, description="Tarefas finalizadas no dia")
+    pending_tasks: list[str] = Field(default_factory=list, description="Tarefas que continuam pendentes")
+    plan_for_tomorrow: list[DailyActionItem] = Field(default_factory=list, description="Plano de ação para o dia seguinte")
+    whatsapp_text: str = Field(..., description="Texto limpo e pronto para envio no WhatsApp com formatação e emojis")
+    messages_analyzed: int = Field(default=0, description="Total de mensagens analisadas")
+    provider: str = Field(..., description="Provedor de LLM utilizado")
+    model: str = Field(..., description="Modelo de LLM utilizado")
+    processing_time_ms: float = Field(..., description="Tempo de processamento em ms")
+
+
+class WeeklyReportRequest(BaseModel):
+    """Requisição para relatório semanal e plano de domingo."""
+
+    start_date: Optional[str] = Field(default=None, description="Data de início (YYYY-MM-DD)")
+    end_date: Optional[str] = Field(default=None, description="Data de fim (YYYY-MM-DD)")
+
+
+class WeeklyReportResponse(BaseModel):
+    """Resposta consolidada de inteligência semanal."""
+
+    period: str = Field(..., description="Período coberto (ex: 2026-08-08 a 2026-08-14)")
+    executive_summary: str = Field(..., description="Visão geral dos resultados e dinâmicas da semana")
+    active_projects: list[str] = Field(default_factory=list, description="Projetos mais movimentados")
+    top_contacts: list[str] = Field(default_factory=list, description="Pessoas/contatos com maior interação")
+    bottlenecks: list[str] = Field(default_factory=list, description="Gargalos e problemas recorrentes")
+    tasks_metrics: dict = Field(default_factory=dict, description="Métricas de execução (total, concluídas, pendentes)")
+    sunday_strategic_plan: list[DailyActionItem] = Field(default_factory=list, description="Plano estratégico para a semana seguinte")
+    whatsapp_text: str = Field(..., description="Relatório semanal formatado para WhatsApp")
+    messages_analyzed: int = Field(default=0, description="Total de mensagens analisadas")
+    provider: str = Field(..., description="Provedor de LLM utilizado")
+    model: str = Field(..., description="Modelo de LLM utilizado")
+    processing_time_ms: float = Field(..., description="Tempo de processamento em ms")
+
+

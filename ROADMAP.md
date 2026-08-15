@@ -4,7 +4,7 @@ Este documento estabelece o plano de desenvolvimento de **6 meses** para a const
 
 ---
 
-## 🚩 Status Atual: Fase 4 Concluída (Próximo: Fase 5 — API da Memória & Agente Hermes)
+## 🚩 Status Atual: Fase 5 Concluída (Próximo: Fase 6 — Deploy em Produção VPS Alpine Linux + Raspberry Pi)
 
 ---
 
@@ -23,10 +23,10 @@ FASE 3: Criação de Repositório Remoto & Sincronização Git Push [CONCLUÍDO]
 FASE 4: Memória em Camadas (Postgres + pgvector + NetworkX) [CONCLUÍDO]
    │
    ▼
-FASE 5: API da Memória & Agente Hermes (Resumos Diários/Semanais) [PRÓXIMO]
+FASE 5: API da Memória & Agente Hermes (Resumos Diários/Semanais) [CONCLUÍDO]
    │
    ▼
-FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B)
+FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [PRÓXIMO]
 ```
 
 ---
@@ -60,7 +60,7 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B)
 
 ---
 
-### 🟢 Fase 4: Memória em Camadas & Extração Semântica (Concluída nesta sessão)
+### 🟢 Fase 4: Memória em Camadas & Extração Semântica (Concluída)
 - [x] Configuração do banco de dados relacional e vetorial (SQLAlchemy com suporte a PostgreSQL/pgvector e fallback SQLite local).
 - [x] Modelagem das tabelas de dados (`messages`, `tasks`, `entities`, `embeddings`).
 - [x] Construção do pipeline de Extração Semântica silenciosa no AI Gateway (`POST /ai/extract`).
@@ -70,14 +70,16 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B)
 
 ---
 
-### 🟠 Fase 5: API Memory, Agente Hermes & Automação de Relatórios (Próxima)
-- [ ] Integração da API de Memória com o agente **Hermes** para consulta contextual semântica.
-- [ ] Automação n8n para envio do **Resumo Diário** (18:00) com acontecimentos do dia e plano para o dia seguinte no WhatsApp.
-- [ ] Automação n8n para consolidação e envio do **Relatório Semanal** e planejamento estratégico no domingo à noite.
+### 🟢 Fase 5: API Memory, Agente Hermes & Automação de Relatórios (Concluída)
+- [x] Integração da API de Memória com o agente **Hermes** para consulta contextual semântica com **RAG Híbrido** e citação de fontes (`POST /api/v1/memory/query`).
+- [x] Motor de geração de **Resumo Diário** (18:00) com acontecimentos do dia e plano priorizado para o dia seguinte no WhatsApp (`POST /api/v1/memory/daily/generate` e `GET /api/v1/memory/daily`).
+- [x] Motor de consolidação de **Inteligência Semanal** e plano estratégico para o domingo à noite (`POST /api/v1/memory/weekly/generate` e `GET /api/v1/memory/weekly`).
+- [x] Workflows n8n automatizados com Agendadores Cron e Webhook interativo para WhatsApp (`workflows/n8n_daily_summary_cron.json`, `workflows/n8n_weekly_plan_cron.json`, `workflows/n8n_hermes_qa_whatsapp.json`).
+- [x] Documentação técnica completa em `docs/phase5_hermes_and_reports.md` e 53 testes automatizados passando com 100% de sucesso.
 
 ---
 
-### ⚪ Fase 6: Deploy em Produção (VPS Alpine Linux & Raspberry Pi 3B)
+### 🟠 Fase 6: Deploy em Produção (VPS Alpine Linux & Raspberry Pi 3B) [PRÓXIMA]
 - [ ] Preparação da VPS em Alpine Linux (Docker, Docker Compose).
 - [ ] Configuração do Caddy como Reverse Proxy HTTPS automático.
 - [ ] Ajuste da rede privada Tailscale conectando o Raspberry Pi 3B (n8n local) e a VPS Alpine Linux.
