@@ -92,14 +92,21 @@ class ContactService:
             should_close = True
 
         try:
-            # 1. Garante que TODA pessoa do Grafo NetworkX possua um card no banco SQL (sem inventar telefones fictícios!)
+            # 1. Garante que TODA pessoa real do Grafo NetworkX possua um card no banco SQL
             try:
+                from src.ai_gateway.bypass import is_owner_interaction
                 person_nodes = knowledge_graph.list_nodes(category="PERSON")
                 for node in person_nodes:
-                    node_name = node.get("name")
-                    if not node_name:
+                    node_name = node.get("name") or ""
+                    node_id = str(node.get("id") or "").strip()
+                    if not node_name or node_name.lower() in ["user", "desconhecido", "equipe", "hermes"]:
                         continue
+
                     phone = (node.get("phone") or "").strip()
+                    if is_owner_interaction(node_name) or is_owner_interaction(phone):
+                        phone = settings.USER_PHONE_NUMBER
+                        node_name = settings.USER_NAME
+
                     c_id = generate_contact_id(node_name.strip(), phone)
                     existing = db.query(ContactRecord).filter(
                         (ContactRecord.name.ilike(node_name.strip())) | (ContactRecord.id == c_id)
@@ -109,7 +116,7 @@ class ContactService:
                             id=c_id,
                             name=node_name.strip(),
                             phone_number=phone,
-                            role=node.get("role") or "UNKNOWN",
+                            role=node.get("role") or ("EXECUTIVE" if is_owner_interaction(node_name) else "UNKNOWN"),
                             company=node.get("company") or "",
                             projects_json=[node.get("details")] if node.get("details") else [],
                             notes=node.get("details") or "",
@@ -117,6 +124,9 @@ class ContactService:
                             updated_at=datetime.now(timezone.utc),
                         )
                         db.add(c_rec)
+                        db.commit()
+                    elif is_owner_interaction(node_name) and existing.phone_number != settings.USER_PHONE_NUMBER:
+                        existing.phone_number = settings.USER_PHONE_NUMBER
                         db.commit()
             except Exception as e:
                 logger.warning(f"Aviso ao auto-sincronizar nós de pessoas do grafo: {e}")

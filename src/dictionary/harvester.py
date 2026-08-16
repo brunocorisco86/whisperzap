@@ -104,7 +104,7 @@ class LexicalHarvester:
                 logger.warning(f"Aviso no Pescador Léxico da IA ({e}). Usando decisão heurística resiliente.")
                 decisions = [
                     {
-                        "candidate_id": c["id"],
+                        "candidate_id": c["candidate_id"],
                         "raw_term": c["raw_term"],
                         "decision": "PROMOVE",
                         "canonical_term": c["raw_term"].capitalize(),

@@ -10,8 +10,44 @@
       "name": "Webhook WhatsApp (Evolution API)",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
-      "position": [160, 300],
+      "position": [100, 300],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000001"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ ($json.body?.data?.key?.remoteJid || $json.body?.sender?.phone || '').includes('@g.us') || ($json.body?.data?.key?.remoteJid || '').includes('@broadcast') || $json.body?.data?.isGroup === true || $json.body?.data?.key?.participant ? 'GROUP_OR_BROADCAST' : 'PRIVATE' }}",
+              "operation": "equal",
+              "value2": "PRIVATE"
+            }
+          ]
+        }
+      },
+      "name": "Ignorar Mensagens de Grupo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [300, 300],
+      "id": "1e112d7c-a7a2-4bb0-80a1-000000000010"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ ['stickerMessage', 'reactionMessage', 'contactMessage', 'locationMessage'].includes($json.body?.data?.messageType || $json.body?.messageType || '') ? 'IGNORE' : 'PROCESS' }}",
+              "operation": "equal",
+              "value2": "PROCESS"
+            }
+          ]
+        }
+      },
+      "name": "Filtro Mídias Sem Texto (Stickers/Reações)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [500, 300],
+      "id": "1e112d7c-a7a2-4bb0-80a1-000000000011"
     },
     {
       "parameters": {
@@ -28,7 +64,7 @@
       "name": "É Mensagem de Áudio?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [380, 300],
+      "position": [700, 300],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000002"
     },
     {
@@ -52,7 +88,7 @@
       "name": "Baixar Base64 (Evolution API)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [600, 200],
+      "position": [920, 180],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000006"
     },
     {
@@ -67,7 +103,7 @@
       "name": "Speech-to-Text (POST /transcribe)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [820, 200],
+      "position": [1120, 180],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000003"
     },
     {
@@ -82,7 +118,7 @@
       "name": "AI Gateway (POST /ai/revise)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [1040, 200],
+      "position": [1340, 180],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000004"
     },
     {
@@ -106,7 +142,7 @@
       "name": "Envia Transcrição James (WhatsApp)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [1260, 140],
+      "position": [1560, 120],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000005"
     },
     {
@@ -121,8 +157,26 @@
       "name": "Salvar Memória de Áudio (POST /messages)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [1260, 280],
+      "position": [1560, 260],
       "id": "1e112d7c-a7a2-4bb0-80a1-000000000007"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ (() => { const t = ($json.body?.data?.message?.conversation || $json.body?.data?.message?.extendedTextMessage?.text || $json.body?.text || $json.body?.message || '').trim(); if (!t || t.length <= 15) return 'BYPASS'; const trivial = ['bom dia','boa tarde','boa noite','oi','ola','olá','ok','beleza','valeu','obrigado','obrigada','meu nome','sim','não','nao','tchau','opa']; const clean = t.toLowerCase().replace(/[^\\w\\s]/g, '').trim(); if (trivial.includes(clean) || clean.split(/\\s+/).length <= 3) return 'BYPASS'; return 'PROCESS'; })() }}",
+              "operation": "equal",
+              "value2": "PROCESS"
+            }
+          ]
+        }
+      },
+      "name": "Bypass IA Texto Curto / Saudação?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [920, 440],
+      "id": "1e112d7c-a7a2-4bb0-80a1-000000000012"
     },
     {
       "parameters": {
@@ -139,7 +193,7 @@
       "name": "É Pergunta para o Hermes?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [600, 440],
+      "position": [1140, 400],
       "id": "4e112d7c-a7a2-4bb0-80a1-000000000002"
     },
     {
@@ -154,7 +208,7 @@
       "name": "Agente Hermes (POST /api/v1/memory/query)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [820, 400],
+      "position": [1360, 360],
       "id": "4e112d7c-a7a2-4bb0-80a1-000000000003"
     },
     {
@@ -178,7 +232,7 @@
       "name": "Envia Resposta Hermes (WhatsApp)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [1040, 400],
+      "position": [1580, 360],
       "id": "4e112d7c-a7a2-4bb0-80a1-000000000004"
     },
     {
@@ -193,12 +247,49 @@
       "name": "Salvar Mensagem de Texto (POST /messages)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [820, 560],
+      "position": [1360, 480],
       "id": "4e112d7c-a7a2-4bb0-80a1-000000000008"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.HERMES_API_URL || 'http://host.docker.internal:8000' }}/api/v1/memory/messages",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  speaker: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.pushName || $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid?.split('@')[0] || 'Desconhecido',\n  raw_text: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.message?.conversation || $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.message?.extendedTextMessage?.text || $('Webhook WhatsApp (Evolution API)').item.json.body?.text || '',\n  revised_text: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.message?.conversation || $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.message?.extendedTextMessage?.text || $('Webhook WhatsApp (Evolution API)').item.json.body?.text || '',\n  meta_info: {\n    source: 'whatsapp',\n    message_type: 'text',\n    bypass_ai: true,\n    remoteJid: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid,\n    pushName: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.pushName\n  }\n}) }}",
+        "options": {}
+      },
+      "name": "Salvar Mensagem Direta Sem IA (Bypass)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1140, 580],
+      "id": "1e112d7c-a7a2-4bb0-80a1-000000000013"
     }
   ],
   "connections": {
     "Webhook WhatsApp (Evolution API)": {
+      "main": [
+        [
+          {
+            "node": "Ignorar Mensagens de Grupo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ignorar Mensagens de Grupo?": {
+      "main": [
+        [
+          {
+            "node": "Filtro Mídias Sem Texto (Stickers/Reações)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtro Mídias Sem Texto (Stickers/Reações)": {
       "main": [
         [
           {
@@ -220,7 +311,7 @@
         ],
         [
           {
-            "node": "É Pergunta para o Hermes?",
+            "node": "Bypass IA Texto Curto / Saudação?",
             "type": "main",
             "index": 0
           }
@@ -259,6 +350,24 @@
           },
           {
             "node": "Salvar Memória de Áudio (POST /messages)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bypass IA Texto Curto / Saudação?": {
+      "main": [
+        [
+          {
+            "node": "É Pergunta para o Hermes?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Salvar Mensagem Direta Sem IA (Bypass)",
             "type": "main",
             "index": 0
           }

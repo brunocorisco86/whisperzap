@@ -100,19 +100,25 @@ class AnalyticsService:
             now = datetime.now(timezone.utc)
             start_date, end_date, prev_start, prev_end = self._resolve_date_ranges(period, now)
 
+            from src.ai_gateway.bypass import is_owner_interaction
+
             # 1. Carrega mensagens do período atual e anterior
-            current_messages = (
+            raw_current_messages = (
                 db.query(MessageRecord)
                 .filter(MessageRecord.created_at >= start_date, MessageRecord.created_at <= end_date)
                 .order_by(MessageRecord.created_at.asc())
                 .all()
             )
 
-            prev_messages = (
+            raw_prev_messages = (
                 db.query(MessageRecord)
                 .filter(MessageRecord.created_at >= prev_start, MessageRecord.created_at < start_date)
                 .all()
             )
+
+            # Filtra interações do próprio usuário/proprietário do dashboard executivo
+            current_messages = [m for m in raw_current_messages if not is_owner_interaction(m.speaker, m.meta_info)]
+            prev_messages = [m for m in raw_prev_messages if not is_owner_interaction(m.speaker, m.meta_info)]
 
             # 2. Carrega tarefas associadas
             current_tasks = (

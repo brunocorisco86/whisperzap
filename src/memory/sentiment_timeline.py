@@ -77,7 +77,14 @@ class SentimentTimelineService:
             snapshots_responses: list[DailySentimentSnapshotResponse] = []
             total_interactions = len(messages)
 
+            from src.ai_gateway.bypass import is_owner_interaction
+
             for speaker, msgs in person_messages.items():
+                # Ignora interações do próprio usuário/proprietário do termômetro de sentimentos de contatos
+                sample_meta = msgs[0].meta_info if (msgs and isinstance(msgs[0].meta_info, dict)) else {}
+                if is_owner_interaction(speaker, sample_meta):
+                    continue
+
                 pos = 0
                 neu = 0
                 neg = 0

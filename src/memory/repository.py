@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from src.ai_gateway.providers import get_ai_provider
 from src.ai_gateway.schemas import SemanticExtractionRequest
 from src.config import settings
-from src.contacts.service import contact_service, generate_contact_id
 from src.memory.database import SessionLocal
 from src.memory.graph import knowledge_graph
 from src.memory.models import (
@@ -72,22 +71,18 @@ class MemoryRepository:
         try:
             msg_id = str(uuid4())
 
-            # 1. Extração Semântica estruturada
-            extraction_req = SemanticExtractionRequest(
-                text=data.revised_text,
-                speaker=data.speaker,
-                context=str(data.meta_info) if data.meta_info else None,
-                include_dictionary=True,
-            )
-            try:
-                from src.ai_gateway.extractor import semantic_extractor
-                extracted = await semantic_extractor.extract(extraction_req)
-            except Exception as extract_err:
-                logger.warning(f"Extração semântica com IA falhou ({extract_err}). Usando fallback heurístico.")
+            # 1. Verificação de Bypass de IA (Threshold de caracteres, palavras, saudações e mídias sem texto)
+            from src.ai_gateway.bypass import should_bypass_ai, is_owner_interaction
+            msg_type = (data.meta_info or {}).get("message_type", "text") if isinstance(data.meta_info, dict) else "text"
+            text_to_check = data.revised_text or data.raw_text or ""
+            bypass_active, bypass_reason = should_bypass_ai(text_to_check, message_type=msg_type, meta_info=data.meta_info)
+
+            if bypass_active:
+                logger.info(f"Bypass de IA ativado para mensagem de '{data.speaker}': motivo='{bypass_reason}'")
                 from src.ai_gateway.schemas import SemanticExtractionResponse
                 extracted = SemanticExtractionResponse(
                     intent="NOTE",
-                    summary=data.revised_text[:120] if data.revised_text else "",
+                    summary=text_to_check[:120] if text_to_check else "",
                     sentiment="NEUTRAL",
                     sentiment_score=0.0,
                     tasks=[],
@@ -96,11 +91,41 @@ class MemoryRepository:
                     decisions=[],
                     ideas=[],
                     topics=[],
-                    urgency="MEDIUM",
-                    provider="fallback",
-                    model="fallback",
+                    urgency="LOW",
+                    provider="bypass",
+                    model="bypass",
                     processing_time_ms=0.0,
                 )
+            else:
+                # Extração Semântica estruturada com IA
+                extraction_req = SemanticExtractionRequest(
+                    text=data.revised_text,
+                    speaker=data.speaker,
+                    context=str(data.meta_info) if data.meta_info else None,
+                    include_dictionary=True,
+                )
+                try:
+                    from src.ai_gateway.extractor import semantic_extractor
+                    extracted = await semantic_extractor.extract(extraction_req)
+                except Exception as extract_err:
+                    logger.warning(f"Extração semântica com IA falhou ({extract_err}). Usando fallback heurístico.")
+                    from src.ai_gateway.schemas import SemanticExtractionResponse
+                    extracted = SemanticExtractionResponse(
+                        intent="NOTE",
+                        summary=data.revised_text[:120] if data.revised_text else "",
+                        sentiment="NEUTRAL",
+                        sentiment_score=0.0,
+                        tasks=[],
+                        entities=[],
+                        triples=[],
+                        decisions=[],
+                        ideas=[],
+                        topics=[],
+                        urgency="MEDIUM",
+                        provider="fallback",
+                        model="fallback",
+                        processing_time_ms=0.0,
+                    )
 
             # Importa dinamicamente contact_service para evitar circular import
             from src.contacts.service import contact_service
@@ -187,6 +212,7 @@ class MemoryRepository:
             # 6. Auto-criação / Sincronização de Contatos no Banco SQL e Grafo
             try:
                 from src.contacts.models import ContactRecord
+                from src.contacts.service import contact_service, generate_contact_id
                 import re
 
                 # 6.1 Processa o Speaker da mensagem

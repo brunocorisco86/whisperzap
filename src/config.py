@@ -64,5 +64,16 @@ class Settings(BaseSettings):
     EVOLUTION_API_KEY: str = "8c114ae397eb273edfe82e05728be8b4e17cc25649d7e26df40c438c67c368b0"
     EVOLUTION_INSTANCE: str = "hermes"
 
+    # Usuário Proprietário / Identificação
+    USER_PHONE_NUMBER: str = "554497604925"
+    USER_NAME: str = "Bruno"
+    USER_ALIASES: str = "Bruno,user,eu,me,admin,554497604925,5544979604925"
+
+    # Regras de Bypass de IA & Grupos
+    IGNORE_GROUP_MESSAGES: bool = True
+    AI_BYPASS_CHAR_THRESHOLD: int = 15
+    AI_BYPASS_WORD_THRESHOLD: int = 3
+    AI_BYPASS_PHRASES: str = "bom dia,boa tarde,boa noite,oi,olá,ola,ok,beleza,valeu,obrigado,obrigada,meu nome,sim,não,nao,tchau,ate mais,até mais,opa"
+
 
 settings = Settings()
