@@ -98,22 +98,109 @@ def test_should_bypass_ai():
     assert reason == "process_ai"
 
 
+from src.ai_gateway.bypass import (
+    is_emoji_only_or_symbols,
+    is_group_message,
+    is_owner_interaction,
+    normalize_text,
+    should_bypass_ai,
+    should_drop_message,
+)
+
+
+def test_is_emoji_only_or_symbols():
+    assert is_emoji_only_or_symbols("🥰🥰🥰") is True
+    assert is_emoji_only_or_symbols("👍") is True
+    assert is_emoji_only_or_symbols("🤝") is True
+    assert is_emoji_only_or_symbols("🐔🇧🇷") is True
+    assert is_emoji_only_or_symbols("??? !!! ...") is True
+    assert is_emoji_only_or_symbols("") is True
+    assert is_emoji_only_or_symbols("   ") is True
+
+    # Mensagens com texto real
+    assert is_emoji_only_or_symbols("Olá tudo bem? 🥰") is False
+    assert is_emoji_only_or_symbols("Relatório pronto 👍") is False
+    assert is_emoji_only_or_symbols("Calibração do sensor do silo 3") is False
+
+
+def test_should_drop_message():
+    # 1. Textos vazios / nulos
+    assert should_drop_message("")[0] is True
+    assert should_drop_message(None)[0] is True
+    assert should_drop_message("   ")[0] is True
+
+    # 2. Apenas emojis / símbolos
+    assert should_drop_message("🥰🥰🥰🥰")[0] is True
+    assert should_drop_message("🤝")[0] is True
+    assert should_drop_message("👍 🙏")[0] is True
+
+    # 3. Mídias não textuais
+    assert should_drop_message("", message_type="stickerMessage")[0] is True
+    assert should_drop_message("", message_type="reactionMessage")[0] is True
+    assert should_drop_message("", message_type="imageMessage")[0] is True
+
+    # 4. Mensagens de grupo
+    assert should_drop_message("Texto longo de grupo com mais de 20 caracteres", meta_info={"remoteJid": "12036302482910@g.us"})[0] is True
+
+    # 5. Saudações triviais / ruídos curtos
+    assert should_drop_message("oi")[0] is True
+    assert should_drop_message("bom dia")[0] is True
+    assert should_drop_message("boa tarde")[0] is True
+    assert should_drop_message("tudo bem")[0] is True
+    assert should_drop_message("ok")[0] is True
+
+    # 6. Mensagem de negócio legítima (GANHA PRIVILÉGIO DE IA)
+    drop, reason = should_drop_message("Precisamos revisar o lote 45 e a calibração dos sensores de silo da C.Vale com urgência.")
+    assert drop is False
+    assert reason == "privileged_valid_message"
+
+    # Pergunta com comando ou pergunta de negócio ganha privilégio
+    drop, reason = should_drop_message("? Como estão os níveis dos silos da granja?")
+    assert drop is False
+    assert reason == "privileged_valid_message"
+
+    # Frases sociais adicionais descartadas
+    assert should_drop_message("partiu")[0] is True
+    assert should_drop_message("fechou entao")[0] is True
+    assert should_drop_message("que bacana")[0] is True
+
+
 @pytest.mark.asyncio
-async def test_save_message_with_ai_bypass():
+async def test_save_message_drops_empty_and_emojis():
     db = SessionLocal()
     try:
-        # Envia saudação curta
-        msg_data = MessageCreate(
-            speaker="João Silva",
-            raw_text="bom dia",
-            revised_text="bom dia",
+        # Envia apenas emojis -> deve retornar None e não salvar
+        msg_emoji = MessageCreate(
+            speaker="Tuca",
+            raw_text="🥰🥰🥰🥰🥰🥰🥰",
+            revised_text="🥰🥰🥰🥰🥰🥰🥰",
             meta_info={"source": "whatsapp", "message_type": "text"},
         )
-        saved = await memory_repository.save_message(msg_data, db=db)
-        assert saved.id is not None
-        assert saved.intent == "NOTE"
-        assert saved.sentiment == "NEUTRAL"
-        assert saved.sentiment_score == 0.0
+        saved_emoji = await memory_repository.save_message(msg_emoji, db=db)
+        assert saved_emoji is None
+
+        # Envia texto vazio de áudio inaudível -> deve retornar None
+        msg_empty = MessageCreate(
+            speaker="Bruno",
+            raw_text="",
+            revised_text="",
+            audio_duration_s=5,
+            meta_info={"source": "whatsapp", "message_type": "audio"},
+        )
+        saved_empty = await memory_repository.save_message(msg_empty, db=db)
+        assert saved_empty is None
+
+        # Envia mensagem válida informativa de trabalho -> deve salvar normalmente
+        msg_valid = MessageCreate(
+            speaker="João Silva",
+            raw_text="Lembre-me amanhã de fazer a planilha do bem-estar animal para a auditoria.",
+            revised_text="Lembre-me amanhã de fazer a planilha do bem-estar animal para a auditoria.",
+            meta_info={"source": "whatsapp", "message_type": "text"},
+        )
+        saved_valid = await memory_repository.save_message(msg_valid, db=db)
+        assert saved_valid is not None
+        assert saved_valid.id is not None
+        assert "planilha" in saved_valid.revised_text
     finally:
         db.close()
 

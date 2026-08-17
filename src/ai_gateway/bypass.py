@@ -96,6 +96,105 @@ def is_owner_interaction(speaker: Optional[str] = None, meta_info: Optional[Dict
     return False
 
 
+TRIVIAL_SOCIAL_PHRASES = {
+    "bom dia", "boa tarde", "boa noite", "oi", "ola", "olá", "opa", "tudo bem", "como vai", "fala ai", "e ai", "eae",
+    "valeu", "obrigado", "obrigada", "de nada", "por nada", "beleza", "blz", "show", "top", "combinado", "fechado",
+    "ta bom", "tá bom", "ok", "certo", "falou", "tchau", "ate mais", "até mais", "partiu", "maravilha", "muito bom",
+    "perfeito", "bacana", "que bacana", "dai tudo azul", "que lindo", "vai ter baile", "pilchado", "e os guri ne",
+    "sim", "nao", "não", "aham", "uhum", "ta", "tá", "ok ok", "blz entao", "beleza entao", "fechou entao",
+    "frango sentado", "paaaaa", "vai sair quando",
+}
+
+ACTION_AND_BUSINESS_KEYWORDS = {
+    "silo", "silos", "lote", "lotes", "ração", "racao", "sensor", "calibração", "calibracao", "telemetria",
+    "c.vale", "cvale", "miratorg", "mtech", "granja", "aviário", "aviario", "aviários", "fal", "fau",
+    "relatório", "relatorio", "reunião", "reuniao", "tarefa", "prazo", "agendamento", "entregar", "enviar",
+    "verificar", "alinhar", "revisar", "concluir", "fazer", "pagar", "comprar", "preço", "custo",
+    "urgente", "amanhã", "amanha", "quinta", "sexta", "segunda", "terça", "terca", "quarta",
+    "auditoria", "checklist", "exame", "consulta", "mortalidade", "conversão", "iep", "peso", "placa",
+}
+
+
+def has_business_or_action_intent(text: str) -> bool:
+    """Verifica se o texto possui palavras-chave de ação, negócios, operações ou entidades."""
+    clean = normalize_text(text)
+    words = set(clean.split())
+    if words.intersection(ACTION_AND_BUSINESS_KEYWORDS):
+        return True
+    return False
+
+
+def is_emoji_only_or_symbols(text: str) -> bool:
+    """Verifica se o texto é composto exclusivamente por emojis, pontuação, símbolos ou espaços."""
+    if not text or not text.strip():
+        return True
+    alnum_only = re.sub(r"[^\w]", "", text)
+    if len(alnum_only.strip()) == 0:
+        return True
+    return False
+
+
+def should_drop_message(
+    text: Optional[str],
+    message_type: str = "text",
+    meta_info: Optional[Dict[str, Any]] = None,
+) -> Tuple[bool, str]:
+    """Determina se a mensagem deve ser COMPLETAMENTE IGNORADA e NÃO SALVA no banco de dados,
+
+    nem enviada para análise de agentes, histórico, embeddings ou word cloud.
+    Garante que apenas conversas com real privilégio e densidade informativa sejam processadas.
+    """
+    # 1. Mensagens de grupo (se configurado para ignorar)
+    if settings.IGNORE_GROUP_MESSAGES and is_group_message(meta_info):
+        return True, "group_message"
+
+    # 2. Tipos de mídia sem conteúdo textual ou sem suporte de fala
+    non_text_types = {
+        "sticker", "stickermessage", "sticker_message",
+        "reaction", "reactionmessage", "reaction_message",
+        "contactmessage", "contact_message", "locationmessage", "location_message",
+        "imagemessage", "imagemessage", "videomessage", "video_message",
+    }
+    msg_type_str = str(message_type).lower().strip()
+    if msg_type_str in non_text_types and (not text or not str(text).strip()):
+        return True, f"non_text_media_{msg_type_str}"
+
+    # 3. Mensagem sem texto ou nula (ex: áudio inaudível / ruído)
+    if not text or not str(text).strip():
+        return True, "empty_text"
+
+    raw_clean = str(text).strip()
+    clean = normalize_text(raw_clean)
+
+    # 4. Mensagem composta apenas por emojis ou símbolos
+    if not clean or is_emoji_only_or_symbols(raw_clean):
+        return True, "only_emojis_or_symbols"
+
+    # 5. Lista abrangente de saudações e ruído conversacional social
+    if clean in TRIVIAL_SOCIAL_PHRASES:
+        return True, "trivial_social_phrase"
+
+    # Se configurado em .env AI_BYPASS_PHRASES adicionais
+    if settings.AI_BYPASS_PHRASES:
+        custom_phrases = [
+            normalize_text(p) for p in settings.AI_BYPASS_PHRASES.split(",") if normalize_text(p)
+        ]
+        if clean in custom_phrases:
+            return True, "custom_trivial_phrase"
+
+    # 6. Avaliação de Densidade Informativa e Privilégio de Memória
+    words = clean.split()
+    # Se for uma pergunta/comando explícito para o agente
+    is_direct_query = raw_clean.startswith("?") or raw_clean.startswith("/") or clean.startswith("hermes")
+
+    # Mensagens muito curtas (< 20 caracteres e <= 3 palavras) sem palavras de negócio/ação e sem ser query
+    if len(raw_clean) < 20 and len(words) <= 3 and not is_direct_query:
+        if not has_business_or_action_intent(raw_clean):
+            return True, "low_density_trivial"
+
+    return False, "privileged_valid_message"
+
+
 def should_bypass_ai(
     text: Optional[str],
     message_type: str = "text",
@@ -105,50 +204,15 @@ def should_bypass_ai(
 
     Retorna: (should_bypass: bool, reason: str)
     """
-    # 1. Bypass explícito no payload
+    # 1. Se deve ser descartada, automaticamente faz bypass
+    should_drop, drop_reason = should_drop_message(text, message_type=message_type, meta_info=meta_info)
+    if should_drop:
+        return True, drop_reason
+
+    # 2. Bypass explícito no payload
     if meta_info and isinstance(meta_info, dict):
         if meta_info.get("bypass_ai") is True or meta_info.get("bypass") is True:
             return True, "explicit_bypass"
 
-    # 2. Mensagens de grupo (se configurado para ignorar)
-    if settings.IGNORE_GROUP_MESSAGES and is_group_message(meta_info):
-        return True, "group_message"
-
-    # 3. Tipos de mídia sem conteúdo textual ou sem suporte de fala (stickers, reações, etc.)
-    non_text_types = {
-        "sticker", "stickermessage", "sticker_message",
-        "reaction", "reactionmessage", "reaction_message",
-        "contactmessage", "contact_message", "locationmessage", "location_message",
-    }
-    if str(message_type).lower() in non_text_types:
-        return True, "non_text_media_type"
-
-    # 4. Mensagem sem texto ou nula
-    if not text or not str(text).strip():
-        return True, "empty_text"
-
-    clean = normalize_text(str(text))
-    raw_clean = str(text).strip()
-
-    # Se após limpeza restou nada (ex: apenas emojis ou pontuação)
-    if not clean:
-        return True, "only_emojis_or_punctuation"
-
-    # 5. Threshold de número de caracteres (ex: <= 15 caracteres)
-    if len(raw_clean) <= settings.AI_BYPASS_CHAR_THRESHOLD:
-        return True, f"char_threshold_under_{settings.AI_BYPASS_CHAR_THRESHOLD}"
-
-    # 6. Threshold de número de palavras (ex: <= 3 palavras)
-    words = clean.split()
-    if len(words) <= settings.AI_BYPASS_WORD_THRESHOLD:
-        return True, f"word_threshold_under_{settings.AI_BYPASS_WORD_THRESHOLD}"
-
-    # 7. Frases ou saudações triviais configuradas
-    if settings.AI_BYPASS_PHRASES:
-        bypass_phrases = [
-            normalize_text(p) for p in settings.AI_BYPASS_PHRASES.split(",") if normalize_text(p)
-        ]
-        if clean in bypass_phrases:
-            return True, "trivial_phrase_match"
-
     return False, "process_ai"
+

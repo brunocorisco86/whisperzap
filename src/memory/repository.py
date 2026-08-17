@@ -61,20 +61,30 @@ class MemoryRepository:
             rng = random.Random(seed)
             return [rng.uniform(-1.0, 1.0) for _ in range(768)]
 
-    async def save_message(self, data: MessageCreate, db: Session | None = None) -> MessageRecord:
-        """Salva a mensagem, executa extração semântica silenciosa, salva entidades/tarefas, embedding e atualiza o grafo."""
+    async def save_message(self, data: MessageCreate, db: Session | None = None) -> MessageRecord | None:
+        """Salva a mensagem, executa extração semântica silenciosa, salva entidades/tarefas, embedding e atualiza o grafo.
+
+        Se a mensagem for vazia, ruído, sticker ou apenas emojis, é completamente descartada e retorna None.
+        """
         should_close = False
         if db is None:
             db = SessionLocal()
             should_close = True
 
         try:
-            msg_id = str(uuid4())
-
-            # 1. Verificação de Bypass de IA (Threshold de caracteres, palavras, saudações e mídias sem texto)
-            from src.ai_gateway.bypass import should_bypass_ai, is_owner_interaction
+            # 1. Verificação de Descarte de Mensagem (Vazio, apenas emojis, stickers, ruídos)
+            from src.ai_gateway.bypass import should_drop_message, should_bypass_ai, is_owner_interaction
             msg_type = (data.meta_info or {}).get("message_type", "text") if isinstance(data.meta_info, dict) else "text"
             text_to_check = data.revised_text or data.raw_text or ""
+            
+            drop_active, drop_reason = should_drop_message(text_to_check, message_type=msg_type, meta_info=data.meta_info)
+            if drop_active:
+                logger.info(f"Mensagem DESCARTADA (não salva na memória): remetente='{data.speaker}', motivo='{drop_reason}', texto='{text_to_check[:40]}'")
+                return None
+
+            msg_id = str(uuid4())
+
+            # 2. Verificação de Bypass de IA para extração semântica
             bypass_active, bypass_reason = should_bypass_ai(text_to_check, message_type=msg_type, meta_info=data.meta_info)
 
             if bypass_active:

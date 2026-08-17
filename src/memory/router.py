@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 from src.ai_gateway.schemas import (
     DailySummaryRequest,
@@ -25,11 +25,27 @@ from src.reports.weekly import weekly_report_service
 router = APIRouter(prefix="/api/v1/memory", tags=["Memória em Camadas & Agente Hermes"])
 
 
-@router.post("/messages", status_code=status.HTTP_201_CREATED)
-async def save_message(payload: MessageCreate, db: Session = Depends(get_db)):
-    """Salva a mensagem, realiza a extração semântica silenciosa e atualiza o grafo."""
+@router.post("/messages")
+async def save_message(payload: MessageCreate, response: Response, db: Session = Depends(get_db)):
+    """Salva a mensagem, realiza a extração semântica silenciosa e atualiza o grafo.
+
+    Se a mensagem for vazia, ruído ou apenas emojis, ela é descartada sem consumir tokens ou persistir no banco.
+    """
     msg = await memory_repository.save_message(payload, db=db)
+    if msg is None:
+        response.status_code = status.HTTP_200_OK
+        return {
+            "status": "ignored",
+            "saved": False,
+            "message_id": None,
+            "speaker": payload.speaker,
+            "reason": "Mensagem ignorada e descartada (vazia, apenas emojis, mídia sem texto ou trivial)",
+        }
+
+    response.status_code = status.HTTP_201_CREATED
     return {
+        "status": "saved",
+        "saved": True,
         "message_id": msg.id,
         "speaker": msg.speaker,
         "intent": msg.intent,
@@ -219,7 +235,9 @@ async def list_recent_messages(
     """Lista mensagens e notas de áudio enriquecidas com transcrições, metadados e tarefas."""
     from src.memory.models import MessageRecord
 
-    query = db.query(MessageRecord)
+    query = db.query(MessageRecord).filter(
+        (MessageRecord.revised_text != "") | (MessageRecord.raw_text != "")
+    )
     if speaker:
         query = query.filter(MessageRecord.speaker.ilike(f"%{speaker.strip()}%"))
     if intent:

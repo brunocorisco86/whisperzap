@@ -781,9 +781,12 @@ function renderMessages() {
   const filterSentiment = msgFilterSentiment ? msgFilterSentiment.value.toUpperCase() : '';
 
   const filtered = allMessages.filter(m => {
-    const speaker = (m.speaker || '').toLowerCase();
     const revised = (m.revised_text || '').toLowerCase();
     const raw = (m.raw_text || '').toLowerCase();
+    const textValid = (m.revised_text || m.raw_text || '').trim();
+    if (!textValid) return false;
+
+    const speaker = (m.speaker || '').toLowerCase();
     const summary = (m.summary || '').toLowerCase();
 
     const matchSearch = !searchTerm || speaker.includes(searchTerm) || revised.includes(searchTerm) || raw.includes(searchTerm) || summary.includes(searchTerm);
@@ -893,8 +896,8 @@ function renderMessages() {
             </button>
           </div>
 
-          <div class="message-text" id="text-revised-${m.id}">"${m.revised_text || m.raw_text || 'Sem texto disponível'}"</div>
-          <div class="message-raw-text" id="text-raw-${m.id}" style="display: none;">"${m.raw_text || m.revised_text || 'Sem transcrição bruta'}"</div>
+          <div class="message-text" id="text-revised-${m.id}">"${m.revised_text || m.raw_text || ''}"</div>
+          <div class="message-raw-text" id="text-raw-${m.id}" style="display: none;">"${m.raw_text || m.revised_text || ''}"</div>
         </div>
 
         <!-- Tarefas Extraídas -->

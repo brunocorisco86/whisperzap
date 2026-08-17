@@ -1,0 +1,41 @@
+name: CD - Deploy Automatizado em Produção (VPS Hostinger)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Remoto na VPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout do Código
+        uses: actions/checkout@v4
+
+      - name: Executar Deploy via SSH na VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_SSH_USER || 'root' }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script_stop: true
+          script: |
+            echo "🚀 Iniciando Deploy do WhisperZap / Hermes na VPS..."
+            cd /root/projetos/whisperzap
+            
+            # Sincroniza branch main
+            git fetch origin main
+            git reset --hard origin/main
+            
+            # Reinicia container hermes-api com build atualizado se necessário
+            docker-compose up -d --build hermes-api
+            
+            # Aguarda estabilização e verifica healthcheck
+            sleep 5
+            curl -f http://localhost:8005/health || exit 1
+            
+            echo "✅ Deploy concluído com sucesso e serviço 100% saudável!"
