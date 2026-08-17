@@ -216,15 +216,62 @@ pytest tests/ -v
 
 ---
 
-## 🗺️ Roadmap Estratégico
+## 🗺️ Roadmap Estratégico & Ideação de Produto
 
-- [x] **Privilégio Estrito de Identidade**: Bloqueio de grupos e filtro de entrada no AI Gateway baseado na tabela de contatos.
-- [x] **Bonificação de Favoritos**: Multiplicador de +10% de peso sobre o papel para contatos com estrela.
+- [x] **Privilégio Estrito de Identidade**: Bloqueio de grupos e filtro de entrada no AI Gateway baseado na tabela de contatos com cartão.
+- [x] **Bonificação de Favoritos**: Multiplicador de +10% de peso sobre o papel para contatos favoritados.
 - [x] **Deduplicação de Cards & Purga de Órfãos na Zeladora**: Fusão automática de duplicatas e eliminação de tarefas sem autor.
-- [ ] **MUSA Intelligent Profile Enrichment (RAG de Cards)**:
-  - Motor de análise profunda do Grafo de Conhecimento e do histórico longitudinal de conversas de um contato.
-  - Ao abrir o card, o usuário poderá acionar o Hermes para sugerir atualizações de cargo ideal, empresas/projetos relacionados, estilo de tomada de decisão e pontos de atenção com base no histórico real acumulado.
+- [ ] **MUSA Intelligent Profile Enrichment (Edição Cognitiva de Cards via RAG)** *(Ideação Detalhada Abaixo)*
 - [ ] **Voice Push Notifications**: Envio de alertas de voz sintetizados para tarefas de alta prioridade.
+- [ ] **MUSA Graph Clustering Auto-Tuning**: Detecção automática de novas comunidades temáticas no Grafo Social.
+
+---
+
+### 💡 Ideação Arquitetural: MUSA Intelligent Profile Enrichment
+
+```
+ ┌────────────────────────┐
+ │   Card do Contato na   │ ──(Usuário clica em "✨ Sugestão RAG")──┐
+ │   Interface Web        │                                         │
+ └────────────────────────┘                                         ▼
+                                                   ┌─────────────────────────────────┐
+                                                   │ 1. RAG Longitudinal MUSA        │
+                                                   │    - Varredura de 90 dias       │
+                                                   │    - Vizinhos no Grafo NetworkX │
+                                                   │    - Tarefas & Sentimentos      │
+                                                   └────────────────┬────────────────┘
+                                                                    │
+                                                                    ▼
+                                                   ┌─────────────────────────────────┐
+                                                   │ 2. Hermes Synthesis Engine      │
+                                                   │    - Deduz papel ideal e peso   │
+                                                   │    - Identifica novos projetos  │
+                                                   │    - Mapeia empresas e fazendas │
+                                                   │    - Gera dossiê de notas       │
+                                                   └────────────────┬────────────────┘
+                                                                    │
+                                                                    ▼
+ ┌────────────────────────┐                        ┌─────────────────────────────────┐
+ │   Card Atualizado e    │ ◄──(Aprovação "1-Clique")│ 3. Painel Diff (Antes vs Depois)│
+ │   Grafo Calibrado      │                        │    - Recomendações prontas      │
+ └────────────────────────┘                        └─────────────────────────────────┘
+```
+
+#### 1. A Oportunidade
+Conforme os meses avançam, a **MUSA** acumula dezenas de mensagens, intenções e conexões sobre cada parceiro, produtor rural ou executivo. Manter o perfil dos contatos (cargo, projetos ativos, empresa, notas de comportamento) atualizado manualmente é demorado.
+
+#### 2. Como Funciona a Experiência (UX)
+1. **Acionamento Human-in-the-Loop**: Ao abrir o modal de um contato com mais de 10 interações registradas, o botão **`✨ Sugestão Cognitiva (RAG MUSA)`** fica destacado.
+2. **Análise Multi-Modal**:
+   - **Camada Vetorial (`pgvector`)**: Analisa todas as transcrições e mensagens do interlocutor.
+   - **Camada Estrutural (Grafo MUSA)**: Analisa com quem ele se conecta (quais silos, sistemas, fazendas e outras pessoas ele cita).
+   - **Série Temporal de Humor**: Analisa a estabilidade emocional e padrões de urgência.
+3. **Proposta Estruturada da IA**:
+   - **Papel Hierárquico Recomendado**: ex: sugere migrar de `COLLEAGUE` para `EXECUTIVE` devido a decisões de compras e alinhamento de diretoria.
+   - **Empresa / Unidade**: Detecta menções a *"C.Vale Palotina"*, *"Fazenda São Bento"*, etc.
+   - **Projetos Ativos**: Extrai tags dinâmicas como `["Silo 4", "Auditoria Miratorg", "Calibração Sensores"]`.
+   - **Dossiê / Anotações**: Redige um resumo executivo com pontos fortes, estilo de comunicação e preferências operacionais.
+4. **Aprovação em 1-Clique**: O usuário vê o comparativo visual do que mudou e aprova com um único clique, atualizando o SQL e rebalanceando os pesos do Grafo de Conhecimento.
 
 ---
 
