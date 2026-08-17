@@ -49,9 +49,202 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  padding-left: 72px;
+  transition: padding-left 0.2s ease;
 }
 
-/* Navbar */
+/* ==========================================================================
+   ELEGANT EXPANDABLE SIDEBAR (HERMES & MUSA)
+   ========================================================================== */
+.app-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 72px;
+  background: rgba(13, 17, 23, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.26s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.26s ease;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.app-sidebar:hover {
+  width: 250px;
+  box-shadow: 10px 0 35px rgba(0, 0, 0, 0.7);
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1.25rem 1.15rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  min-height: 70px;
+}
+
+.sidebar-logo {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.45));
+}
+
+.sidebar-brand-text {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: opacity 0.2s ease 0.04s, transform 0.2s ease 0.04s;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.app-sidebar:hover .sidebar-brand-text {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1rem 0.6rem;
+  flex: 1;
+}
+
+.sidebar-nav .tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.95rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.18s ease;
+  width: 100%;
+  text-decoration: none;
+}
+
+.sidebar-nav .tab-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-nav .tab-btn.active {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.2), rgba(245, 158, 11, 0.08));
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #60a5fa;
+  font-weight: 700;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.15);
+}
+
+.tab-icon {
+  font-size: 1.3rem;
+  min-width: 32px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  flex: 1;
+}
+
+.app-sidebar:hover .tab-label {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.tab-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-full);
+  background: rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.app-sidebar:hover .tab-badge {
+  opacity: 1;
+}
+
+.sidebar-footer {
+  padding: 0.9rem 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.user-avatar-badge {
+  font-size: 1.35rem;
+  min-width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: var(--radius-full);
+}
+
+.sidebar-user-info {
+  display: flex;
+  flex-direction: column;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.app-sidebar:hover .sidebar-user-info {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.sidebar-user-info .user-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sidebar-user-info .user-role {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #f59e0b;
+  letter-spacing: 0.05em;
+}
+
+/* Top Navbar */
 .navbar {
   display: flex;
   justify-content: space-between;
@@ -69,10 +262,6 @@ body {
   display: flex;
   align-items: center;
   gap: 0.85rem;
-}
-
-.brand-icon {
-  font-size: 1.8rem;
 }
 
 .brand-title {
@@ -147,41 +336,9 @@ body {
 
 /* Container */
 .container {
-  max-width: 1280px;
+  max-width: 1320px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
-}
-
-/* Tab Navigation */
-.tab-nav {
-  display: flex;
-  gap: 0.5rem;
-  border-bottom: 1px solid var(--border-subtle);
-  margin-bottom: 1.5rem;
-  overflow-x: auto;
-}
-
-.tab-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-family: inherit;
-  font-size: 0.95rem;
-  font-weight: 600;
-  padding: 0.85rem 1.25rem;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.tab-btn:hover {
-  color: var(--text-primary);
-}
-
-.tab-btn.active {
-  color: var(--color-primary);
-  border-bottom-color: var(--color-primary);
 }
 
 /* Tab Content */

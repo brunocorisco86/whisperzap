@@ -16,17 +16,82 @@
 </head>
 <body>
 
+  <!-- Collapsible Icon Sidebar -->
+  <aside class="app-sidebar" id="app-sidebar">
+    <div class="sidebar-header">
+      <img src="/static/favicon.svg" alt="MUSA Icon" class="sidebar-logo">
+      <div class="sidebar-brand-text">
+        <span class="hermes-brand">HERMES</span>
+        <span class="ampersand">&</span>
+        <span class="musa-brand">MUSA</span>
+      </div>
+    </div>
+
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar-nav">
+      <button class="tab-btn active" data-tab="tab-contacts" title="👥 Contatos Oficiais">
+        <span class="tab-icon">👥</span>
+        <span class="tab-label">Contatos</span>
+        <span class="tab-badge" id="count-contacts">0</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-graph" title="🕸️ Grafo MUSA (NetworkX)">
+        <span class="tab-icon">🕸️</span>
+        <span class="tab-label">Grafo MUSA</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-tasks" title="📋 Tarefas Operacionais">
+        <span class="tab-icon">📋</span>
+        <span class="tab-label">Tarefas</span>
+        <span class="tab-badge" id="count-tasks">0</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-messages" title="🎙️ Áudios & Transcrições">
+        <span class="tab-icon">🎙️</span>
+        <span class="tab-label">Áudios & Memória</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-analytics" title="📊 Analytics & Dashboard">
+        <span class="tab-icon">📊</span>
+        <span class="tab-label">Analytics</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-sentiment" title="🎭 Sentimentos & Humor">
+        <span class="tab-icon">🎭</span>
+        <span class="tab-label">Humor & Sentimentos</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-dictionary" title="📖 Dicionário Léxico">
+        <span class="tab-icon">📖</span>
+        <span class="tab-label">Dicionário Léxico</span>
+        <span class="tab-badge" id="count-dict">0</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-query" title="🧠 Agente Hermes (Q&A)">
+        <span class="tab-icon">🧠</span>
+        <span class="tab-label">Agente Hermes</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-infra" title="⚙️ Infra & Topologia">
+        <span class="tab-icon">⚙️</span>
+        <span class="tab-label">Infra & Status</span>
+      </button>
+    </nav>
+
+    <!-- Sidebar Footer / Owner Badge -->
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span class="user-avatar-badge" title="Proprietário & Deus Supremo">👑</span>
+        <div class="sidebar-user-info">
+          <span class="user-name">Bruno Conter</span>
+          <span class="user-role">OWNER • Supremo</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
   <!-- Top Navbar -->
   <header class="navbar">
     <div class="nav-brand">
-      <img src="/static/favicon.svg" alt="MUSA Icon" class="brand-logo-img" style="width: 36px; height: 36px; filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.45));">
       <div class="brand-text">
         <h1 class="brand-title">
           <span class="hermes-brand">HERMES</span>
           <span class="ampersand">&</span>
           <span class="musa-brand">MUSA</span>
         </h1>
-        <span class="brand-subtitle">Voice Intelligence & Neural Knowledge Graph</span>
+        <span class="brand-subtitle">Voice Intelligence & Neural Memory Engine</span>
       </div>
     </div>
 
@@ -47,37 +112,6 @@
 
   <!-- Main Container -->
   <main class="container">
-    
-    <!-- Tab Navigation -->
-    <nav class="tab-nav">
-      <button class="tab-btn active" data-tab="tab-contacts">
-        👥 Contatos (<span id="count-contacts">0</span>)
-      </button>
-      <button class="tab-btn" data-tab="tab-graph">
-        🕸️ Grafo MUSA (NetworkX)
-      </button>
-      <button class="tab-btn" data-tab="tab-tasks">
-        📋 Tarefas (<span id="count-tasks">0</span>)
-      </button>
-      <button class="tab-btn" data-tab="tab-messages">
-        🎙️ Áudios & Transcrições
-      </button>
-      <button class="tab-btn" data-tab="tab-analytics">
-        📊 Analytics & Dashboard
-      </button>
-      <button class="tab-btn" data-tab="tab-dictionary">
-        📖 Dicionário Léxico (<span id="count-dict">0</span>)
-      </button>
-      <button class="tab-btn" data-tab="tab-sentiment">
-        🌡️ Sentimentos & Humor
-      </button>
-      <button class="tab-btn" data-tab="tab-query">
-        🧠 Agente Hermes (Q&A)
-      </button>
-      <button class="tab-btn" data-tab="tab-infra">
-        ⚙️ Infra & Topologia
-      </button>
-    </nav>
 
     <!-- Tab 1: Contacts & Roles -->
     <section id="tab-contacts" class="tab-content active">
