@@ -177,8 +177,54 @@ pytest tests/ -v
 | `GET` | `/api/v1/memory/tasks` | Lista tarefas com ancoragem de solicitante e anotações |
 | `PATCH`| `/api/v1/memory/tasks/{id}` | Atualiza status (`DONE`, `CANCELLED`, `PENDING`) e anotações |
 | `GET` | `/api/v1/analytics/dashboard` | KPIs executivos, séries temporais, WordMap e Heatmap 24x7 |
-| `POST` | `/api/v1/memory/graph/clean` | Dispara faxina sob demanda da Zeladora no Grafo |
+| `POST` | `/api/v1/memory/graph/clean` | Dispara faxina da Zeladora (podas, fusão de aliases, deduplicação de cards e purga de órfãos) |
 | `POST` | `/api/v1/memory/query` | Consulta ao Hermes com RAG Híbrido e citação de fontes |
+
+---
+
+## 📐 Modelo de Dados (MER / DER) & Privilégio de Identidade
+
+```
+ ┌────────────────────────┐         1:N         ┌─────────────────────────┐
+ │        CONTACTS        │────────────────────<│        MESSAGES         │
+ ├────────────────────────┤                     ├─────────────────────────┤
+ │ id (PK: wa_{digits})   │                     │ id (PK: UUID)           │
+ │ phone_number (Unique)  │                     │ speaker (FK -> Contact) │
+ │ name, nickname, role   │                     │ raw_text, revised_text  │
+ │ company, projects_json │                     │ intent, sentiment       │
+ │ custom_weight          │                     │ audio_filename          │
+ │ is_favorite (Boolean)  │                     │ meta_info (JSON)        │
+ └────────────────────────┘                     └────────────┬────────────┘
+             │                                               │
+             │                                      1:N      │
+             │                                  ┌────────────┴────────────┐
+             │                                  │                         │
+             ▼ 1:N                              ▼ 1:N                     ▼ 1:N
+ ┌────────────────────────┐         ┌────────────────────────┐ ┌────────────────────────┐
+ │         TASKS          │         │        ENTITIES        │ │       EMBEDDINGS       │
+ ├────────────────────────┤         ├────────────────────────┤ ├────────────────────────┤
+ │ id (PK: UUID)          │         │ id (PK: UUID)          │ │ id (PK: UUID)          │
+ │ message_id (FK)        │         │ message_id (FK)        │ │ message_id (FK)        │
+ │ assignee (FK -> Contact│         │ name, category         │ │ text_content           │
+ │ title, due_date, status│         │ details, created_at    │ │ embedding (Vector 768) │
+ └────────────────────────┘         └────────────────────────┘ └────────────────────────┘
+```
+
+> **Princípio Sagrado da Memória**: *A história é escrita pelos vitoriosos; contatos sem cartão oficial não geram conhecimento nem tarefas.*
+> - Nenhuma mensagem entra no **AI Gateway** nem é salva na **Memória MUSA** se o remetente não for o **Proprietário (`Bruno Conter`)** ou um **Contato Oficial com Cartão Cadastrado** (`ContactRecord`).
+> - A **Zeladora (`GraphJanitorService`)** realiza deduplicação contínua de cartões (resolvendo variações fonéticas e telefones com/sem DDI) e purga registros órfãos.
+
+---
+
+## 🗺️ Roadmap Estratégico
+
+- [x] **Privilégio Estrito de Identidade**: Bloqueio de grupos e filtro de entrada no AI Gateway baseado na tabela de contatos.
+- [x] **Bonificação de Favoritos**: Multiplicador de +10% de peso sobre o papel para contatos com estrela.
+- [x] **Deduplicação de Cards & Purga de Órfãos na Zeladora**: Fusão automática de duplicatas e eliminação de tarefas sem autor.
+- [ ] **MUSA Intelligent Profile Enrichment (RAG de Cards)**:
+  - Motor de análise profunda do Grafo de Conhecimento e do histórico longitudinal de conversas de um contato.
+  - Ao abrir o card, o usuário poderá acionar o Hermes para sugerir atualizações de cargo ideal, empresas/projetos relacionados, estilo de tomada de decisão e pontos de atenção com base no histórico real acumulado.
+- [ ] **Voice Push Notifications**: Envio de alertas de voz sintetizados para tarefas de alta prioridade.
 
 ---
 

@@ -52,6 +52,7 @@ class GraphJanitorReport(BaseModel):
     edges_after: int
     edges_pruned_count: int
     nodes_merged_count: int
+    contacts_merged_count: int = 0
     orphan_messages_purged_count: int = 0
     orphan_tasks_purged_count: int = 0
     orphan_audio_files_deleted_count: int = 0
@@ -89,6 +90,11 @@ class GraphJanitorService:
         orphan_purge_res = {"purged_messages_count": 0, "deleted_audio_files_count": 0, "purged_speakers": []}
         if purge_orphan_messages:
             orphan_purge_res = self.purge_orphan_messages_and_audios(dry_run=dry_run, db=db)
+
+        # 0.1 Deduplicação e Fusão de Cards de Contatos
+        from src.contacts.service import contact_service
+        contact_merge_res = contact_service.deduplicate_contacts(dry_run=dry_run, db=db)
+        contacts_merged = contact_merge_res.get("contacts_merged_count", 0)
 
         with self.kg._lock:
             g = self.kg.graph
@@ -168,6 +174,8 @@ class GraphJanitorService:
                 f"{len(merged_nodes)} aliases mesclados",
                 f"{edges_pruned_count} arestas otimizadas",
             ]
+            if contacts_merged > 0:
+                summary_parts.append(f"{contacts_merged} cards de contatos deduplicados")
             if purged_msgs > 0:
                 summary_parts.append(f"{purged_msgs} mensagens de contatos sem card purgadas")
             if purged_tasks > 0:
@@ -188,6 +196,7 @@ class GraphJanitorService:
                 edges_after=edges_after,
                 edges_pruned_count=edges_pruned_count,
                 nodes_merged_count=len(merged_nodes),
+                contacts_merged_count=contacts_merged,
                 orphan_messages_purged_count=purged_msgs,
                 orphan_tasks_purged_count=purged_tasks,
                 orphan_audio_files_deleted_count=purged_audios,

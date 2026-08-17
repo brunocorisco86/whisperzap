@@ -197,21 +197,92 @@ def is_emoji_only_or_symbols(text: str) -> bool:
     return False
 
 
+def is_registered_contact(speaker: Optional[str] = None, meta_info: Optional[Dict[str, Any]] = None, db: Optional[Any] = None) -> bool:
+    """Verifica se o remetente é o Dono do Sistema ou um Contato previamente cadastrado com cartão válido."""
+    # Se não há identificação explícita de speaker nem remetente externo em meta_info, assume a interface do Dono
+    if not speaker or str(speaker).lower() in {"user", "bruno", "admin"}:
+        if not meta_info or (not meta_info.get("remoteJid") and not meta_info.get("phone") and not meta_info.get("sender_phone")):
+            return True
+
+    # 1. Dono sempre é registrado
+    if is_owner_interaction(speaker, meta_info):
+        return True
+
+    # 2. Verifica se é grupo (grupos nunca são contatos individuais com cartão)
+    if is_group_message(meta_info, speaker):
+        return False
+
+    phone_to_check = ""
+    if meta_info and isinstance(meta_info, dict):
+        phone_to_check = str(meta_info.get("phone") or meta_info.get("sender_phone") or meta_info.get("remoteJid") or "")
+    if not phone_to_check and speaker:
+        phone_to_check = speaker
+
+    # Se tiver telefone, deve ter padrão de caracteres válido
+    if phone_to_check and not is_valid_contact_phone(phone_to_check) and not any(c.isalpha() for c in str(speaker or "")):
+        return False
+
+    # 3. Consulta no banco de dados se o contato possui cartão cadastrado
+    from src.contacts.models import ContactRecord
+    from src.memory.database import SessionLocal
+
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+
+    try:
+        speaker_raw = str(speaker or "").strip()
+        speaker_norm = normalize_text(speaker_raw)
+        speaker_digits = re.sub(r"\D", "", phone_to_check)
+
+        contacts = db.query(ContactRecord).all()
+        for c in contacts:
+            c_name_norm = normalize_text(c.name)
+            c_nick_norm = normalize_text(c.nickname or "")
+            c_digits = re.sub(r"\D", "", c.phone_number or "")
+
+            # Match por dígitos de telefone (exato ou últimos 8 dígitos)
+            if speaker_digits and c_digits:
+                if speaker_digits == c_digits or (len(speaker_digits) >= 8 and len(c_digits) >= 8 and speaker_digits[-8:] == c_digits[-8:]):
+                    return True
+
+            # Match por nome / apelido
+            if speaker_norm and (speaker_norm == c_name_norm or (c_nick_norm and speaker_norm == c_nick_norm)):
+                return True
+
+        return False
+    except Exception as e:
+        logger.warning(f"Erro ao verificar contato registrado: {e}")
+        return False
+    finally:
+        if should_close:
+            db.close()
+
+
 def should_drop_message(
     text: Optional[str],
     message_type: str = "text",
     meta_info: Optional[Dict[str, Any]] = None,
+    speaker: Optional[str] = None,
+    db: Optional[Any] = None,
+    require_registered_card: bool = True,
 ) -> Tuple[bool, str]:
     """Determina se a mensagem deve ser COMPLETAMENTE IGNORADA e NÃO SALVA no banco de dados,
 
     nem enviada para análise de agentes, histórico, embeddings ou word cloud.
-    Garante que apenas conversas com real privilégio e densidade informativa sejam processadas.
+    Garante que apenas conversas com real privilégio, remetentes com cartão oficial e densidade informativa sejam processadas.
     """
-    # 1. Mensagens de grupo (se configurado para ignorar)
-    if settings.IGNORE_GROUP_MESSAGES and is_group_message(meta_info):
+    # 1. Mensagens de grupo (sempre ignoradas)
+    if is_group_message(meta_info, speaker):
         return True, "group_message"
 
-    # 2. Tipos de mídia sem conteúdo textual ou sem suporte de fala
+    # 2. Exigência de Identidade Prévia (Dono ou Contato com Cartão)
+    if require_registered_card:
+        if not is_registered_contact(speaker=speaker, meta_info=meta_info, db=db):
+            return True, "unregistered_contact_no_card"
+
+    # 3. Tipos de mídia sem conteúdo textual ou sem suporte de fala
     non_text_types = {
         "sticker", "stickermessage", "sticker_message",
         "reaction", "reactionmessage", "reaction_message",
@@ -222,18 +293,18 @@ def should_drop_message(
     if msg_type_str in non_text_types and (not text or not str(text).strip()):
         return True, f"non_text_media_{msg_type_str}"
 
-    # 3. Mensagem sem texto ou nula (ex: áudio inaudível / ruído)
+    # 4. Mensagem sem texto ou nula (ex: áudio inaudível / ruído)
     if not text or not str(text).strip():
         return True, "empty_text"
 
     raw_clean = str(text).strip()
     clean = normalize_text(raw_clean)
 
-    # 4. Mensagem composta apenas por emojis ou símbolos
+    # 5. Mensagem composta apenas por emojis ou símbolos
     if not clean or is_emoji_only_or_symbols(raw_clean):
         return True, "only_emojis_or_symbols"
 
-    # 5. Lista abrangente de saudações e ruído conversacional social
+    # 6. Lista abrangente de saudações e ruído conversacional social
     if clean in TRIVIAL_SOCIAL_PHRASES:
         return True, "trivial_social_phrase"
 
@@ -245,7 +316,7 @@ def should_drop_message(
         if clean in custom_phrases:
             return True, "custom_trivial_phrase"
 
-    # 6. Avaliação de Densidade Informativa e Privilégio de Memória
+    # 7. Avaliação de Densidade Informativa e Privilégio de Memória
     words = clean.split()
     # Se for uma pergunta/comando explícito para o agente
     is_direct_query = raw_clean.startswith("?") or raw_clean.startswith("/") or clean.startswith("hermes")
@@ -262,13 +333,21 @@ def should_bypass_ai(
     text: Optional[str],
     message_type: str = "text",
     meta_info: Optional[Dict[str, Any]] = None,
+    speaker: Optional[str] = None,
+    db: Optional[Any] = None,
 ) -> Tuple[bool, str]:
     """Determina se a mensagem deve fazer bypass do processamento de IA (extração semântica e análise de sentimento).
 
     Retorna: (should_bypass: bool, reason: str)
     """
     # 1. Se deve ser descartada, automaticamente faz bypass
-    should_drop, drop_reason = should_drop_message(text, message_type=message_type, meta_info=meta_info)
+    should_drop, drop_reason = should_drop_message(
+        text,
+        message_type=message_type,
+        meta_info=meta_info,
+        speaker=speaker,
+        db=db,
+    )
     if should_drop:
         return True, drop_reason
 

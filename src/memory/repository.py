@@ -77,7 +77,13 @@ class MemoryRepository:
             msg_type = (data.meta_info or {}).get("message_type", "text") if isinstance(data.meta_info, dict) else "text"
             text_to_check = data.revised_text or data.raw_text or ""
             
-            drop_active, drop_reason = should_drop_message(text_to_check, message_type=msg_type, meta_info=data.meta_info)
+            drop_active, drop_reason = should_drop_message(
+                text_to_check,
+                message_type=msg_type,
+                meta_info=data.meta_info,
+                speaker=data.speaker,
+                db=db,
+            )
             if drop_active:
                 logger.info(f"Mensagem DESCARTADA (não salva na memória): remetente='{data.speaker}', motivo='{drop_reason}', texto='{text_to_check[:40]}'")
                 return None
@@ -85,7 +91,13 @@ class MemoryRepository:
             msg_id = str(uuid4())
 
             # 2. Verificação de Bypass de IA para extração semântica
-            bypass_active, bypass_reason = should_bypass_ai(text_to_check, message_type=msg_type, meta_info=data.meta_info)
+            bypass_active, bypass_reason = should_bypass_ai(
+                text_to_check,
+                message_type=msg_type,
+                meta_info=data.meta_info,
+                speaker=data.speaker,
+                db=db,
+            )
 
             if bypass_active:
                 logger.info(f"Bypass de IA ativado para mensagem de '{data.speaker}': motivo='{bypass_reason}'")

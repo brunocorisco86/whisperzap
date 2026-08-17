@@ -502,4 +502,168 @@ class ContactService:
             return "LOW"
 
 
+    def deduplicate_contacts(self, dry_run: bool = False, db: Session | None = None) -> Dict[str, Any]:
+        """Identifica e mescla cartões de contatos duplicados (por telefone ou variações de nome).
+
+        - Escolhe o cartão canônico com base em: Dono > Favorito > Peso do Papel > Completude dos dados.
+        - Transfere histórico de mensagens e tarefas para o cartão canônico.
+        - Redireciona arestas e nós no Grafo MUSA (NetworkX).
+        - Remove o cartão duplicado secundário.
+        """
+        should_close = False
+        if db is None:
+            db = SessionLocal()
+            should_close = True
+
+        merged_pairs = []
+        contacts_merged_count = 0
+
+        try:
+            from src.memory.models import MessageRecord, TaskRecord
+
+            all_contacts = db.query(ContactRecord).all()
+            if not all_contacts:
+                return {"contacts_merged_count": 0, "merged_pairs": []}
+
+            # Agrupa contatos por chave de telefone normalizada e por nome normalizado
+            groups: Dict[str, List[ContactRecord]] = defaultdict(list)
+            for c in all_contacts:
+                phone_digits = re.sub(r"\D", "", c.phone_number or "")
+                # Se tiver 8 ou mais dígitos, agrupa pelo sufixo de 8 dígitos
+                if len(phone_digits) >= 8:
+                    groups[f"phone_{phone_digits[-8:]}"].append(c)
+                elif c.phone_number:
+                    groups[f"phone_{phone_digits}"].append(c)
+
+                # Agrupa por nome normalizado
+                if c.name:
+                    name_norm = normalize_text(c.name)
+                    if name_norm:
+                        groups[f"name_{name_norm}"].append(c)
+
+            processed_ids = set()
+
+            for group_key, candidates in groups.items():
+                # Filtra duplicatas reais dentro do grupo
+                unique_candidates = [c for c in candidates if c.id not in processed_ids]
+                if len(unique_candidates) <= 1:
+                    continue
+
+                # Identifica o contato Canônico:
+                # 1. Dono (OWNER)
+                # 2. is_favorite == True
+                # 3. Maior peso efetivo
+                # 4. Mais campos preenchidos
+                canonical = max(
+                    unique_candidates,
+                    key=lambda c: (
+                        1000 if c.role == "OWNER" else 0,
+                        500 if c.is_favorite else 0,
+                        calculate_effective_weight(c),
+                        len(c.company or "") + len(c.notes or "") + len(c.nickname or "") + len(c.name or ""),
+                    ),
+                )
+
+                for duplicate in unique_candidates:
+                    if duplicate.id == canonical.id:
+                        continue
+
+                    # Mescla dados no Canônico se estiverem vazios
+                    if not canonical.company and duplicate.company:
+                        canonical.company = duplicate.company
+                    if not canonical.nickname and duplicate.nickname:
+                        canonical.nickname = duplicate.nickname
+                    if not canonical.avatar_url and duplicate.avatar_url:
+                        canonical.avatar_url = duplicate.avatar_url
+                    if not canonical.notes and duplicate.notes:
+                        canonical.notes = duplicate.notes
+                    elif duplicate.notes and duplicate.notes not in (canonical.notes or ""):
+                        canonical.notes = f"{canonical.notes or ''}\n[Nota Importada]: {duplicate.notes}".strip()
+
+                    # Mescla projetos
+                    canon_proj = set(canonical.projects_json or [])
+                    dup_proj = set(duplicate.projects_json or [])
+                    canonical.projects_json = list(canon_proj | dup_proj)
+
+                    if duplicate.is_favorite:
+                        canonical.is_favorite = True
+
+                    if not dry_run:
+                        # 1. Transfere mensagens associadas
+                        db.query(MessageRecord).filter(MessageRecord.speaker == duplicate.name).update(
+                            {"speaker": canonical.name}, synchronize_session=False
+                        )
+
+                        # 2. Transfere tarefas associadas
+                        db.query(TaskRecord).filter(TaskRecord.assignee == duplicate.name).update(
+                            {"assignee": canonical.name}, synchronize_session=False
+                        )
+
+                        # 3. Redireciona arestas e nós no Grafo MUSA
+                        with knowledge_graph._lock:
+                            g = knowledge_graph.graph
+                            if g.has_node(duplicate.name) and g.has_node(canonical.name):
+                                # Arestas de entrada
+                                for u, _, edge_data in list(g.in_edges(duplicate.name, data=True)):
+                                    if u != canonical.name:
+                                        knowledge_graph.add_edge(
+                                            source=u,
+                                            target=canonical.name,
+                                            relation=edge_data.get("relation", "RELATED_TO"),
+                                            weight=edge_data.get("weight", 1.0),
+                                        )
+                                # Arestas de saída
+                                for _, v, edge_data in list(g.out_edges(duplicate.name, data=True)):
+                                    if v != canonical.name:
+                                        knowledge_graph.add_edge(
+                                            source=canonical.name,
+                                            target=v,
+                                            relation=edge_data.get("relation", "RELATED_TO"),
+                                            weight=edge_data.get("weight", 1.0),
+                                        )
+                                knowledge_graph.graph.nodes[canonical.name]["mentions"] = (
+                                    knowledge_graph.graph.nodes[canonical.name].get("mentions", 1)
+                                    + knowledge_graph.graph.nodes[duplicate.name].get("mentions", 1)
+                                )
+                                knowledge_graph.graph.remove_node(duplicate.name)
+                                knowledge_graph._save()
+                            elif g.has_node(duplicate.name) and not g.has_node(canonical.name):
+                                # Renomeia o nó
+                                knowledge_graph.add_node(canonical.name, category="PERSON")
+                                for u, _, edge_data in list(g.in_edges(duplicate.name, data=True)):
+                                    knowledge_graph.add_edge(u, canonical.name, edge_data.get("relation", "RELATED_TO"))
+                                for _, v, edge_data in list(g.out_edges(duplicate.name, data=True)):
+                                    knowledge_graph.add_edge(canonical.name, v, edge_data.get("relation", "RELATED_TO"))
+                                knowledge_graph.graph.remove_node(duplicate.name)
+                                knowledge_graph._save()
+
+                        # 4. Remove o registro duplicado
+                        db.delete(duplicate)
+
+                    processed_ids.add(duplicate.id)
+                    contacts_merged_count += 1
+                    merged_pairs.append({
+                        "canonical_id": canonical.id,
+                        "canonical_name": canonical.name,
+                        "merged_id": duplicate.id,
+                        "merged_name": duplicate.name,
+                    })
+
+            if not dry_run and contacts_merged_count > 0:
+                db.commit()
+
+            return {
+                "contacts_merged_count": contacts_merged_count,
+                "merged_pairs": merged_pairs,
+            }
+        except Exception as e:
+            logger.error(f"Erro na deduplicação de cartões de contatos: {e}")
+            if not dry_run:
+                db.rollback()
+            return {"contacts_merged_count": 0, "merged_pairs": []}
+        finally:
+            if should_close:
+                db.close()
+
+
 contact_service = ContactService()

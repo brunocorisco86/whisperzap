@@ -234,3 +234,41 @@ def test_favorite_contact_and_weight_bonus(contact_db):
     assert c2.effective_weight == 0.99
 
 
+def test_deduplicate_contacts_and_merge(contact_db):
+    """Testa a deduplicação de cartões por telefone e por nome, mesclando dados no canônico."""
+    service = ContactService()
+    from src.contacts.models import ContactRecord
+
+    # Cria dois cartões duplicados diretamente no banco
+    c1 = ContactRecord(
+        id="c-dup-1",
+        phone_number="5544999112233",
+        name="Roberto Carlos",
+        role="COLLEAGUE",
+        company="C.Vale",
+    )
+    c2 = ContactRecord(
+        id="c-dup-2",
+        phone_number="44999112233",
+        name="Roberto Carlos Diretor",
+        role="EXECUTIVE",
+        is_favorite=True,
+        notes="Nota confidencial de diretoria",
+    )
+    contact_db.add_all([c1, c2])
+    contact_db.commit()
+
+    # Executa a deduplicação
+    res = service.deduplicate_contacts(dry_run=False, db=contact_db)
+    assert res["contacts_merged_count"] >= 1
+
+    # Verifica que restou apenas 1 cartão com os dados mesclados
+    remaining = service.list_contacts(db=contact_db)
+    robertos = [c for c in remaining if "Roberto Carlos" in c.name]
+    assert len(robertos) == 1
+    canonical = robertos[0]
+    assert canonical.is_favorite is True
+    assert canonical.company == "C.Vale"
+    assert "Nota confidencial" in (canonical.notes or "")
+
+

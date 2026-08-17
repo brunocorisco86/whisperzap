@@ -190,12 +190,28 @@ async def test_save_message_drops_empty_and_emojis():
         saved_empty = await memory_repository.save_message(msg_empty, db=db)
         assert saved_empty is None
 
-        # Envia mensagem válida informativa de trabalho -> deve salvar normalmente
+        # Envia mensagem de contato SEM CARTÃO -> deve retornar None (rejeitado por não ter cartão)
+        msg_no_card = MessageCreate(
+            speaker="Desconhecido Sem Cartao",
+            raw_text="Mensagem sem cartão cadastrado não gera memória.",
+            revised_text="Mensagem sem cartão cadastrado não gera memória.",
+            meta_info={"source": "whatsapp", "message_type": "text", "phone": "5544999999999"},
+        )
+        saved_no_card = await memory_repository.save_message(msg_no_card, db=db)
+        assert saved_no_card is None
+
+        # Cadastra o cartão do João Silva
+        from src.contacts.models import ContactRecord
+        c_joao = ContactRecord(id="c-joao-test", name="João Silva", phone_number="5544999991234", role="EXECUTIVE")
+        db.merge(c_joao)
+        db.commit()
+
+        # Envia mensagem válida de contato COM CARTÃO -> deve salvar normalmente
         msg_valid = MessageCreate(
             speaker="João Silva",
             raw_text="Lembre-me amanhã de fazer a planilha do bem-estar animal para a auditoria.",
             revised_text="Lembre-me amanhã de fazer a planilha do bem-estar animal para a auditoria.",
-            meta_info={"source": "whatsapp", "message_type": "text"},
+            meta_info={"source": "whatsapp", "message_type": "text", "phone": "5544999991234"},
         )
         saved_valid = await memory_repository.save_message(msg_valid, db=db)
         assert saved_valid is not None
