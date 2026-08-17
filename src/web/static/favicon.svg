@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="100%" height="100%">
+  <defs>
+    <linearGradient id="musaGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE047" />
+      <stop offset="50%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#B45309" />
+    </linearGradient>
+    <linearGradient id="musaBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+    <filter id="musaGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Fundo Circular Obsidiana Noturno -->
+  <rect width="128" height="128" rx="32" fill="url(#musaBg)" />
+  <rect width="124" height="124" x="2" y="2" rx="30" fill="none" stroke="url(#musaGold)" stroke-width="1.5" stroke-opacity="0.4" />
+
+  <!-- Lira Mítica & Grafo Neural MUSA -->
+  <g transform="translate(16, 16)" filter="url(#musaGlow)">
+    <!-- Braços da Lira com volutas gregas -->
+    <path d="M16 26 C12 14, 20 8, 28 14 C36 20, 28 32, 28 42 C28 66, 38 78, 48 80 C58 78, 68 66, 68 42 C68 32, 60 20, 68 14 C76 8, 84 14, 80 26 C74 46, 76 68, 62 82 C56 88, 48 90, 48 90 C48 90, 40 88, 34 82 C20 68, 22 46, 16 26 Z" 
+          fill="none" stroke="url(#musaGold)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Barra Transversal Superior -->
+    <line x1="22" y1="28" x2="74" y2="28" stroke="url(#musaGold)" stroke-width="3" stroke-linecap="round" />
+    
+    <!-- Base da Lira -->
+    <path d="M36 86 L60 86 L64 92 L32 92 Z" fill="url(#musaGold)" opacity="0.9" />
+
+    <!-- Cordas da Lira / Arestas do Grafo Neural -->
+    <line x1="38" y1="30" x2="38" y2="82" stroke="url(#musaGold)" stroke-width="1.5" stroke-opacity="0.6" />
+    <line x1="48" y1="30" x2="48" y2="84" stroke="url(#musaGold)" stroke-width="2" stroke-opacity="0.8" />
+    <line x1="58" y1="30" x2="58" y2="82" stroke="url(#musaGold)" stroke-width="1.5" stroke-opacity="0.6" />
+
+    <!-- Nós do Conhecimento (Neural Graph Nodes) -->
+    <circle cx="38" cy="46" r="3.5" fill="#FDE047" />
+    <circle cx="58" cy="46" r="3.5" fill="#FDE047" />
+    <circle cx="48" cy="60" r="4.5" fill="#FFFBEB" stroke="url(#musaGold)" stroke-width="1.5" />
+    <circle cx="38" cy="72" r="3" fill="#F59E0B" />
+    <circle cx="58" cy="72" r="3" fill="#F59E0B" />
+
+    <!-- Conexões Relacionais Cruzadas -->
+    <line x1="38" y1="46" x2="48" y2="60" stroke="url(#musaGold)" stroke-width="1.5" />
+    <line x1="58" y1="46" x2="48" y2="60" stroke="url(#musaGold)" stroke-width="1.5" />
+    <line x1="38" y1="72" x2="48" y2="60" stroke="url(#musaGold)" stroke-width="1.5" />
+    <line x1="58" y1="72" x2="48" y2="60" stroke="url(#musaGold)" stroke-width="1.5" />
+    <line x1="38" y1="46" x2="58" y2="46" stroke="url(#musaGold)" stroke-width="1.2" stroke-dasharray="2 2" opacity="0.8" />
+  </g>
+</svg>
