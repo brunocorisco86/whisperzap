@@ -52,6 +52,9 @@ class GraphJanitorReport(BaseModel):
     edges_after: int
     edges_pruned_count: int
     nodes_merged_count: int
+    orphan_messages_purged_count: int = 0
+    orphan_audio_files_deleted_count: int = 0
+    orphan_speakers_purged: List[str] = []
     pruned_nodes: List[str]
     merged_nodes: List[Dict[str, Any]]
     summary: str
@@ -74,10 +77,17 @@ class GraphJanitorService:
         min_edge_weight: float = 1.0,
         prune_isolated: bool = True,
         deduplicate_aliases: bool = True,
+        purge_orphan_messages: bool = True,
+        db: Optional[Any] = None,
     ) -> GraphJanitorReport:
-        """Executa a faxina no Grafo de Conhecimento com proteção estrita aos nós sagrados."""
+        """Executa a faxina no Grafo de Conhecimento e no Banco de Mensagens com proteção estrita aos nós sagrados."""
         start_time = time.time()
-        logger.info(f"🧹 [Zeladora] Iniciando faxina no grafo (dry_run={dry_run})...")
+        logger.info(f"🧹 [Zeladora] Iniciando faxina no grafo e banco de mensagens (dry_run={dry_run})...")
+
+        # 0. Purgar mensagens, áudios e transcrições de contatos sem cartão
+        orphan_purge_res = {"purged_messages_count": 0, "deleted_audio_files_count": 0, "purged_speakers": []}
+        if purge_orphan_messages:
+            orphan_purge_res = self.purge_orphan_messages_and_audios(dry_run=dry_run, db=db)
 
         with self.kg._lock:
             g = self.kg.graph
@@ -85,7 +95,7 @@ class GraphJanitorService:
             edges_before = g.number_of_edges()
 
             # 1. Constrói a Whitelist de Nós Sagrados
-            sacred_nodes = self._build_sacred_whitelist()
+            sacred_nodes = self._build_sacred_whitelist(db=db)
 
             pruned_nodes: List[str] = []
             merged_nodes: List[Dict[str, Any]] = []
@@ -147,10 +157,21 @@ class GraphJanitorService:
             elapsed_ms = round((time.time() - start_time) * 1000, 2)
             now_iso = datetime.now(timezone.utc).isoformat()
 
-            summary = (
-                f"A Zeladora realizou a faxina: {len(pruned_nodes)} nós efêmeros/órfãos podados, "
-                f"{len(merged_nodes)} aliases mesclados e {edges_pruned_count} arestas otimizadas em {elapsed_ms}ms."
-            )
+            purged_msgs = orphan_purge_res.get("purged_messages_count", 0)
+            purged_audios = orphan_purge_res.get("deleted_audio_files_count", 0)
+            purged_spks = orphan_purge_res.get("purged_speakers", [])
+
+            summary_parts = [
+                f"{len(pruned_nodes)} nós efêmeros/órfãos podados",
+                f"{len(merged_nodes)} aliases mesclados",
+                f"{edges_pruned_count} arestas otimizadas",
+            ]
+            if purged_msgs > 0:
+                summary_parts.append(f"{purged_msgs} mensagens de contatos sem card purgadas")
+            if purged_audios > 0:
+                summary_parts.append(f"{purged_audios} arquivos de áudio removidos")
+
+            summary = f"A Zeladora realizou a faxina: {', '.join(summary_parts)} em {elapsed_ms}ms."
 
             report = GraphJanitorReport(
                 timestamp=now_iso,
@@ -163,6 +184,9 @@ class GraphJanitorService:
                 edges_after=edges_after,
                 edges_pruned_count=edges_pruned_count,
                 nodes_merged_count=len(merged_nodes),
+                orphan_messages_purged_count=purged_msgs,
+                orphan_audio_files_deleted_count=purged_audios,
+                orphan_speakers_purged=purged_spks,
                 pruned_nodes=pruned_nodes[:50],  # Primeiros 50 para o relatório
                 merged_nodes=merged_nodes,
                 summary=summary,
@@ -174,12 +198,18 @@ class GraphJanitorService:
             logger.info(f"✅ [Zeladora] Faxina concluída com sucesso: {summary}")
             return report
 
-    def _build_sacred_whitelist(self) -> Set[str]:
+            logger.info(f"✅ [Zeladora] Faxina concluída com sucesso: {summary}")
+            return report
+
+    def _build_sacred_whitelist(self, db: Optional[Any] = None) -> Set[str]:
         """Monta a lista de nós que NUNCA podem ser removidos."""
         sacred = set()
 
         # 1. Contatos da Tabela contacts
-        db = SessionLocal()
+        should_close = False
+        if db is None:
+            db = SessionLocal()
+            should_close = True
         try:
             contacts = db.query(ContactRecord).all()
             for c in contacts:
@@ -192,7 +222,8 @@ class GraphJanitorService:
         except Exception as e:
             logger.warning(f"Aviso ao carregar contatos para a whitelist da Zeladora: {e}")
         finally:
-            db.close()
+            if should_close:
+                db.close()
 
         # 2. Termos do Dicionário Léxico Oficial
         try:
@@ -291,6 +322,127 @@ class GraphJanitorService:
                 json.dump(history, f, ensure_ascii=False, indent=2)
         except Exception as e:
             logger.error(f"Erro ao salvar histórico da Zeladora: {e}")
+
+    def purge_orphan_messages_and_audios(self, dry_run: bool = False, db: Optional[Any] = None) -> Dict[str, Any]:
+        """Purga todas as mensagens, áudios e transcrições de remetentes sem cartão cadastrado na tabela contacts.
+
+        Protege integralmente os contatos oficiais cadastrados e o Proprietário (Bruno Conter).
+        """
+        import re
+        from src.ai_gateway.bypass import get_owner_identifiers, is_owner_interaction, normalize_text
+        from src.memory.models import MessageRecord
+
+        should_close = False
+        if db is None:
+            db = SessionLocal()
+            should_close = True
+
+        purged_messages_count = 0
+        deleted_audio_files_count = 0
+        purged_speakers_set: Set[str] = set()
+
+        try:
+            # 1. Carrega todos os contatos válidos com cartão
+            contacts = db.query(ContactRecord).all()
+            valid_names: Set[str] = set()
+            valid_phones: Set[str] = set()
+            valid_suffixes: Set[str] = set()
+
+            for c in contacts:
+                if c.name:
+                    valid_names.add(c.name.strip().lower())
+                    valid_names.add(normalize_text(c.name))
+                if c.nickname:
+                    valid_names.add(c.nickname.strip().lower())
+                    valid_names.add(normalize_text(c.nickname))
+                if c.phone_number:
+                    digits = re.sub(r"\D", "", c.phone_number)
+                    valid_phones.add(digits)
+                    if len(digits) >= 8:
+                        valid_suffixes.add(digits[-8:])
+
+            owner_ids = get_owner_identifiers()
+
+            # 2. Varre todas as mensagens no banco
+            all_messages = db.query(MessageRecord).all()
+            messages_to_delete = []
+
+            for msg in all_messages:
+                speaker_raw = str(msg.speaker or "").strip()
+                speaker_clean = speaker_raw.lower()
+                speaker_norm = normalize_text(speaker_raw)
+                speaker_digits = re.sub(r"\D", "", speaker_raw)
+
+                # Verifica se é o dono (Bruno Conter)
+                if is_owner_interaction(speaker_raw, msg.meta_info):
+                    if msg.speaker != "Bruno Conter" and not dry_run:
+                        msg.speaker = "Bruno Conter"
+                    continue
+
+                # Verifica se pertence a algum contato com cartão
+                is_valid_contact = False
+                if speaker_clean in valid_names or speaker_norm in valid_names:
+                    is_valid_contact = True
+                elif speaker_digits and (speaker_digits in valid_phones or any(speaker_digits.endswith(suf) for suf in valid_suffixes)):
+                    is_valid_contact = True
+                else:
+                    for c in contacts:
+                        c_clean = c.name.strip().lower()
+                        c_norm = normalize_text(c.name)
+                        if c_clean in speaker_clean or speaker_clean in c_clean or (c_norm and c_norm in speaker_norm):
+                            is_valid_contact = True
+                            if not dry_run and msg.speaker != c.name:
+                                msg.speaker = c.name
+                            break
+
+                if not is_valid_contact:
+                    messages_to_delete.append(msg)
+                    purged_speakers_set.add(speaker_raw)
+
+            # 3. Executa a exclusão das mensagens órfãs e arquivos de áudio
+            if not dry_run and messages_to_delete:
+                for m in messages_to_delete:
+                    # Deleta arquivos de áudio físicos residuais
+                    if m.audio_filename:
+                        for candidate_dir in ["assets", "data/audios", "data", "temp"]:
+                            fpath = os.path.join(candidate_dir, m.audio_filename)
+                            if os.path.exists(fpath):
+                                try:
+                                    os.remove(fpath)
+                                    deleted_audio_files_count += 1
+                                except Exception as e:
+                                    logger.warning(f"Aviso ao deletar arquivo de áudio {fpath}: {e}")
+                    db.delete(m)
+
+                # Remove também nós do grafo MUSA associados a esses remetentes sem cartão
+                with self.kg._lock:
+                    for spk in purged_speakers_set:
+                        if spk and self.kg.graph.has_node(spk):
+                            self.kg.graph.remove_node(spk)
+                    self.kg._save()
+
+                db.commit()
+                purged_messages_count = len(messages_to_delete)
+            elif dry_run:
+                purged_messages_count = len(messages_to_delete)
+
+            return {
+                "purged_messages_count": purged_messages_count,
+                "deleted_audio_files_count": deleted_audio_files_count,
+                "purged_speakers": sorted(list(purged_speakers_set)),
+            }
+        except Exception as e:
+            logger.error(f"Erro ao purgar mensagens órfãs na Zeladora: {e}")
+            if not dry_run:
+                db.rollback()
+            return {
+                "purged_messages_count": 0,
+                "deleted_audio_files_count": 0,
+                "purged_speakers": [],
+            }
+        finally:
+            if should_close:
+                db.close()
 
     def get_history(self) -> List[Dict[str, Any]]:
         """Retorna o histórico das faxinas realizadas."""
