@@ -1,147 +1,165 @@
-# 🏛️ Hermes Voice Memory — Voice Memory & Knowledge Graph System
+# 🏛️ Hermes Voice Memory — Enterprise Voice Intelligence & Neural Knowledge Graph
 
-[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2Bpgvector-336791.svg)](https://www.postgresql.org/)
-[![Docker](https://img.shields.io/badge/Docker-Production%20Ready-2496ED.svg)](https://www.docker.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL_16-pgvector-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-Production_Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![NetworkX](https://img.shields.io/badge/NetworkX-Knowledge_Graph-FF6F00?style=for-the-badge)](https://networkx.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-F59E0B?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-> **Hermes Voice Memory** é um ecossistema inteligente de copiloto de voz, memória de longo prazo e inteligência estratégica, projetado para transformar mensagens e áudios do WhatsApp em conhecimento relacional, tarefas acionáveis e análises em tempo real para o agronegócio e a gestão executiva.
+> *"Sua voz não é apenas som: é o centro de comando e inteligência operacional do seu negócio."*
 
----
-
-## 🧭 Sumário Executivo
-
-O Hermes resolve a dispersão de informações e a sobrecarga cognitiva na comunicação operacional diária:
-1. **Transcrição & Revisão Contextual**: Processa áudios em milissegundos via `faster-whisper` e corrige termos técnicos com **Gemini 3.1 Flash Lite**;
-2. **Memória em Camadas**: Persiste mensagens estruturadas no **PostgreSQL 16 com pgvector** (embeddings vetoriais) e modela entidades e relacionamentos no **Grafo NetworkX**;
-3. **Ancoragem de Solicitante & Tarefas**: Vincula quem originou cada demanda, permitindo anotações persistentes, status dinâmico e integração com WhatsApp;
-4. **Agentes Autônomos em Background**:
-   * 🧹 **Agente Zeladora (`GraphJanitor`)**: Faxina semanal automática no Grafo aos Domingos às 23:00, podando ruídos e unificando aliases;
-   * 🎣 **Agente Pescador Léxico (`LexicalHarvester`)**: Pesca diária de jargões técnicos às 19:00 com sugestão de termos;
-   * 🌡️ **Série Temporal de Sentimentos**: Monitoramento emocional contínuo às 18:00;
-   * 🧠 **Agente Hermes**: RAG Híbrido contextual com resposta a perguntas e citações exatas;
-5. **Analytics & Dashboard Executivo**: Visualização em **Chart.js** com agrupamento temporal (Dia, Semana, Mês), Nuvem de Palavras semântica (*WordMap*) e Matriz de Horários de Pico (*Heatmap 24x7*).
+O **Hermes Voice Memory** é um ecossistema de inteligência conversacional, memória de longo prazo e copiloto executivo autônomo. Ele transforma mensagens e áudios do WhatsApp em **grafos relacionais de conhecimento, gestão acionável de tarefas, séries temporais de sentimentos e síntese estratégica** com precisão cirúrgica e **zero desperdício de tokens de IA**.
 
 ---
 
-## 🏗️ Arquitetura do Sistema
+## 🎯 Por Que o Hermes? (O Pitch do Produto)
+
+No agronegócio, na gestão executiva e nas operações de alta velocidade, **90% dos direcionamentos críticos acontecem por mensagens e áudios de WhatsApp**. O resultado? Informações perdidas em conversas dispersas, tarefas esquecidas e sobrecarga cognitiva.
+
+O Hermes é a solução corporativa definitiva:
+
+```
+                  ┌────────────────────────────────────────────────────────┐
+                  │   🎙️ ÁUDIOS & NOTAS DO WHATSAPP                       │
+                  └─────────────────────────┬──────────────────────────────┘
+                                            │
+                                  ⚡ Transcrição Local
+                                  🧠 Funil Semântico
+                                            │
+                  ┌─────────────────────────┴──────────────────────────────┐
+                  ▼                                                        ▼
+    ┌───────────────────────────┐                            ┌───────────────────────────┐
+    │  🕸️ Grafo de Conhecimento  │                            │  📋 Tarefas & Governança  │
+    │  Pessoas, Empresas e Nós  │                            │  Quem pediu, prazo e foco │
+    └───────────────────────────┘                            └───────────────────────────┘
+                  ▲                                                        ▲
+                  └─────────────────────────┬──────────────────────────────┘
+                                            │
+                  ┌─────────────────────────┴──────────────────────────────┐
+                  │  👑 OWNER: Deferência total e prioridade executiva     │
+                  │  ⭐ Favoritos: +10% de peso operacional no funil       │
+                  │  🌡️ Termômetro Emocional: Monitoramento contínuo      │
+                  └────────────────────────────────────────────────────────┘
+```
+
+### 💡 Os Diferenciais Competitivos
+- 🚀 **Economia Inteligente de Tokens (Funil Semântico)**: Descarta ruídos ("ok", saudações vazias, stickers, "Sem texto disponível") na borda, sem gastar tokens LLM ou poluir o banco.
+- 👑 **Reconhecimento Supremo do Proprietário (`OWNER`)**: O sistema reconhece notas pessoais do Criador/Arquiteto (`Bruno Conter`), aplicando tom executivo de deferência, prontidão e lealdade máxima nos relatórios e Q&A.
+- ⭐ **Sistema de Favoritos Ponderados**: Contatos marcados como favoritos ganham **+10% de peso de prioridade** imediata no motor de relevância.
+- 🕸️ **Knowledge Graph em Tempo Real (NetworkX + Graphify)**: Modela quem fala com quem, projetos cruzados e conexões ocultas entre fazendas, cooperativas e departamentos.
+- 🧹 **Agente Zeladora (`GraphJanitor`)**: Faxina autônoma semanal que remove ruídos temporais e funde aliases automaticamente.
+- 🔒 **Privacidade & Soberania de Dados**: Deploy em infraestrutura híbrida privada (Homelab no Raspberry Pi + VPS dedicada).
+
+---
+
+## 🏗️ Arquitetura e Stack Tecnológica
+
+O sistema opera em uma arquitetura distribuída resiliente e de baixo acoplamento:
 
 ```mermaid
 flowchart TD
-    subgraph Inputs["1. Entrada de Voz & Mensagens"]
-        WA["📱 WhatsApp (Evolution API v2 / Z-API)"]
-        WEB["🎙️ Gravação no Navegador / Upload de Áudio"]
+    subgraph EdgeLayer["1. Borda & Ingestão (Raspberry Pi / Homelab)"]
+        WA["📱 WhatsApp / Mensagens de Voz"]
+        EVO["⚡ Evolution API v2 (Instância Hermes)"]
+        N8N["🔄 n8n Orchestrator (Filtro de Grupos & Media Webhook)"]
     end
 
-    subgraph CoreEngine["2. Processamento & AI Gateway"]
-        WHISPER["⚡ Faster-Whisper (Transcrição Local CPU/GPU)"]
-        GATEWAY["🧠 AI Gateway (Gemini 3.1 Flash Lite / OpenRouter)"]
-        DICT["📖 Dicionário Léxico & Glossário Fonético"]
+    subgraph APILayer["2. Motor de IA & Core Engine (VPS Hostinger)"]
+        WHISPER["🎙️ Faster-Whisper (Transcrição em Milissegundos)"]
+        BYPASS["🛡️ Funil Semântico & Bypass Lexical (Anti-Poluição)"]
+        AIGATEWAY["🧠 AI Gateway (Gemini 2.5 Flash / Flash Lite)"]
+        LEXICAL["📖 Glossário Fonético & Dicionário Técnico"]
     end
 
-    subgraph MemoryLayer["3. Memória em Camadas & Grafo"]
-        PG[("🐘 PostgreSQL 16 + pgvector (Embeddings)")]
-        NX[("🕸️ Grafo de Conhecimento NetworkX")]
-        CONTACTS[("👥 Tabela de Contatos & Papéis")]
+    subgraph StorageLayer["3. Memória em Camadas & Persistência"]
+        PG[("🐘 PostgreSQL 16 + pgvector (Embeddings & SQL)")]
+        NX[("🕸️ NetworkX Knowledge Graph (hermes_graph.json)")]
+        CONTACTS[("👥 Tabela de Contatos, Papéis & Favoritos")]
     end
 
-    subgraph AutonomousAgents["4. Agentes Autônomos (Cron & On-Demand)"]
-        JANITOR["🧹 Zeladora (Graph Janitor - Dom 23h)"]
-        HARVESTER["🎣 Pescador Léxico (Harvester - Diário 19h)"]
-        SENTIMENT["🌡️ Consolidador Emocional (Diário 18h)"]
-        HERMES["🧠 Hermes RAG Híbrido (Q&A Contextual)"]
+    subgraph AutonomousLayer["4. Agentes Autônomos de Background"]
+        JANITOR["🧹 Zeladora (Graph Janitor - Faxina Semanal)"]
+        HARVESTER["🎣 Pescador Léxico (Harvester Diário)"]
+        SENTIMENT["🌡️ Consolidador Emocional (Timeline de Humor)"]
+        HERMES_RAG["🧠 Hermes RAG Híbrido (Q&A Contextual)"]
     end
 
-    subgraph Interfaces["5. Interfaces & Visualização"]
-        HUB["🖥️ Hermes Control Hub (Web UI)"]
-        DASH["📊 Analytics & Dashboard (Chart.js)"]
-        REPORTS["📋 Resumos Diários & Semanais no WhatsApp"]
+    subgraph Interfaces["5. Interfaces & Visualização Executiva"]
+        HUB["🖥️ Hermes Web Control Hub (Glassmorphism UI)"]
+        DASH["📊 Analytics & Heatmap 24x7 (Chart.js)"]
+        GRAPH_VIZ["🌐 Visualizador Interativo de Grafos (Graphify AST)"]
     end
 
-    Inputs --> WHISPER
-    WHISPER --> GATEWAY
-    DICT --> GATEWAY
-    GATEWAY --> MemoryLayer
-    MemoryLayer --> AutonomousAgents
-    AutonomousAgents --> Interfaces
+    WA --> EVO
+    EVO --> N8N
+    N8N --> WHISPER
+    WHISPER --> BYPASS
+    BYPASS --> AIGATEWAY
+    LEXICAL --> AIGATEWAY
+    AIGATEWAY --> StorageLayer
+    StorageLayer --> AutonomousLayer
+    AutonomousLayer --> Interfaces
 ```
 
----
-
-## 📊 Fases do Roadmap Entregues (100% Concluído)
-
-| Fase | Descrição | Status |
-| :--- | :--- | :---: |
-| **Fase 1** | Setup de Infraestrutura Local, Governança e Testes (`pytest`) | ✅ Concluído |
-| **Fase 2** | MVP 1 — Transcrição de Áudio WhatsApp & AI Gateway | ✅ Concluído |
-| **Fase 3** | Repositório Remoto & Sincronização Git Push Contínua | ✅ Concluído |
-| **Fase 4** | Memória em Camadas (PostgreSQL + pgvector + NetworkX) | ✅ Concluído |
-| **Fase 5** | API Memory, Agente Hermes (RAG Híbrido) & Relatórios WhatsApp | ✅ Concluído |
-| **Fase 6** | Deploy de Produção em VPS Alpine Linux com Caddy e Docker Compose | ✅ Concluído |
-| **Fase 7** | Analytics, Métricas & Dashboard Executivo com Chart.js | ✅ Concluído |
-| **Bônus** | Agente Zeladora (Graph Janitor) & Faxina Semanal no Grafo | ✅ Concluído |
+### 🧩 Stack de Engenharia
+| Camada | Tecnologia | Papel no Sistema |
+| :--- | :--- | :--- |
+| **Linguagem & Runtime** | Python 3.12+ / Linux | Desempenho nativo com suporte a tipagem estrita e asyncio |
+| **API Framework** | FastAPI + Uvicorn | Servidor assíncrono de alto throughput com OpenAPI e endpoints RESTful |
+| **Transcrição Local** | Faster-Whisper (CTranslate2) | Transcrição ultra-rápida de áudio (OGG/MP3/WAV/Base64) em CPU/GPU |
+| **AI Gateway** | Google Gemini 2.5 Flash / Lite | Extração de entidades (`NER`), classificação de intenções e RAG Híbrido |
+| **Banco Relacional & Vetorial** | PostgreSQL 16 + pgvector | Persistência de mensagens, contatos, tarefas e busca semântica por cosseno |
+| **Grafo Relacional** | NetworkX + Graphify | Modelagem de conexões inter-pessoais, detecção de comunidades e clusterização |
+| **Orquestração de Borda** | n8n + Evolution API v2 | Ingestão de webhooks, download de mídia e bloqueio preliminar de grupos |
+| **Interface & Analytics** | Vanilla JS + Glassmorphism CSS + Chart.js | Painel executivo responsivo, sem overhead de frameworks pesados |
+| **Proxy Reverso & SSL** | Caddy v2 | Terminação TLS automática com HTTP/2 e compressão Gzip/Zstandard |
 
 ---
 
-## 🤖 Agentes Especializados
+## 💎 Funcionalidades em Destaque
 
-### 1. 🧹 Agente "Zeladora" (`GraphJanitorService`)
-* **Propósito**: Manter o Grafo de Conhecimento enxuto, consistente e livre de termos efêmeros e ruídos;
-* **Regras de Faxina**:
-  1. *Proteção Sagrada*: Contatos oficiais (`contacts`), empresas, projetos e nós com $\ge 3$ conexões nunca são deletados;
-  2. *Poda de Efêmeros*: Remove marcadores temporais (*amanhã*, *ontem*, *segunda-feira*) e saudações;
-  3. *Poda de Órfãos*: Remove nós isolados de baixo valor (`degree == 0` e `mentions <= 1`);
-  4. *Fusão de Aliases*: Desambigua variações (ex: `silo 3` ➔ `Silo 3`) transferindo todas as arestas;
-* **Agendamento**: Todo **Domingo às 23:00** via `cron_service.py` ou sob demanda na aba do Grafo no Control Hub.
+### 1. 👑 Papel `OWNER` (Proprietário Supremo)
+- **Hierarquia Inviolável**: Peso $1.00$ com tratamento prioritário em todas as rotinas.
+- **Reconhecimento de Notas Pessoais**: Identifica automaticamente áudios enviados para si mesmo (`fromMe: true` ou telefone do Bruno Conter), classificando como direcionamento estratégico.
+- **Deferência no Agente Hermes**: O assistente responde com tom refinado, cortês e de alto alinhamento executivo.
 
-### 2. 🎣 Agente "Pescador Léxico" (`LexicalHarvester`)
-* **Propósito**: Identificar termos técnicos e fonéticos não catalogados no dia a dia;
-* **Agendamento**: Diário às **19:00**.
+### 2. ⭐ Contatos Favoritos com +10% de Peso
+- **Priorização Dinâmica**: Qualquer contato favoritado no card web ganha **+10% sobre o peso base do seu papel** ($Effective = Base \times 1.10$).
+- **Visual Diferenciado**: Cartões com moldura âmbar suave, tag `⭐ +10% Fav` e estrela interativa para toggle com 1 clique.
 
-### 3. 🧠 Agente Hermes (`HermesAgentService`)
-* **Propósito**: RAG Híbrido combinando busca vetorial semântica, busca direta por interlocutor (`speaker match`), ancoragem de tarefas pendentes e conexões do Grafo NetworkX.
+### 3. 🛡️ Funil Semântico Anti-Poluição (Economia de Tokens)
+- **Bloqueio de Mensagens Triviais**: Expressões de baixa relevância (*"bom dia"*, *"ok"*, *"blz"*, *"valeu"*, *"Sem texto disponível"*) são descartadas antes de chamar a IA.
+- **Proteção do Histórico**: Garante que o Word Cloud e o grafo não fiquem poluídos com saudações vazias.
+
+### 4. 🧹 Agente Zeladora do Grafo (`GraphJanitor`)
+- **Faxina Semanal Programada**: Roda todo Domingo às 23:00.
+- **Poda Segura**: Remove nós órfãos temporais (*amanhã*, *ontem*) enquanto protege 100% dos contatos oficiais, empresas e projetos.
 
 ---
 
-## 🛠️ Instalação e Execução
+## 🚀 Instalação e Inicialização Rápida
 
-### 1. Pré-requisitos
-* Python 3.12+
-* Docker & Docker Compose
-* FFmpeg instalado (`sudo apt install ffmpeg`)
-
-### 2. Configuração Local
+### 1. Clonagem e Variáveis de Ambiente
 ```bash
-# Clone o repositório
 git clone git@github.com:brunocorisco86/whisperzap.git
 cd whisperzap
 
-# Crie o ambiente virtual
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Instale as dependências
-pip install -r requirements.txt
-
-# Configure as variáveis de ambiente
 cp .env.example .env
-
-# Execute os testes automatizados
-pytest
+# Preencha suas chaves no .env (GEMINI_API_KEY, DATABASE_URL, etc.)
 ```
 
-### 3. Execução do Servidor
-```bash
-uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
-```
-* **Control Hub**: `http://localhost:8000/`
-* **Swagger API Docs**: `http://localhost:8000/docs`
-* **Pareamento WhatsApp**: `http://localhost:8000/whatsapp/qr`
-
-### 4. Deploy em Produção (Docker Compose)
+### 2. Execução Local com Docker Compose
 ```bash
 docker compose up -d --build
+```
+- **Hermes Control Hub**: `http://localhost:8005/`
+- **Swagger API Docs**: `http://localhost:8005/docs`
+- **Health Check**: `http://localhost:8005/health`
+
+### 3. Execução de Testes Automatizados
+```bash
+pytest tests/ -v
 ```
 
 ---
@@ -151,20 +169,22 @@ docker compose up -d --build
 | Método | Endpoint | Descrição |
 | :--- | :--- | :--- |
 | `POST` | `/transcribe` | Transcrição de áudio via Faster-Whisper |
-| `POST` | `/ai/revise` | Revisão contextual de texto via AI Gateway |
+| `POST` | `/ai/revise` | Revisão contextual de texto com jargões técnicos via AI Gateway |
+| `GET` | `/api/v1/contacts` | Lista contatos reais com pesos calculados, status de favorito e sentimentos |
+| `PATCH`| `/api/v1/contacts/{id}/favorite` | Alterna o status de favorito do contato (+10% de peso) |
+| `DELETE`| `/api/v1/contacts/{id}` | Remove contato no SQL e purga nós associados no Grafo |
 | `POST` | `/api/v1/memory/messages` | Salva mensagem com extração semântica e nós no Grafo |
-| `GET` | `/api/v1/memory/messages` | Feed de mensagens com metadados e áudio |
 | `GET` | `/api/v1/memory/tasks` | Lista tarefas com ancoragem de solicitante e anotações |
-| `PATCH`| `/api/v1/memory/tasks/{id}` | Atualiza status (`DONE`, `CANCELLED`, `PENDING`) e notas |
-| `GET` | `/api/v1/analytics/dashboard` | Dados do Dashboard (KPIs, Séries, Top Contatos, WordMap, Heatmap) |
-| `POST` | `/api/v1/memory/graph/clean` | Dispara faxina da Zeladora no Grafo de Conhecimento |
-| `GET` | `/api/v1/memory/graph/janitor/logs` | Consulta histórico de relatórios da Zeladora |
-| `POST` | `/api/v1/memory/query` | Consulta contextual ao Hermes com RAG Híbrido |
+| `PATCH`| `/api/v1/memory/tasks/{id}` | Atualiza status (`DONE`, `CANCELLED`, `PENDING`) e anotações |
+| `GET` | `/api/v1/analytics/dashboard` | KPIs executivos, séries temporais, WordMap e Heatmap 24x7 |
+| `POST` | `/api/v1/memory/graph/clean` | Dispara faxina sob demanda da Zeladora no Grafo |
+| `POST` | `/api/v1/memory/query` | Consulta ao Hermes com RAG Híbrido e citação de fontes |
 
 ---
 
-## 👥 Contatos & Governança
+## 👥 Governança & Créditos
 
-* **Desenvolvido por**: Bruno Conter
-* **Foco de Aplicação**: Gestão Operacional, Inteligência Avícola e Negócios C.Vale
-* **Repositório**: [github.com/brunocorisco86/whisperzap](https://github.com/brunocorisco86/whisperzap)
+- **Criador, Proprietário & Arquiteto**: Bruno Conter
+- **Domínio de Aplicação**: Gestão Operacional, Inteligência de Agronegócio e Homelab Executivo
+- **Repositório Oficial**: [github.com/brunocorisco86/whisperzap](https://github.com/brunocorisco86/whisperzap)
+- **Licença**: MIT
