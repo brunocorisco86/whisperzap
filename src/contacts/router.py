@@ -114,7 +114,7 @@ async def toggle_favorite(contact_id: str, db: Session = Depends(get_db)):
 
 @router.delete("/{contact_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_contact(contact_id: str, db: Session = Depends(get_db)):
-    """Remove um contato cadastrado."""
+    """Remove um contato cadastrado e purga todos os nós associados no Grafo de Conhecimento."""
     from src.memory.graph import knowledge_graph
     rec = db.query(ContactRecord).filter(
         (ContactRecord.id == contact_id)
@@ -124,7 +124,18 @@ async def delete_contact(contact_id: str, db: Session = Depends(get_db)):
     if not rec:
         raise HTTPException(status_code=404, detail="Contato não encontrado")
 
-    knowledge_graph.remove_node(rec.name)
+    # Remove todos os nós no Grafo NetworkX
+    names_to_remove = {rec.name, rec.nickname, rec.phone_number, rec.id}
+    for n in names_to_remove:
+        if n:
+            knowledge_graph.remove_node(n)
+
+    # Purga nós do grafo cuja string contenha o nome
+    for node in knowledge_graph.list_nodes():
+        node_name = node.get("name", "")
+        if rec.name and rec.name.lower() in node_name.lower():
+            knowledge_graph.remove_node(node_name)
+
     db.delete(rec)
     db.commit()
     return None

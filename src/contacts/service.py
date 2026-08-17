@@ -185,46 +185,7 @@ class ContactService:
             # 1. Executa auto-deduplicação e fusão preventiva
             self.deduplicate_and_merge_contacts(db=db)
 
-            # 2. Sincroniza pessoas conhecidas do Grafo
-            try:
-                from src.ai_gateway.bypass import is_owner_interaction, normalize_text
-                person_nodes = knowledge_graph.list_nodes(category="PERSON")
-                all_sql_contacts = db.query(ContactRecord).all()
-                for node in person_nodes:
-                    node_name = node.get("name") or ""
-                    if not node_name or node_name.lower() in ["user", "desconhecido", "equipe", "hermes"]:
-                        continue
-
-                    if is_owner_interaction(node_name):
-                        continue
-
-                    clean_nname = normalize_text(node_name)
-                    # Verifica se já existe contato com nome igual ou substring
-                    existing = next((c for c in all_sql_contacts if clean_nname and (clean_nname in normalize_text(c.name) or normalize_text(c.name) in clean_nname)), None)
-
-                    phone = (node.get("phone") or "").strip()
-                    if not existing and is_valid_contact_phone(phone):
-                        c_id = generate_contact_id(node_name.strip(), phone)
-                        if c_id:
-                            c_rec = ContactRecord(
-                                id=c_id,
-                                name=node_name.strip(),
-                                phone_number=phone,
-                                role=node.get("role") or "UNKNOWN",
-                                company=node.get("company") or "",
-                                projects_json=[node.get("details")] if node.get("details") else [],
-                                notes=node.get("details") or "",
-                                created_at=datetime.now(timezone.utc),
-                                updated_at=datetime.now(timezone.utc),
-                            )
-                            db.add(c_rec)
-                            db.commit()
-                            all_sql_contacts.append(c_rec)
-            except Exception as e:
-                logger.warning(f"Aviso ao auto-sincronizar nós de pessoas do grafo: {e}")
-                db.rollback()
-
-            # 3. Busca contatos com filtros
+            # 2. Busca contatos com filtros diretamente do banco
             query = db.query(ContactRecord)
             if only_unknown:
                 query = query.filter(ContactRecord.role == "UNKNOWN")
@@ -234,7 +195,8 @@ class ContactService:
             if company:
                 query = query.filter(ContactRecord.company.ilike(f"%{company}%"))
 
-            records = query.order_by(ContactRecord.name.asc()).all()
+            # Ordena favoritos no topo, depois por nome
+            records = query.order_by(ContactRecord.is_favorite.desc(), ContactRecord.name.asc()).all()
 
             # 3. Enriquece com as últimas 3 mensagens e sentimentos de cada pessoa
             from src.memory.models import MessageRecord
