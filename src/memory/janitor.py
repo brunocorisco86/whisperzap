@@ -395,21 +395,12 @@ class GraphJanitorService:
                         msg.speaker = "Bruno Conter"
                     continue
 
-                # Verifica se pertence a algum contato com cartão
+                # Verifica se pertence a algum contato com cartão (Match estrito por telefone ou nome/apelido)
                 is_valid_contact = False
-                if speaker_clean in valid_names or speaker_norm in valid_names:
+                if speaker_digits and (speaker_digits in valid_phones or any(len(speaker_digits) >= 8 and speaker_digits.endswith(suf) for suf in valid_suffixes)):
                     is_valid_contact = True
-                elif speaker_digits and (speaker_digits in valid_phones or any(speaker_digits.endswith(suf) for suf in valid_suffixes)):
+                elif speaker_clean in valid_names or speaker_norm in valid_names:
                     is_valid_contact = True
-                else:
-                    for c in contacts:
-                        c_clean = c.name.strip().lower()
-                        c_norm = normalize_text(c.name)
-                        if c_clean in speaker_clean or speaker_clean in c_clean or (c_norm and c_norm in speaker_norm):
-                            is_valid_contact = True
-                            if not dry_run and msg.speaker != c.name:
-                                msg.speaker = c.name
-                            break
 
                 if not is_valid_contact:
                     messages_to_delete.append(msg)
@@ -434,27 +425,17 @@ class GraphJanitorService:
                 # Verifica se a tarefa é atribuída a um contato com cartão
                 is_valid_task = False
                 if assignee_raw:
-                    if assignee_clean in valid_names or assignee_norm in valid_names:
+                    if assignee_digits and (assignee_digits in valid_phones or any(len(assignee_digits) >= 8 and assignee_digits.endswith(suf) for suf in valid_suffixes)):
                         is_valid_task = True
-                    elif assignee_digits and (assignee_digits in valid_phones or any(assignee_digits.endswith(suf) for suf in valid_suffixes)):
+                    elif assignee_clean in valid_names or assignee_norm in valid_names:
                         is_valid_task = True
-                    else:
-                        for c in contacts:
-                            c_clean = c.name.strip().lower()
-                            c_norm = normalize_text(c.name)
-                            if c_clean in assignee_clean or assignee_clean in c_clean or (c_norm and c_norm in assignee_norm):
-                                is_valid_task = True
-                                if not dry_run and task.assignee != c.name:
-                                    task.assignee = c.name
-                                break
                 else:
                     # Se não tem assignee explícito, checa se a mensagem de origem é válida ou do Dono
                     if task.message:
                         m_spk = str(task.message.speaker or "").strip()
-                        if is_owner_interaction(m_spk, task.message.meta_info) or m_spk.lower() in valid_names:
+                        if is_owner_interaction(m_spk, task.message.meta_info) or normalize_text(m_spk) in valid_names:
                             is_valid_task = True
                     else:
-                        # Tarefa sem assignee e sem mensagem é órfã
                         is_valid_task = False
 
                 if not is_valid_task:
@@ -482,11 +463,20 @@ class GraphJanitorService:
                     for t in tasks_to_delete:
                         db.delete(t)
 
-                # Remove também nós do grafo MUSA associados a esses remetentes sem cartão
+                # Remove do Grafo MUSA todos os nós de pessoas sem cartão e nós dos remetentes purgados
                 with self.kg._lock:
+                    g = self.kg.graph
+                    for node, attrs in list(g.nodes(data=True)):
+                        cat = (attrs.get("category") or "").upper()
+                        if cat == "PERSON":
+                            node_norm = normalize_text(node)
+                            node_digits = re.sub(r"\D", "", node)
+                            if node_norm not in valid_names and node_norm not in owner_ids:
+                                if not (node_digits and (node_digits in valid_phones or any(len(node_digits) >= 8 and node_digits.endswith(suf) for suf in valid_suffixes))):
+                                    g.remove_node(node)
                     for spk in purged_speakers_set:
-                        if spk and self.kg.graph.has_node(spk):
-                            self.kg.graph.remove_node(spk)
+                        if spk and g.has_node(spk):
+                            g.remove_node(spk)
                     self.kg._save()
 
                 db.commit()
