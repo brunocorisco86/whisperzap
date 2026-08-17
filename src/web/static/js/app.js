@@ -587,17 +587,27 @@ function renderContacts() {
       `
       : '';
 
+    const isFav = Boolean(c.is_favorite);
+    const weightPercent = Math.round((c.effective_weight || 0.4) * 100);
+
     return `
-      <div class="contact-card" id="contact-card-${c.id || cleanPhone || c.name}">
+      <div class="contact-card ${isFav ? 'is-favorite' : ''}" id="contact-card-${c.id || cleanPhone || c.name}">
         <div class="contact-header">
           <div class="contact-avatar" id="avatar-${cleanPhone || c.name}">
             ${c.avatar_url ? `<img src="${c.avatar_url}" alt="${c.name}">` : initials}
           </div>
-          <div class="contact-title-group">
-            <div class="contact-name">${c.name}</div>
+          <div class="contact-title-group" style="flex: 1;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div class="contact-name">${c.name}</div>
+              <button class="btn-favorite-icon ${isFav ? 'active' : ''}" onclick="toggleContactFavorite('${c.id || cleanPhone || c.name}')" title="${isFav ? 'Remover dos Favoritos' : 'Salvar como Favorito (+10% de peso)'}">
+                ${isFav ? '⭐' : '☆'}
+              </button>
+            </div>
             <div class="contact-company">${c.company || 'Pessoal / Geral'}</div>
-            <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap; margin-top: 0.2rem;">
+            <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap; margin-top: 0.25rem;">
               <span class="badge ${badgeClass}">${roleLabel}</span>
+              ${isFav ? `<span class="badge badge-owner" style="font-size: 0.68rem;">⭐ +10% Fav</span>` : ''}
+              <span class="badge badge-vendor" style="font-size: 0.68rem;" title="Peso efetivo de prioridade">${weightPercent}% Peso</span>
               <span class="sentiment-badge ${latestSentInfo.class}" title="Sentimento mais recente">${latestSentInfo.emoji} ${latestSentInfo.label}</span>
             </div>
           </div>
@@ -622,12 +632,15 @@ function renderContacts() {
         <div class="contact-actions">
           ${cleanPhone ? `
             <button class="btn btn-secondary btn-sm" onclick="fetchWhatsAppAvatar('${cleanPhone}')" title="Buscar foto oficial do perfil no WhatsApp">
-              📸 Puxar Foto
+              📸 Foto
             </button>
           ` : '<span></span>'}
 
-          <div style="display: flex; gap: 0.4rem;">
-            <button class="btn btn-secondary btn-sm" onclick="editContact('${c.id || c.name}')">✏️ Editar</button>
+          <div style="display: flex; gap: 0.4rem; align-items: center;">
+            <button class="btn btn-secondary btn-sm" onclick="toggleContactFavorite('${c.id || cleanPhone || c.name}')" title="Alternar favorito">
+              ${isFav ? '⭐ Favorito' : '☆ Favoritar'}
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="editContact('${c.id || c.name}')">✏️</button>
             <button class="btn btn-danger btn-sm" onclick="deleteContact('${c.id || c.name}')">🗑️</button>
           </div>
         </div>
@@ -635,6 +648,23 @@ function renderContacts() {
     `;
   }).join('');
 }
+
+async function toggleContactFavorite(contactId) {
+  try {
+    const res = await fetch(`/api/v1/contacts/${encodeURIComponent(contactId)}/favorite`, { method: 'PATCH' });
+    if (!res.ok) throw new Error('Falha ao alternar status de favorito');
+    const updated = await res.json();
+    const idx = allContacts.findIndex(c => c.id === updated.id || c.name === updated.name || c.phone_number === updated.phone_number);
+    if (idx !== -1) {
+      allContacts[idx] = updated;
+    }
+    renderContacts();
+    showToast(updated.is_favorite ? `⭐ ${updated.name} salvo nos Favoritos (+10% de peso)!` : `☆ ${updated.name} removido dos Favoritos.`);
+  } catch (err) {
+    showToast('Erro ao atualizar favorito: ' + err.message, 'error');
+  }
+}
+window.toggleContactFavorite = toggleContactFavorite;
 
 function renderTasks() {
   if (!tasksContainer) return;

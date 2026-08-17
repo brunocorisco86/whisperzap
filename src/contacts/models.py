@@ -1,7 +1,7 @@
 """Modelo de Banco de Dados para Contatos e Papéis."""
 
 from datetime import datetime, timezone
-from sqlalchemy import JSON, Column, DateTime, Float, String, Text
+from sqlalchemy import JSON, Boolean, Column, DateTime, Float, String, Text
 from src.memory.models import Base
 
 
@@ -23,6 +23,7 @@ class ContactRecord(Base):
     projects_json = Column(JSON, default=list)  # Lista de strings com projetos vinculados
     avatar_url = Column(String(500), nullable=True)  # URL da foto de perfil do WhatsApp
     custom_weight = Column(Float, nullable=True)
+    is_favorite = Column(Boolean, default=False, nullable=False, index=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)

@@ -81,6 +81,8 @@ async def update_contact(contact_id: str, payload: ContactUpdate, db: Session = 
         rec.company = payload.company.strip() if payload.company else None
     if payload.projects is not None:
         rec.projects_json = payload.projects
+    if payload.is_favorite is not None:
+        rec.is_favorite = payload.is_favorite
     if payload.custom_weight is not None:
         rec.custom_weight = payload.custom_weight
     if payload.notes is not None:
@@ -99,6 +101,15 @@ async def update_contact(contact_id: str, payload: ContactUpdate, db: Session = 
 
     contact_service._sync_contact_to_graph(rec)
     return record_to_response(rec)
+
+
+@router.patch("/{contact_id}/favorite", response_model=ContactResponse)
+async def toggle_favorite(contact_id: str, db: Session = Depends(get_db)):
+    """Alterna o status de favorito de um contato (+10% de peso de prioridade)."""
+    try:
+        return contact_service.toggle_favorite(contact_id=contact_id, db=db)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.delete("/{contact_id}", status_code=status.HTTP_204_NO_CONTENT)

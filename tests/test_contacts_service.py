@@ -198,3 +198,39 @@ def test_phone_number_validation_and_group_rejection(contact_db):
             db=contact_db,
         )
 
+
+def test_favorite_contact_and_weight_bonus(contact_db):
+    service = ContactService()
+
+    # Cria contato normal (ex: COLLEAGUE peso 0.70)
+    c1 = service.create_or_update_contact(
+        ContactCreate(
+            phone_number="44999112233",
+            name="Colega Silva",
+            role=ContactRole.COLLEAGUE,
+            is_favorite=False,
+        ),
+        db=contact_db,
+    )
+    assert c1.is_favorite is False
+    assert c1.effective_weight == 0.70
+
+    # Alterna para Favorito (+10% de peso -> 0.70 * 1.10 = 0.77)
+    fav = service.toggle_favorite(c1.id, db=contact_db)
+    assert fav.is_favorite is True
+    assert fav.effective_weight == 0.77
+
+    # Cria produtor rural cooperado (peso 0.90 -> com favorito vai a 0.90 * 1.10 = 0.99)
+    c2 = service.create_or_update_contact(
+        ContactCreate(
+            phone_number="44988776655",
+            name="Produtor Rural Cooperado",
+            role=ContactRole.PRODUCER_COOPERATED,
+            is_favorite=True,
+        ),
+        db=contact_db,
+    )
+    assert c2.is_favorite is True
+    assert c2.effective_weight == 0.99
+
+

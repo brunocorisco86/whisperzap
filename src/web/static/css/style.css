@@ -305,6 +305,32 @@ select:focus {
   box-shadow: var(--shadow-md);
 }
 
+.contact-card.is-favorite {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.03) 0%, var(--bg-surface) 100%);
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.08);
+}
+
+.btn-favorite-icon {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0.1rem 0.3rem;
+  border-radius: var(--radius-sm);
+  transition: transform 0.15s ease, filter 0.15s ease;
+  line-height: 1;
+}
+
+.btn-favorite-icon:hover {
+  transform: scale(1.2);
+  filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.6));
+}
+
+.btn-favorite-icon.active {
+  filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.5));
+}
+
 .contact-header {
   display: flex;
   align-items: center;

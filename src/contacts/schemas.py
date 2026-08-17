@@ -105,6 +105,7 @@ class ContactBase(BaseModel):
     custom_weight: Optional[float] = Field(
         default=None, ge=0.0, le=1.0, description="Peso manual customizado de 0.0 a 1.0 (opcional)"
     )
+    is_favorite: bool = Field(default=False, description="Contato marcado como favorito (+10% de peso de prioridade)")
     notes: Optional[str] = Field(default=None, description="Anotações e observações adicionais")
 
 
@@ -121,6 +122,7 @@ class ContactUpdate(BaseModel):
     projects: Optional[list[str]] = None
     avatar_url: Optional[str] = None
     custom_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    is_favorite: Optional[bool] = None
     notes: Optional[str] = None
 
 

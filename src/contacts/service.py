@@ -44,16 +44,22 @@ def generate_contact_id(name: str, phone: str = "") -> Optional[str]:
 
 
 def calculate_effective_weight(contact: ContactRecord | ContactCreate) -> float:
-    """Calcula o peso de prioridade efetivo (0.0 a 1.0) para o contato."""
+    """Calcula o peso de prioridade efetivo (0.0 a 1.0) para o contato, bonificando favoritos com +10% de peso."""
     if getattr(contact, "custom_weight", None) is not None:
-        return float(contact.custom_weight)
+        base = float(contact.custom_weight)
+    else:
+        role_str = getattr(contact, "role", "UNKNOWN")
+        try:
+            role_enum = ContactRole(role_str) if isinstance(role_str, str) else role_str
+            base = ROLE_WEIGHTS.get(role_enum, 0.40)
+        except ValueError:
+            base = 0.40
 
-    role_str = getattr(contact, "role", "UNKNOWN")
-    try:
-        role_enum = ContactRole(role_str) if isinstance(role_str, str) else role_str
-        return ROLE_WEIGHTS.get(role_enum, 0.40)
-    except ValueError:
-        return 0.40
+    # Se for marcado como favorito, ganha +10% sobre o peso do seu papel
+    if getattr(contact, "is_favorite", False) is True:
+        base = round(base * 1.10, 2)
+
+    return min(1.00, max(0.0, base))
 
 
 def record_to_response(
@@ -75,6 +81,7 @@ def record_to_response(
         projects=projects,
         avatar_url=rec.avatar_url,
         custom_weight=rec.custom_weight,
+        is_favorite=bool(rec.is_favorite),
         notes=rec.notes,
         effective_weight=calculate_effective_weight(rec),
         latest_sentiment=latest_sentiment,
@@ -355,8 +362,10 @@ class ContactService:
                     existing.role = data.role.value if isinstance(data.role, ContactRole) else str(data.role)
                 if data.company is not None:
                     existing.company = data.company
-                if data.projects:
+                if data.projects is not None:
                     existing.projects_json = data.projects
+                if data.is_favorite is not None:
+                    existing.is_favorite = data.is_favorite
                 if data.custom_weight is not None:
                     existing.custom_weight = data.custom_weight
                 if data.notes:
@@ -378,6 +387,7 @@ class ContactService:
                     company=data.company,
                     projects_json=data.projects,
                     custom_weight=data.custom_weight,
+                    is_favorite=bool(data.is_favorite),
                     notes=data.notes,
                     created_at=datetime.now(timezone.utc),
                     updated_at=datetime.now(timezone.utc),
@@ -389,6 +399,38 @@ class ContactService:
             # Sincroniza nó no Grafo NetworkX
             self._sync_contact_to_graph(rec)
 
+            return record_to_response(rec)
+        finally:
+            if should_close:
+                db.close()
+
+    def toggle_favorite(
+        self, contact_id: str, is_favorite: Optional[bool] = None, db: Session | None = None
+    ) -> ContactResponse:
+        """Alterna ou define o status de favorito do contato (+10% de peso de prioridade)."""
+        should_close = False
+        if db is None:
+            db = SessionLocal()
+            should_close = True
+
+        try:
+            rec = db.query(ContactRecord).filter(
+                (ContactRecord.id == contact_id)
+                | (ContactRecord.name == contact_id)
+                | (ContactRecord.phone_number == contact_id)
+            ).first()
+            if not rec:
+                raise ValueError(f"Contato '{contact_id}' não encontrado.")
+
+            if is_favorite is not None:
+                rec.is_favorite = is_favorite
+            else:
+                rec.is_favorite = not bool(rec.is_favorite)
+
+            rec.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            db.refresh(rec)
+            self._sync_contact_to_graph(rec)
             return record_to_response(rec)
         finally:
             if should_close:
