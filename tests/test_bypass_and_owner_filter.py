@@ -263,9 +263,15 @@ def test_analytics_excludes_owner_interactions():
         db.close()
 
 
-def test_sentiment_timeline_excludes_owner():
+def test_sentiment_timeline_excludes_owner_and_unregistered_contacts():
     db = SessionLocal()
     try:
+        from src.contacts.models import ContactRecord
+        # Cadastra apenas Lucas Gerente
+        c_lucas = ContactRecord(id="c-lucas-sent", name="Lucas Gerente", phone_number="554499887766", role="EXECUTIVE")
+        db.merge(c_lucas)
+        db.commit()
+
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
         msg_owner = MessageRecord(
@@ -290,15 +296,30 @@ def test_sentiment_timeline_excludes_owner():
             sentiment_score=0.7,
             meta_info={"fromMe": False},
         )
+        msg_no_card = MessageRecord(
+            id=str(uuid4()),
+            created_at=datetime.now(timezone.utc),
+            speaker="Desconhecido Sem Card",
+            raw_text="Mensagem sem cartão cadastrado.",
+            revised_text="Mensagem sem cartão cadastrado.",
+            intent="NOTE",
+            sentiment="POSITIVE",
+            sentiment_score=0.9,
+            meta_info={"fromMe": False},
+        )
         db.add(msg_owner)
         db.add(msg_contact)
+        db.add(msg_no_card)
         db.commit()
 
         collection = sentiment_timeline_service.collect_daily_sentiments(target_date=today_str, db=db)
         snapshot_speakers = [s.speaker for s in collection.snapshots]
 
+        # Bruno (Dono) e Desconhecido Sem Card NÃO devem constar
         assert "Bruno" not in snapshot_speakers
         assert "user" not in snapshot_speakers
+        assert "Desconhecido Sem Card" not in snapshot_speakers
+        # Apenas contato oficial com cartão deve constar
         assert "Lucas Gerente" in snapshot_speakers
     finally:
         db.close()

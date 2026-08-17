@@ -463,6 +463,21 @@ class GraphJanitorService:
                     for t in tasks_to_delete:
                         db.delete(t)
 
+                # Purga snapshots de sentimentos diários de pessoas sem cartão
+                from src.memory.models import DailySentimentSnapshotRecord
+                all_snapshots = db.query(DailySentimentSnapshotRecord).all()
+                for snap in all_snapshots:
+                    s_raw = str(snap.speaker or "").strip()
+                    s_digits = re.sub(r"\D", "", s_raw)
+                    is_valid_snap = False
+                    if s_raw.lower() in valid_names or normalize_text(s_raw) in valid_names:
+                        is_valid_snap = True
+                    elif s_digits and (s_digits in valid_phones or any(len(s_digits) >= 8 and s_digits.endswith(suf) for suf in valid_suffixes)):
+                        is_valid_snap = True
+
+                    if not is_valid_snap:
+                        db.delete(snap)
+
                 # Remove do Grafo MUSA todos os nós de pessoas sem cartão e nós dos remetentes purgados
                 with self.kg._lock:
                     g = self.kg.graph
