@@ -53,6 +53,7 @@ class GraphJanitorReport(BaseModel):
     edges_pruned_count: int
     nodes_merged_count: int
     orphan_messages_purged_count: int = 0
+    orphan_tasks_purged_count: int = 0
     orphan_audio_files_deleted_count: int = 0
     orphan_speakers_purged: List[str] = []
     pruned_nodes: List[str]
@@ -158,6 +159,7 @@ class GraphJanitorService:
             now_iso = datetime.now(timezone.utc).isoformat()
 
             purged_msgs = orphan_purge_res.get("purged_messages_count", 0)
+            purged_tasks = orphan_purge_res.get("purged_tasks_count", 0)
             purged_audios = orphan_purge_res.get("deleted_audio_files_count", 0)
             purged_spks = orphan_purge_res.get("purged_speakers", [])
 
@@ -168,6 +170,8 @@ class GraphJanitorService:
             ]
             if purged_msgs > 0:
                 summary_parts.append(f"{purged_msgs} mensagens de contatos sem card purgadas")
+            if purged_tasks > 0:
+                summary_parts.append(f"{purged_tasks} tarefas de pessoas sem card purgadas")
             if purged_audios > 0:
                 summary_parts.append(f"{purged_audios} arquivos de áudio removidos")
 
@@ -185,6 +189,7 @@ class GraphJanitorService:
                 edges_pruned_count=edges_pruned_count,
                 nodes_merged_count=len(merged_nodes),
                 orphan_messages_purged_count=purged_msgs,
+                orphan_tasks_purged_count=purged_tasks,
                 orphan_audio_files_deleted_count=purged_audios,
                 orphan_speakers_purged=purged_spks,
                 pruned_nodes=pruned_nodes[:50],  # Primeiros 50 para o relatório
@@ -324,13 +329,14 @@ class GraphJanitorService:
             logger.error(f"Erro ao salvar histórico da Zeladora: {e}")
 
     def purge_orphan_messages_and_audios(self, dry_run: bool = False, db: Optional[Any] = None) -> Dict[str, Any]:
-        """Purga todas as mensagens, áudios e transcrições de remetentes sem cartão cadastrado na tabela contacts.
+        """Purga todas as mensagens, áudios, transcrições e tarefas de remetentes sem cartão cadastrado na tabela contacts.
 
+        A história é escrita pelos vitoriosos: pessoas sem cartão não deixam registros nem tarefas no sistema.
         Protege integralmente os contatos oficiais cadastrados e o Proprietário (Bruno Conter).
         """
         import re
         from src.ai_gateway.bypass import get_owner_identifiers, is_owner_interaction, normalize_text
-        from src.memory.models import MessageRecord
+        from src.memory.models import MessageRecord, TaskRecord
 
         should_close = False
         if db is None:
@@ -338,6 +344,7 @@ class GraphJanitorService:
             should_close = True
 
         purged_messages_count = 0
+        purged_tasks_count = 0
         deleted_audio_files_count = 0
         purged_speakers_set: Set[str] = set()
 
@@ -399,20 +406,72 @@ class GraphJanitorService:
                     messages_to_delete.append(msg)
                     purged_speakers_set.add(speaker_raw)
 
-            # 3. Executa a exclusão das mensagens órfãs e arquivos de áudio
-            if not dry_run and messages_to_delete:
-                for m in messages_to_delete:
-                    # Deleta arquivos de áudio físicos residuais
-                    if m.audio_filename:
-                        for candidate_dir in ["assets", "data/audios", "data", "temp"]:
-                            fpath = os.path.join(candidate_dir, m.audio_filename)
-                            if os.path.exists(fpath):
-                                try:
-                                    os.remove(fpath)
-                                    deleted_audio_files_count += 1
-                                except Exception as e:
-                                    logger.warning(f"Aviso ao deletar arquivo de áudio {fpath}: {e}")
-                    db.delete(m)
+            # 3. Varre todas as tarefas no banco
+            all_tasks = db.query(TaskRecord).all()
+            tasks_to_delete = []
+
+            for task in all_tasks:
+                assignee_raw = str(task.assignee or "").strip()
+                assignee_clean = assignee_raw.lower()
+                assignee_norm = normalize_text(assignee_raw)
+                assignee_digits = re.sub(r"\D", "", assignee_raw)
+
+                # Verifica se a tarefa é atribuída ao Dono
+                if assignee_raw and is_owner_interaction(assignee_raw):
+                    if task.assignee != "Bruno Conter" and not dry_run:
+                        task.assignee = "Bruno Conter"
+                    continue
+
+                # Verifica se a tarefa é atribuída a um contato com cartão
+                is_valid_task = False
+                if assignee_raw:
+                    if assignee_clean in valid_names or assignee_norm in valid_names:
+                        is_valid_task = True
+                    elif assignee_digits and (assignee_digits in valid_phones or any(assignee_digits.endswith(suf) for suf in valid_suffixes)):
+                        is_valid_task = True
+                    else:
+                        for c in contacts:
+                            c_clean = c.name.strip().lower()
+                            c_norm = normalize_text(c.name)
+                            if c_clean in assignee_clean or assignee_clean in c_clean or (c_norm and c_norm in assignee_norm):
+                                is_valid_task = True
+                                if not dry_run and task.assignee != c.name:
+                                    task.assignee = c.name
+                                break
+                else:
+                    # Se não tem assignee explícito, checa se a mensagem de origem é válida ou do Dono
+                    if task.message:
+                        m_spk = str(task.message.speaker or "").strip()
+                        if is_owner_interaction(m_spk, task.message.meta_info) or m_spk.lower() in valid_names:
+                            is_valid_task = True
+                    else:
+                        # Tarefa sem assignee e sem mensagem é órfã
+                        is_valid_task = False
+
+                if not is_valid_task:
+                    tasks_to_delete.append(task)
+                    if assignee_raw:
+                        purged_speakers_set.add(assignee_raw)
+
+            # 4. Executa a exclusão das mensagens órfãs, tarefas e arquivos de áudio
+            if not dry_run:
+                if messages_to_delete:
+                    for m in messages_to_delete:
+                        # Deleta arquivos de áudio físicos residuais
+                        if m.audio_filename:
+                            for candidate_dir in ["assets", "data/audios", "data", "temp"]:
+                                fpath = os.path.join(candidate_dir, m.audio_filename)
+                                if os.path.exists(fpath):
+                                    try:
+                                        os.remove(fpath)
+                                        deleted_audio_files_count += 1
+                                    except Exception as e:
+                                        logger.warning(f"Aviso ao deletar arquivo de áudio {fpath}: {e}")
+                        db.delete(m)
+
+                if tasks_to_delete:
+                    for t in tasks_to_delete:
+                        db.delete(t)
 
                 # Remove também nós do grafo MUSA associados a esses remetentes sem cartão
                 with self.kg._lock:
@@ -423,20 +482,24 @@ class GraphJanitorService:
 
                 db.commit()
                 purged_messages_count = len(messages_to_delete)
+                purged_tasks_count = len(tasks_to_delete)
             elif dry_run:
                 purged_messages_count = len(messages_to_delete)
+                purged_tasks_count = len(tasks_to_delete)
 
             return {
                 "purged_messages_count": purged_messages_count,
+                "purged_tasks_count": purged_tasks_count,
                 "deleted_audio_files_count": deleted_audio_files_count,
                 "purged_speakers": sorted(list(purged_speakers_set)),
             }
         except Exception as e:
-            logger.error(f"Erro ao purgar mensagens órfãs na Zeladora: {e}")
+            logger.error(f"Erro ao purgar registros órfãos na Zeladora: {e}")
             if not dry_run:
                 db.rollback()
             return {
                 "purged_messages_count": 0,
+                "purged_tasks_count": 0,
                 "deleted_audio_files_count": 0,
                 "purged_speakers": [],
             }

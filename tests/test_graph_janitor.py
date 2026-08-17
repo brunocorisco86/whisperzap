@@ -122,7 +122,7 @@ def test_janitor_purges_orphan_messages_and_audios(temp_graph, test_db):
     """Garante que a Zeladora purga mensagens e áudios de contatos sem cartão salvo na tabela contacts."""
     kg, janitor = temp_graph
 
-    from src.memory.models import MessageRecord
+    from src.memory.models import MessageRecord, TaskRecord
     from src.contacts.models import ContactRecord
 
     # 1. Cria contatos com cartão
@@ -131,26 +131,36 @@ def test_janitor_purges_orphan_messages_and_audios(temp_graph, test_db):
     test_db.add_all([c1, c2])
     test_db.commit()
 
-    # 2. Cria mensagens de contatos com cartão e mensagens de contatos sem cartão (órfãos)
+    # 2. Cria mensagens e tarefas de contatos com cartão e órfãos
     m_owner = MessageRecord(id="m-1", speaker="Bruno Conter", raw_text="Nota pessoal", revised_text="Nota pessoal")
     m_debora = MessageRecord(id="m-2", speaker="Debora Patel Conter", raw_text="Oi amor", revised_text="Oi amor")
     m_orphan1 = MessageRecord(id="m-3", speaker="Desconhecido Sem Card", raw_text="Spam ou teste", revised_text="Spam ou teste")
     m_orphan2 = MessageRecord(id="m-4", speaker="Gueguis Lanches", raw_text="Cardápio", revised_text="Cardápio")
 
-    test_db.add_all([m_owner, m_debora, m_orphan1, m_orphan2])
+    t_owner = TaskRecord(id="t-1", message_id="m-1", title="Tarefa do Bruno", assignee="Bruno Conter")
+    t_debora = TaskRecord(id="t-2", message_id="m-2", title="Tarefa da Debora", assignee="Debora Patel Conter")
+    t_orphan = TaskRecord(id="t-3", message_id=None, title="Tarefa sem card", assignee="Fantasma Sem Card")
+
+    test_db.add_all([m_owner, m_debora, m_orphan1, m_orphan2, t_owner, t_debora, t_orphan])
     test_db.commit()
 
     # 3. Executa a purga da Zeladora
     res = janitor.purge_orphan_messages_and_audios(dry_run=False, db=test_db)
     assert res["purged_messages_count"] == 2
+    assert res["purged_tasks_count"] >= 1
     assert "Desconhecido Sem Card" in res["purged_speakers"]
     assert "Gueguis Lanches" in res["purged_speakers"]
 
-    # 4. Verifica que apenas mensagens de contatos com cartão e do dono foram mantidas
-    remaining = test_db.query(MessageRecord).filter(MessageRecord.id.in_(["m-1", "m-2", "m-3", "m-4"])).all()
-    rem_speakers = {r.speaker for r in remaining}
-    assert len(remaining) == 2
+    # 4. Verifica que apenas mensagens e tarefas de contatos com cartão e do dono foram mantidas
+    remaining_msgs = test_db.query(MessageRecord).filter(MessageRecord.id.in_(["m-1", "m-2", "m-3", "m-4"])).all()
+    rem_speakers = {r.speaker for r in remaining_msgs}
+    assert len(remaining_msgs) == 2
     assert "Bruno Conter" in rem_speakers
     assert "Debora Patel Conter" in rem_speakers
-    assert "Desconhecido Sem Card" not in rem_speakers
-    assert "Gueguis Lanches" not in rem_speakers
+
+    remaining_tasks = test_db.query(TaskRecord).filter(TaskRecord.id.in_(["t-1", "t-2", "t-3"])).all()
+    rem_assignees = {t.assignee for t in remaining_tasks}
+    assert len(remaining_tasks) == 2
+    assert "Bruno Conter" in rem_assignees
+    assert "Debora Patel Conter" in rem_assignees
+    assert "Fantasma Sem Card" not in rem_assignees
