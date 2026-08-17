@@ -9,7 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field
 class ContactRole(str, Enum):
     """Papéis hierárquicos e relacionais de contatos."""
 
-    EXECUTIVE = "EXECUTIVE"  # Gestores diretos, diretores, líderes (peso 1.0)
+    OWNER = "OWNER"  # Bruno Conter: Criador, Proprietário Supremo e Arquiteto do Sistema (peso 1.00 / Prioridade Absoluta)
+    EXECUTIVE = "EXECUTIVE"  # Gestores diretos, diretores, líderes (peso 1.00)
     FAMILY_CORE = "FAMILY_CORE"  # Cônjuge, mãe, pai, filhos (peso 0.95)
     PRODUCER_COOPERATED = "PRODUCER_COOPERATED"  # Produtores rurais, cooperados, associados e integrados (peso 0.90)
     STAKEHOLDER = "STAKEHOLDER"  # Clientes chave, parceiros de projetos estratégicos (peso 0.85)
@@ -20,6 +21,7 @@ class ContactRole(str, Enum):
 
 
 ROLE_WEIGHTS: dict[ContactRole, float] = {
+    ContactRole.OWNER: 1.00,
     ContactRole.EXECUTIVE: 1.00,
     ContactRole.FAMILY_CORE: 0.95,
     ContactRole.PRODUCER_COOPERATED: 0.90,
@@ -32,6 +34,13 @@ ROLE_WEIGHTS: dict[ContactRole, float] = {
 
 # Sinônimos em português para facilitar o parsing de tabelas Markdown
 ROLE_SYNONYMS: dict[str, ContactRole] = {
+    "OWNER": ContactRole.OWNER,
+    "DONO": ContactRole.OWNER,
+    "PROPRIETARIO": ContactRole.OWNER,
+    "PROPRIETÁRIO": ContactRole.OWNER,
+    "ARQUITETO": ContactRole.OWNER,
+    "MESTRE": ContactRole.OWNER,
+    "DEUS": ContactRole.OWNER,
     "EXECUTIVE": ContactRole.EXECUTIVE,
     "GESTOR": ContactRole.EXECUTIVE,
     "GERENTE": ContactRole.EXECUTIVE,

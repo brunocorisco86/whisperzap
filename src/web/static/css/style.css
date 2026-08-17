@@ -369,6 +369,15 @@ select:focus {
   border: 1px solid rgba(236, 72, 153, 0.3);
 }
 
+.badge-owner {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.35) 100%);
+  color: #fef08a;
+  border: 1px solid rgba(251, 191, 36, 0.6);
+  font-weight: 700;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.25);
+  letter-spacing: 0.02em;
+}
+
 .badge-producer {
   background: rgba(16, 185, 129, 0.18);
   color: #34d399;

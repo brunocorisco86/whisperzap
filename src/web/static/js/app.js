@@ -478,6 +478,7 @@ window.triggerGraphJanitor = triggerGraphJanitor;
 
 function getRoleBadgeClass(role) {
   const r = (role || '').toUpperCase();
+  if (r === 'OWNER') return 'badge-owner';
   if (r === 'FAMILY_CORE') return 'badge-family';
   if (r === 'EXECUTIVE') return 'badge-executive';
   if (r === 'PRODUCER_COOPERATED') return 'badge-producer';
@@ -490,6 +491,7 @@ function getRoleBadgeClass(role) {
 function getRoleLabel(role) {
   const r = (role || '').toUpperCase();
   const map = {
+    'OWNER': '👑 PROPRIETÁRIO',
     'FAMILY_CORE': 'Família',
     'EXECUTIVE': 'Diretoria / Gestão',
     'PRODUCER_COOPERATED': 'Produtor Rural / Associado',

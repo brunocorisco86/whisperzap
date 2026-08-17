@@ -110,17 +110,17 @@ class ContactService:
                     db.delete(c)
             db.commit()
 
-            # 1. Consolida o contato do proprietário (Bruno Conter)
+            # 1. Consolida o contato do proprietário (Bruno Conter) como OWNER
             all_recs = db.query(ContactRecord).all()
             owner_contacts = [c for c in all_recs if is_owner_interaction(c.name) or is_owner_interaction(c.phone_number)]
             if owner_contacts:
                 primary_owner = next((c for c in owner_contacts if c.phone_number and is_valid_contact_phone(c.phone_number)), owner_contacts[0])
                 primary_owner.name = "Bruno Conter"
                 primary_owner.phone_number = settings.USER_PHONE_NUMBER or "554497604925"
-                primary_owner.role = "EXECUTIVE"
-                primary_owner.nickname = "Eu / Proprietário"
-                primary_owner.company = "Hermes Memory"
-                primary_owner.notes = "Proprietário do sistema Hermes Voice Memory."
+                primary_owner.role = "OWNER"
+                primary_owner.nickname = "Bruno Conter (Proprietário / Arquiteto)"
+                primary_owner.company = "Hermes Memory / Homelab"
+                primary_owner.notes = "Criador, Proprietário e Arquiteto Supremo do sistema Hermes Voice Memory."
                 primary_owner.updated_at = datetime.now(timezone.utc)
 
                 for dup in owner_contacts:

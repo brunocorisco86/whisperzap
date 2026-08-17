@@ -245,11 +245,11 @@ class MemoryRepository:
                                     id=c_id,
                                     name="Bruno Conter",
                                     phone_number=settings.USER_PHONE_NUMBER or "554497604925",
-                                    nickname="Eu / Proprietário",
-                                    role="EXECUTIVE",
-                                    company="Hermes Memory",
+                                    nickname="Bruno Conter (Proprietário / Arquiteto)",
+                                    role="OWNER",
+                                    company="Hermes Memory / Homelab",
                                     projects_json=[],
-                                    notes="Proprietário do sistema Hermes Voice Memory.",
+                                    notes="Criador, Proprietário e Arquiteto Supremo do sistema Hermes Voice Memory.",
                                     created_at=datetime.now(timezone.utc),
                                     updated_at=datetime.now(timezone.utc),
                                 )
@@ -258,8 +258,10 @@ class MemoryRepository:
                         else:
                             owner_rec.name = "Bruno Conter"
                             owner_rec.phone_number = settings.USER_PHONE_NUMBER or "554497604925"
-                            owner_rec.role = "EXECUTIVE"
-                            owner_rec.nickname = "Eu / Proprietário"
+                            owner_rec.role = "OWNER"
+                            owner_rec.nickname = "Bruno Conter (Proprietário / Arquiteto)"
+                            owner_rec.company = "Hermes Memory / Homelab"
+                            owner_rec.notes = "Criador, Proprietário e Arquiteto Supremo do sistema Hermes Voice Memory."
                             db.commit()
                         if owner_rec:
                             contact_service._sync_contact_to_graph(owner_rec)

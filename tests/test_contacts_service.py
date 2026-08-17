@@ -151,11 +151,11 @@ def test_deduplicate_and_merge_contacts(contact_db):
     # Executa deduplicação
     contacts = service.get_contacts(db=contact_db)
 
-    # Valida que o Bruno existe apenas 1 vez, consolidado com telefone
+    # Valida que o Bruno existe apenas 1 vez, consolidado como OWNER com prioridade suprema
     bruno_cards = [c for c in contacts if "Bruno" in c.name]
     assert len(bruno_cards) == 1
     assert bruno_cards[0].name == "Bruno Conter"
-    assert bruno_cards[0].role == "EXECUTIVE"
+    assert bruno_cards[0].role in [ContactRole.OWNER, "OWNER"]
     assert "97604925" in bruno_cards[0].phone_number
 
     # Valida que Debora existe apenas 1 vez, mantendo o telefone já salvo
