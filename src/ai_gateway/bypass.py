@@ -18,15 +18,20 @@ def normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", clean).strip()
 
 
-def is_group_message(meta_info: Optional[Dict[str, Any]] = None) -> bool:
-    """Verifica se a mensagem é proveniente de um grupo ou lista de transmissão do WhatsApp."""
+def is_group_message(meta_info: Optional[Dict[str, Any]] = None, speaker: Optional[str] = None) -> bool:
+    """Verifica se a mensagem ou contato é proveniente de um grupo ou lista de transmissão."""
+    if speaker:
+        speaker_str = str(speaker).strip()
+        if speaker_str.endswith("@g.us") or "@g.us" in speaker_str or "broadcast" in speaker_str:
+            return True
+
     if not meta_info or not isinstance(meta_info, dict):
         return False
 
     remote_jid = str(meta_info.get("remoteJid") or meta_info.get("remote_jid") or "").strip()
     if remote_jid.endswith("@g.us") or "@g.us" in remote_jid:
         return True
-    if remote_jid.endswith("@broadcast") or "broadcast" in remote_jid:
+    if remote_jid.endswith("@broadcast") or "broadcast" in remote_jid or "newsletter" in remote_jid:
         return True
 
     if meta_info.get("isGroup") is True or meta_info.get("is_group") is True:
@@ -36,6 +41,54 @@ def is_group_message(meta_info: Optional[Dict[str, Any]] = None) -> bool:
         return True
 
     return False
+
+
+def is_valid_contact_phone(phone: Optional[str]) -> bool:
+    """Valida se o número de telefone possui a quantidade padrão de dígitos e formato válido.
+    
+    Números fora do padrão NÃO recebem UID e NÃO viram cartão de contato.
+    - Padrão Nacional Brasil:
+        - 10 dígitos: DDD (2) + Fixo (8) (ex: 4432001122)
+        - 11 dígitos: DDD (2) + Celular (9) (ex: 44999214934)
+        - 12 dígitos: DDI (55) + DDD (2) + 8 dígitos (ex: 554497604925)
+        - 13 dígitos: DDI (55) + DDD (2) + 9 dígitos (ex: 5544999214934)
+    - Padrão Internacional E.164: entre 10 e 15 dígitos numéricos sem caracteres de grupo.
+    """
+    if not phone or not isinstance(phone, (str, int)):
+        return False
+
+    raw = str(phone).strip()
+    # Bloqueia identificadores de grupos ou canais
+    if "@g.us" in raw or "broadcast" in raw or "newsletter" in raw:
+        return False
+
+    digits = re.sub(r"\D", "", raw.split("@")[0])
+    num_len = len(digits)
+
+    # Rejeita números com menos de 10 ou mais de 15 dígitos
+    if num_len < 10 or num_len > 15:
+        return False
+
+    # Validação específica para números que começam com DDI 55 (Brasil)
+    if digits.startswith("55"):
+        # No Brasil com 55: deve ter EXATAMENTE 12 dígitos (55 + DDD + 8) ou 13 dígitos (55 + DDD + 9)
+        if num_len not in (12, 13):
+            return False
+    elif not digits.startswith("55") and num_len in (10, 11):
+        # Sem 55: DDD válido (11 a 99)
+        ddd = int(digits[:2])
+        if ddd < 11 or ddd > 99:
+            return False
+    elif num_len > 13:
+        # Números com 14 dígitos começando com 55 são ruídos/inválidos
+        if digits.startswith("55"):
+            return False
+
+    # Rejeita repetições óbvias de dígitos (ex: 0000000000, 99999999999)
+    if len(set(digits)) <= 2:
+        return False
+
+    return True
 
 
 def get_owner_identifiers() -> set[str]:

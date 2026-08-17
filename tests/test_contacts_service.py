@@ -163,3 +163,38 @@ def test_deduplicate_and_merge_contacts(contact_db):
     assert len(debora_cards) == 1
     assert debora_cards[0].phone_number == "5544999214934"
     assert debora_cards[0].role == "FAMILY_CORE"
+
+
+def test_phone_number_validation_and_group_rejection(contact_db):
+    from src.ai_gateway.bypass import is_valid_contact_phone, is_group_message
+    service = ContactService()
+
+    # 1. Validações de telefone padrão
+    assert is_valid_contact_phone("554497604925") is True    # 12 dígitos BR
+    assert is_valid_contact_phone("5544999214934") is True   # 13 dígitos BR
+    assert is_valid_contact_phone("44999214934") is True     # 11 dígitos BR
+    assert is_valid_contact_phone("4432001122") is True      # 10 dígitos BR
+
+    # Telefones fora do padrão
+    assert is_valid_contact_phone("55449900000879") is False # 14 dígitos BR (inválido)
+    assert is_valid_contact_phone("12345") is False          # Muito curto
+    assert is_valid_contact_phone("00000000000") is False    # Repetição óbvia
+    assert is_valid_contact_phone("120363024567890123@g.us") is False # Grupo
+
+    # 2. Detecção de Grupo
+    assert is_group_message({"remoteJid": "120363024567890123@g.us"}) is True
+    assert is_group_message(speaker="120363024567890123@g.us") is True
+    assert is_group_message({"isGroup": True}) is True
+    assert is_group_message({"remoteJid": "554497604925@s.whatsapp.net"}) is False
+
+    # 3. Tentativa de criar cartão com telefone fora do padrão deve falhar
+    with pytest.raises(ValueError):
+        service.create_or_update_contact(
+            ContactCreate(
+                phone_number="55449900000879",
+                name="Contato Inválido",
+                role=ContactRole.UNKNOWN,
+            ),
+            db=contact_db,
+        )
+

@@ -221,13 +221,14 @@ class MemoryRepository:
             try:
                 from src.contacts.models import ContactRecord
                 from src.contacts.service import contact_service, generate_contact_id
-                from src.ai_gateway.bypass import is_owner_interaction, normalize_text
+                from src.ai_gateway.bypass import is_group_message, is_owner_interaction, is_valid_contact_phone, normalize_text
                 import re
 
-                # 6.1 Processa o Speaker da mensagem
+                # Se for mensagem de grupo ou transmissão, NUNCA cria cartão de contato
+                meta = data.meta_info if isinstance(data.meta_info, dict) else {}
                 speaker_val = (data.speaker or "").strip()
-                if speaker_val:
-                    meta = data.meta_info if isinstance(data.meta_info, dict) else {}
+
+                if not is_group_message(meta, speaker_val) and speaker_val:
                     raw_phone = meta.get("remoteJid", "") or meta.get("phone", "") or speaker_val
                     digits = re.sub(r"\D", "", str(raw_phone).split("@")[0])
                     push_name = meta.get("pushName")
@@ -239,33 +240,34 @@ class MemoryRepository:
                         ).first()
                         if not owner_rec:
                             c_id = generate_contact_id("Bruno Conter", settings.USER_PHONE_NUMBER)
-                            owner_rec = ContactRecord(
-                                id=c_id,
-                                name="Bruno Conter",
-                                phone_number=settings.USER_PHONE_NUMBER or "554497604925",
-                                nickname="Eu / Proprietário",
-                                role="EXECUTIVE",
-                                company="Hermes Memory",
-                                projects_json=[],
-                                notes="Proprietário do sistema Hermes Voice Memory.",
-                                created_at=datetime.now(timezone.utc),
-                                updated_at=datetime.now(timezone.utc),
-                            )
-                            db.add(owner_rec)
-                            db.commit()
+                            if c_id:
+                                owner_rec = ContactRecord(
+                                    id=c_id,
+                                    name="Bruno Conter",
+                                    phone_number=settings.USER_PHONE_NUMBER or "554497604925",
+                                    nickname="Eu / Proprietário",
+                                    role="EXECUTIVE",
+                                    company="Hermes Memory",
+                                    projects_json=[],
+                                    notes="Proprietário do sistema Hermes Voice Memory.",
+                                    created_at=datetime.now(timezone.utc),
+                                    updated_at=datetime.now(timezone.utc),
+                                )
+                                db.add(owner_rec)
+                                db.commit()
                         else:
                             owner_rec.name = "Bruno Conter"
                             owner_rec.phone_number = settings.USER_PHONE_NUMBER or "554497604925"
                             owner_rec.role = "EXECUTIVE"
                             owner_rec.nickname = "Eu / Proprietário"
                             db.commit()
-                        contact_service._sync_contact_to_graph(owner_rec)
-                    else:
-                        existing_contact = None
-                        if digits and len(digits) >= 8:
-                            existing_contact = db.query(ContactRecord).filter(
-                                (ContactRecord.phone_number == digits) | (ContactRecord.phone_number.like(f"%{digits[-8:]}%"))
-                            ).first()
+                        if owner_rec:
+                            contact_service._sync_contact_to_graph(owner_rec)
+                    elif is_valid_contact_phone(digits):
+                        # Só cria ou atualiza cartão para contatos que possuam telefone padrão válido
+                        existing_contact = db.query(ContactRecord).filter(
+                            (ContactRecord.phone_number == digits) | (ContactRecord.phone_number.like(f"%{digits[-8:]}%"))
+                        ).first()
 
                         if not existing_contact:
                             clean_speaker = normalize_text(speaker_val)
@@ -278,54 +280,32 @@ class MemoryRepository:
                         if not existing_contact:
                             contact_name = push_name if (push_name and speaker_val.isdigit()) else speaker_val
                             c_id = generate_contact_id(contact_name, digits)
-                            new_contact = ContactRecord(
-                                id=c_id,
-                                name=contact_name,
-                                phone_number=digits if len(digits) >= 8 else "",
-                                role="UNKNOWN",
-                                company="",
-                                projects_json=[],
-                                notes="Contato identificado automaticamente via mensagem recebida.",
-                                created_at=datetime.now(timezone.utc),
-                                updated_at=datetime.now(timezone.utc),
-                            )
-                            db.add(new_contact)
-                            db.commit()
-                            contact_service._sync_contact_to_graph(new_contact)
+                            if c_id:
+                                new_contact = ContactRecord(
+                                    id=c_id,
+                                    name=contact_name,
+                                    phone_number=digits,
+                                    role="UNKNOWN",
+                                    company="",
+                                    projects_json=[],
+                                    notes="Contato identificado via mensagem recebida.",
+                                    created_at=datetime.now(timezone.utc),
+                                    updated_at=datetime.now(timezone.utc),
+                                )
+                                db.add(new_contact)
+                                db.commit()
+                                contact_service._sync_contact_to_graph(new_contact)
                         elif push_name and existing_contact.name.isdigit():
                             existing_contact.name = push_name
                             db.commit()
                             contact_service._sync_contact_to_graph(existing_contact)
 
-                # 6.2 Processa Entidades do tipo PERSON extraídas da mensagem com deduplicação
+                # 6.2 Entidades do tipo PERSON são enriquecidas no Grafo, mas NÃO criam cartões sem telefone
                 for e in extracted.entities:
                     if e.category and e.category.upper() == "PERSON" and e.name:
                         person_name = e.name.strip()
-                        if len(person_name) > 1 and not is_owner_interaction(person_name):
-                            clean_pname = normalize_text(person_name)
-                            existing_person = None
-                            for c in db.query(ContactRecord).all():
-                                c_clean = normalize_text(c.name)
-                                if c_clean and (c_clean in clean_pname or clean_pname in c_clean):
-                                    existing_person = c
-                                    break
-
-                            if not existing_person:
-                                p_id = generate_contact_id(person_name, "")
-                                new_person = ContactRecord(
-                                    id=p_id,
-                                    name=person_name,
-                                    phone_number="",
-                                    role="UNKNOWN",
-                                    company="",
-                                    projects_json=[],
-                                    notes="Entidade mencionada em mensagens.",
-                                    created_at=datetime.now(timezone.utc),
-                                    updated_at=datetime.now(timezone.utc),
-                                )
-                                db.add(new_person)
-                                db.commit()
-                                contact_service._sync_contact_to_graph(new_person)
+                        if len(person_name) > 1 and not is_owner_interaction(person_name) and not is_group_message(speaker=person_name):
+                            knowledge_graph.add_node(person_name, category="PERSON", details=e.details or "Entidade mencionada")
 
                 # 6.3 Processa Termos Dúbios / Esforço de Adaptação (Buffer de Aprendizado Ativo)
                 if hasattr(extracted, "unclear_terms") and extracted.unclear_terms:
