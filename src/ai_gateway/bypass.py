@@ -358,3 +358,73 @@ def should_bypass_ai(
 
     return False, "process_ai"
 
+
+def should_analyze_sentiment(
+    speaker: Optional[str] = None,
+    meta_info: Optional[Dict[str, Any]] = None,
+    db: Optional[Any] = None,
+    min_weight: Optional[float] = None,
+) -> Tuple[bool, str, float]:
+    """Verifica se o contato possui peso/influência hierárquica suficiente para merecer o gasto de token em análise de sentimento.
+
+    Retorna: (should_analyze: bool, reason: str, effective_weight: float)
+    """
+    threshold = min_weight if min_weight is not None else getattr(settings, "SENTIMENT_WEIGHT_THRESHOLD", 0.70)
+
+    # 1. Dono do sistema
+    if is_owner_interaction(speaker, meta_info):
+        return True, "owner_interaction", 1.00
+
+    from src.contacts.models import ContactRecord
+    from src.contacts.service import calculate_effective_weight
+    from src.memory.database import SessionLocal
+
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+
+    try:
+        phone_to_check = ""
+        if meta_info and isinstance(meta_info, dict):
+            phone_to_check = str(meta_info.get("phone") or meta_info.get("sender_phone") or meta_info.get("remoteJid") or "")
+        if not phone_to_check and speaker:
+            phone_to_check = speaker
+
+        speaker_raw = str(speaker or "").strip()
+        speaker_norm = normalize_text(speaker_raw)
+        speaker_digits = re.sub(r"\D", "", phone_to_check)
+
+        contacts = db.query(ContactRecord).all()
+        matched_contact = None
+
+        for c in contacts:
+            c_name_norm = normalize_text(c.name)
+            c_nick_norm = normalize_text(c.nickname or "")
+            c_digits = re.sub(r"\D", "", c.phone_number or "")
+
+            if speaker_digits and c_digits:
+                if speaker_digits == c_digits or (len(speaker_digits) >= 8 and len(c_digits) >= 8 and speaker_digits[-8:] == c_digits[-8:]):
+                    matched_contact = c
+                    break
+
+            if speaker_norm and (speaker_norm == c_name_norm or (c_nick_norm and speaker_norm == c_nick_norm)):
+                matched_contact = c
+                break
+
+        if not matched_contact:
+            return False, "unregistered_contact_no_card", 0.00
+
+        effective_weight = calculate_effective_weight(matched_contact)
+
+        if effective_weight >= threshold:
+            return True, f"qualified_influence_{effective_weight:.2f}", effective_weight
+        else:
+            return False, f"below_sentiment_threshold_{effective_weight:.2f}", effective_weight
+    except Exception as e:
+        logger.error(f"Erro ao verificar threshold de sentimento para '{speaker}': {e}")
+        return False, "error_checking_threshold", 0.00
+    finally:
+        if should_close:
+            db.close()
+

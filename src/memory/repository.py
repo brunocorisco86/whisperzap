@@ -149,6 +149,18 @@ class MemoryRepository:
                         processing_time_ms=0.0,
                     )
 
+            # 3. Avaliação de Threshold de Peso/Influência para Sentimento
+            from src.ai_gateway.bypass import should_analyze_sentiment
+            analyze_sent, sent_reason, sent_weight = should_analyze_sentiment(
+                speaker=data.speaker,
+                meta_info=data.meta_info,
+                db=db,
+            )
+            if not analyze_sent:
+                logger.info(f"💡 [Sentimento] Análise emocional dispensada para '{data.speaker}' (peso={sent_weight:.2f} < {settings.SENTIMENT_WEIGHT_THRESHOLD}): motivo='{sent_reason}'")
+                extracted.sentiment = "NEUTRAL"
+                extracted.sentiment_score = 0.0
+
             # Importa dinamicamente contact_service para evitar circular import
             from src.contacts.service import contact_service
 

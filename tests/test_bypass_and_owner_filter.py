@@ -323,3 +323,41 @@ def test_sentiment_timeline_excludes_owner_and_unregistered_contacts():
         assert "Lucas Gerente" in snapshot_speakers
     finally:
         db.close()
+
+
+def test_should_analyze_sentiment_by_weight_threshold():
+    """Valida que apenas contatos com peso >= 0.70 (ou favoritos) gastam tokens de análise de sentimento."""
+    from src.ai_gateway.bypass import should_analyze_sentiment
+    from src.contacts.models import ContactRecord
+    db = SessionLocal()
+    try:
+        # 1. Executivo (peso 1.0) -> Deve analisar
+        c_exec = ContactRecord(id="c-th-exec", name="Marcos Diretor", phone_number="554499110011", role="EXECUTIVE")
+        # 2. Fornecedor sem favorito (peso 0.50) -> Não deve analisar (abaixo de 0.70)
+        c_vendor = ContactRecord(id="c-th-vendor", name="Fornecedor Suprimentos", phone_number="554499220022", role="SERVICE_VENDOR", is_favorite=False)
+        # 3. Fornecedor Favorito (peso 0.50 * 1.10 = 0.55 -> ainda abaixo de 0.70)
+        c_vendor_fav = ContactRecord(id="c-th-vendor-fav", name="Fornecedor Estratégico", phone_number="554499330033", role="SERVICE_VENDOR", is_favorite=True)
+        # 4. Colega Favorito (peso 0.70 * 1.10 = 0.77 -> qualificado >= 0.70)
+        c_colleague_fav = ContactRecord(id="c-th-colleague", name="Parceiro Inovação", phone_number="554499440044", role="COLLEAGUE", is_favorite=True)
+
+        db.merge(c_exec)
+        db.merge(c_vendor)
+        db.merge(c_vendor_fav)
+        db.merge(c_colleague_fav)
+        db.commit()
+
+        # Checagens
+        should_exec, reason_exec, w_exec = should_analyze_sentiment("Marcos Diretor", db=db)
+        assert should_exec is True
+        assert w_exec == 1.00
+
+        should_vendor, reason_vendor, w_vendor = should_analyze_sentiment("Fornecedor Suprimentos", db=db)
+        assert should_vendor is False
+        assert "below" in reason_vendor
+        assert w_vendor == 0.50
+
+        should_colleague, reason_colleague, w_colleague = should_analyze_sentiment("Parceiro Inovação", db=db)
+        assert should_colleague is True
+        assert w_colleague == 0.77
+    finally:
+        db.close()

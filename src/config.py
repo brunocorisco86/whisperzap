@@ -75,5 +75,8 @@ class Settings(BaseSettings):
     AI_BYPASS_WORD_THRESHOLD: int = 3
     AI_BYPASS_PHRASES: str = "bom dia,boa tarde,boa noite,oi,olá,ola,ok,beleza,valeu,obrigado,obrigada,meu nome,sim,não,nao,tchau,ate mais,até mais,opa"
 
+    # Threshold de Peso / Influência para Análise de Sentimento (Default 0.70: Executivos, Família, Cooperados, Favoritos)
+    SENTIMENT_WEIGHT_THRESHOLD: float = 0.70
+
 
 settings = Settings()

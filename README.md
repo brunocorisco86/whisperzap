@@ -128,13 +128,17 @@ flowchart TD
 - **Priorização Dinâmica**: Qualquer contato favoritado no card web ganha **+10% sobre o peso base do seu papel** ($Effective = Base \times 1.10$).
 - **Visual Diferenciado**: Cartões com moldura âmbar suave, tag `⭐ +10% Fav` e estrela interativa para toggle com 1 clique.
 
-### 3. 🛡️ Funil Semântico Anti-Poluição (Economia de Tokens)
+### 3. 🛡️ Funil Semântico & Threshold de Influência (Economia de Tokens)
+- **Barreira de Identidade Prévia**: Nenhuma mensagem entra no AI Gateway ou na Memória se o remetente não tiver cartão cadastrado (`ContactRecord`).
+- **Threshold de Sentimento & Humor (`SENTIMENT_WEIGHT_THRESHOLD = 0.70`)**:
+  - Apenas pessoas de alto peso e influência na sua vida ($\ge 0.70$, como `OWNER`, `EXECUTIVE`, `FAMILY_CORE`, `PRODUCER_COOPERATED` ou contatos com **Estrela de Favorito**) ativam o gasto de tokens para inferência de sentimento e série temporal de humor.
+  - Prestadores pontuais ou terceiros sem estrela têm análise emocional dispensada (`NEUTRAL` / `0.0`), poupando tokens e mantendo o termômetro de humor focado no que é estratégico.
 - **Bloqueio de Mensagens Triviais**: Expressões de baixa relevância (*"bom dia"*, *"ok"*, *"blz"*, *"valeu"*, *"Sem texto disponível"*) são descartadas antes de chamar a IA.
-- **Proteção do Histórico**: Garante que o Word Cloud e o grafo não fiquem poluídos com saudações vazias.
 
 ### 4. 🧹 Agente Zeladora do Grafo (`GraphJanitor`)
-- **Faxina Semanal Programada**: Roda todo Domingo às 23:00.
-- **Poda Segura**: Remove nós órfãos temporais (*amanhã*, *ontem*) enquanto protege 100% dos contatos oficiais, empresas e projetos.
+- **Faxina Programada & Sob Demanda**: Roda todo Domingo às 23:00 ou via API.
+- **Deduplicação Inteligente de Cartões**: Mescla duplicatas por telefone ou variações fonéticas de nome, religando arestas no Grafo MUSA.
+- **Purga Implacável de Pessoas sem Cartão**: Deleta áudios, mensagens, tarefas, nós e snapshots de sentimentos de remetentes não cadastrados.
 
 ---
 

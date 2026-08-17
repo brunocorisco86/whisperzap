@@ -8,6 +8,7 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from src.contacts.models import ContactRecord
+from src.config import settings
 from src.memory.database import SessionLocal
 from src.memory.models import (
     DailySentimentCollectionResponse,
@@ -106,12 +107,17 @@ class SentimentTimelineService:
 
                 dominant_sent, avg_score = compute_dominant_sentiment(pos, neu, neg)
 
-                # Busca metadados do contato cadastrado (pessoas sem cartão não deixam registros de sentimento)
+                # Busca metadados do contato cadastrado (pessoas sem cartão ou abaixo do threshold de peso não deixam registros de sentimento)
                 contact = db.query(ContactRecord).filter(
                     (ContactRecord.name.ilike(speaker)) | (ContactRecord.phone_number == speaker)
                 ).first()
 
                 if not contact:
+                    continue
+
+                from src.contacts.service import calculate_effective_weight
+                contact_weight = calculate_effective_weight(contact)
+                if contact_weight < getattr(settings, "SENTIMENT_WEIGHT_THRESHOLD", 0.70):
                     continue
 
                 role_val = contact.role
