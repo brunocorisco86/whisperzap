@@ -59,10 +59,11 @@ class SentimentTimelineService:
             if not target_date:
                 target_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-            # Busca todas as mensagens da data
+            # Busca todas as mensagens da data de forma compatível com PostgreSQL e SQLite
+            from sqlalchemy import cast, String
             messages = (
                 db.query(MessageRecord)
-                .filter(MessageRecord.created_at.like(f"{target_date}%"))
+                .filter(cast(MessageRecord.created_at, String).like(f"{target_date}%"))
                 .order_by(MessageRecord.created_at.asc())
                 .all()
             )

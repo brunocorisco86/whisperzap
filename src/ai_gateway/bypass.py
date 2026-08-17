@@ -39,42 +39,39 @@ def is_group_message(meta_info: Optional[Dict[str, Any]] = None) -> bool:
 
 
 def get_owner_identifiers() -> set[str]:
-    """Retorna o conjunto de identificadores associados ao dono do sistema."""
-    identifiers = set()
+    """Retorna o conjunto de identificadores associados ao dono do sistema (Bruno Conter)."""
+    identifiers = {"bruno", "bruno conter", "bruno conter 🐔🇧🇷", "corisco", "brunao", "brunão", "você", "voce", "eu", "me", "admin"}
     if settings.USER_PHONE_NUMBER:
         digits = re.sub(r"\D", "", settings.USER_PHONE_NUMBER)
         if digits:
             identifiers.add(digits)
+            if len(digits) >= 8:
+                identifiers.add(digits[-8:])  # Últimos 8 dígitos para matching sem DDI/DDD/9º dígito
 
     if settings.USER_NAME:
         identifiers.add(settings.USER_NAME.strip().lower())
+        identifiers.add(normalize_text(settings.USER_NAME))
 
     if settings.USER_ALIASES:
         for alias in settings.USER_ALIASES.split(","):
             cleaned = alias.strip().lower()
             if cleaned:
                 identifiers.add(cleaned)
+                identifiers.add(normalize_text(cleaned))
                 digits = re.sub(r"\D", "", cleaned)
                 if digits and len(digits) >= 8:
                     identifiers.add(digits)
+                    identifiers.add(digits[-8:])
 
     return identifiers
 
 
 def is_owner_interaction(speaker: Optional[str] = None, meta_info: Optional[Dict[str, Any]] = None) -> bool:
-    """Verifica se uma interação/mensagem foi gerada pelo próprio usuário proprietário."""
+    """Verifica com alta precisão se uma mensagem/áudio foi gerada pelo próprio Bruno (notas pessoais ou mensagens enviadas)."""
     owner_ids = get_owner_identifiers()
+    owner_suffix = re.sub(r"\D", "", settings.USER_PHONE_NUMBER)[-8:] if settings.USER_PHONE_NUMBER else "97604925"
 
-    # Verifica speaker
-    if speaker:
-        speaker_clean = speaker.strip().lower()
-        speaker_digits = re.sub(r"\D", "", speaker)
-        if speaker_clean in owner_ids:
-            return True
-        if speaker_digits and speaker_digits in owner_ids:
-            return True
-
-    # Verifica meta_info
+    # 1. Verifica flag fromMe do WhatsApp
     if meta_info and isinstance(meta_info, dict):
         if meta_info.get("fromMe") is True or meta_info.get("fromMe") == 1 or meta_info.get("from_me") is True:
             return True
@@ -86,11 +83,24 @@ def is_owner_interaction(speaker: Optional[str] = None, meta_info: Optional[Dict
         remote_digits = re.sub(r"\D", "", remote_jid.split("@")[0])
         sender_digits = re.sub(r"\D", "", sender_phone)
 
-        if remote_digits and remote_digits in owner_ids:
+        if remote_digits and (remote_digits in owner_ids or remote_digits.endswith(owner_suffix)):
             return True
-        if sender_digits and sender_digits in owner_ids:
+        if sender_digits and (sender_digits in owner_ids or sender_digits.endswith(owner_suffix)):
             return True
-        if push_name and push_name in owner_ids:
+        if push_name and (push_name in owner_ids or "bruno" in push_name or "corisco" in push_name):
+            return True
+
+    # 2. Verifica speaker
+    if speaker:
+        speaker_clean = speaker.strip().lower()
+        speaker_normalized = normalize_text(speaker)
+        speaker_digits = re.sub(r"\D", "", speaker)
+
+        if speaker_clean in owner_ids or speaker_normalized in owner_ids:
+            return True
+        if "bruno conter" in speaker_clean or "bruno" in speaker_clean.split():
+            return True
+        if speaker_digits and (speaker_digits in owner_ids or speaker_digits.endswith(owner_suffix)):
             return True
 
     return False

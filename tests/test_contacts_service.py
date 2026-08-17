@@ -110,4 +110,56 @@ def test_calculate_priority_for_message(contact_db):
 
     # Mensagem com urgência MEDIUM vinda do Fornecedor -> Mantém MEDIUM / LOW
     p3 = service.calculate_priority_for_message("44911112222", raw_urgency="MEDIUM", db=contact_db)
-    assert p3 in ("MEDIUM", "LOW")
+    assert p3 in ["LOW", "MEDIUM"]
+
+
+def test_deduplicate_and_merge_contacts(contact_db):
+    service = ContactService()
+    from src.contacts.models import ContactRecord
+
+    # Cria contatos duplicados do Bruno
+    c_bruno1 = ContactRecord(
+        id="c_bruno1",
+        name="Bruno Conter 🐔🇧🇷",
+        phone_number="554497604925",
+        role="UNKNOWN",
+    )
+    c_bruno2 = ContactRecord(
+        id="c_bruno2",
+        name="Bruno Conter",
+        phone_number="44997604925",
+        nickname="Eu / Corisco/ Brunão",
+        role="EXECUTIVE",
+    )
+    # Cria contato com e sem telefone
+    c_debora1 = ContactRecord(
+        id="c_deb1",
+        name="Debora Patel",
+        phone_number="",
+        role="UNKNOWN",
+    )
+    c_debora2 = ContactRecord(
+        id="c_deb2",
+        name="Debora Patel Conter",
+        phone_number="5544999214934",
+        nickname="Esposa",
+        role="FAMILY_CORE",
+    )
+    contact_db.add_all([c_bruno1, c_bruno2, c_debora1, c_debora2])
+    contact_db.commit()
+
+    # Executa deduplicação
+    contacts = service.get_contacts(db=contact_db)
+
+    # Valida que o Bruno existe apenas 1 vez, consolidado com telefone
+    bruno_cards = [c for c in contacts if "Bruno" in c.name]
+    assert len(bruno_cards) == 1
+    assert bruno_cards[0].name == "Bruno Conter"
+    assert bruno_cards[0].role == "EXECUTIVE"
+    assert "97604925" in bruno_cards[0].phone_number
+
+    # Valida que Debora existe apenas 1 vez, mantendo o telefone já salvo
+    debora_cards = [c for c in contacts if "Debora" in c.name]
+    assert len(debora_cards) == 1
+    assert debora_cards[0].phone_number == "5544999214934"
+    assert debora_cards[0].role == "FAMILY_CORE"

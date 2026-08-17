@@ -1,8 +1,9 @@
 """Serviço de Gestão de Contatos, Ponderação de Prioridade e Integração com Grafo."""
 
 import logging
+from collections import defaultdict
 from datetime import datetime, timezone
-from typing import Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Tuple
 from uuid import uuid4
 from sqlalchemy.orm import Session
 from src.contacts.models import ContactRecord
@@ -17,6 +18,7 @@ from src.contacts.schemas import (
 )
 from src.memory.database import SessionLocal
 from src.memory.graph import knowledge_graph
+from src.config import settings
 
 import hashlib
 import re
@@ -86,37 +88,116 @@ class ContactService:
         db: Session | None = None,
     ) -> list[ContactResponse]:
         """Lista contatos com filtros opcionais e enriquecimento de sentimentos."""
+        return self.get_contacts(role=role, company=company, only_unknown=only_unknown, db=db)
+
+    def deduplicate_and_merge_contacts(self, db: Session) -> None:
+        """Deduplica e funde contatos redundantes, variações com emojis e contatos sem número."""
+        try:
+            from src.ai_gateway.bypass import is_owner_interaction, normalize_text
+            all_recs = db.query(ContactRecord).all()
+            if not all_recs:
+                return
+
+            # 1. Consolida o contato do proprietário (Bruno Conter)
+            owner_contacts = [c for c in all_recs if is_owner_interaction(c.name) or is_owner_interaction(c.phone_number)]
+            if owner_contacts:
+                primary_owner = next((c for c in owner_contacts if c.phone_number and len(c.phone_number) >= 8), owner_contacts[0])
+                primary_owner.name = "Bruno Conter"
+                primary_owner.phone_number = settings.USER_PHONE_NUMBER or "554497604925"
+                primary_owner.role = "EXECUTIVE"
+                primary_owner.nickname = "Eu / Proprietário"
+                primary_owner.company = "Hermes Memory"
+                primary_owner.notes = "Proprietário do sistema Hermes Voice Memory."
+                primary_owner.updated_at = datetime.now(timezone.utc)
+
+                for dup in owner_contacts:
+                    if dup.id != primary_owner.id:
+                        db.delete(dup)
+                db.commit()
+
+            # 2. Funde contatos com mesmo número de telefone (últimos 8 dígitos)
+            remaining = db.query(ContactRecord).all()
+            phone_groups: Dict[str, List[ContactRecord]] = defaultdict(list)
+            for c in remaining:
+                digits = re.sub(r"\D", "", c.phone_number or "")
+                if len(digits) >= 8:
+                    suffix = digits[-8:]
+                    phone_groups[suffix].append(c)
+
+            for suffix, group in phone_groups.items():
+                if len(group) > 1:
+                    # Escolhe o mais completo como primário
+                    primary = max(group, key=lambda x: (x.role != "UNKNOWN", len(x.name or ""), len(x.notes or "")))
+                    for dup in group:
+                        if dup.id != primary.id:
+                            # Herda notas ou apelidos se existirem
+                            if dup.nickname and not primary.nickname:
+                                primary.nickname = dup.nickname
+                            if dup.company and not primary.company:
+                                primary.company = dup.company
+                            db.delete(dup)
+                    db.commit()
+
+            # 3. Funde contatos sem número cujo nome é contido em um contato com número
+            remaining = db.query(ContactRecord).all()
+            with_phone = [c for c in remaining if c.phone_number and len(re.sub(r"\D", "", c.phone_number)) >= 8]
+            without_phone = [c for c in remaining if not c.phone_number or len(re.sub(r"\D", "", c.phone_number)) < 8]
+
+            for unk in without_phone:
+                unk_clean = normalize_text(unk.name)
+                match = next((wp for wp in with_phone if unk_clean and (unk_clean in normalize_text(wp.name) or normalize_text(wp.name) in unk_clean)), None)
+                if match:
+                    if unk.notes and unk.notes not in (match.notes or ""):
+                        match.notes = f"{match.notes or ''} | {unk.notes}".strip(" |")
+                    db.delete(unk)
+            db.commit()
+
+        except Exception as e:
+            logger.warning(f"Erro na deduplicação de contatos: {e}")
+            db.rollback()
+
+    def get_contacts(
+        self,
+        role: str | None = None,
+        company: str | None = None,
+        only_unknown: bool = False,
+        db: Session | None = None,
+    ) -> List[ContactResponse]:
+        """Retorna lista de contatos enriquecida com deduplicação automática e histórico emocional."""
         should_close = False
         if db is None:
             db = SessionLocal()
             should_close = True
 
         try:
-            # 1. Garante que TODA pessoa real do Grafo NetworkX possua um card no banco SQL
+            # 1. Executa auto-deduplicação e fusão preventiva
+            self.deduplicate_and_merge_contacts(db=db)
+
+            # 2. Sincroniza pessoas conhecidas do Grafo
             try:
-                from src.ai_gateway.bypass import is_owner_interaction
+                from src.ai_gateway.bypass import is_owner_interaction, normalize_text
                 person_nodes = knowledge_graph.list_nodes(category="PERSON")
+                all_sql_contacts = db.query(ContactRecord).all()
                 for node in person_nodes:
                     node_name = node.get("name") or ""
-                    node_id = str(node.get("id") or "").strip()
                     if not node_name or node_name.lower() in ["user", "desconhecido", "equipe", "hermes"]:
                         continue
 
-                    phone = (node.get("phone") or "").strip()
-                    if is_owner_interaction(node_name) or is_owner_interaction(phone):
-                        phone = settings.USER_PHONE_NUMBER
-                        node_name = settings.USER_NAME
+                    if is_owner_interaction(node_name):
+                        continue
 
-                    c_id = generate_contact_id(node_name.strip(), phone)
-                    existing = db.query(ContactRecord).filter(
-                        (ContactRecord.name.ilike(node_name.strip())) | (ContactRecord.id == c_id)
-                    ).first()
+                    clean_nname = normalize_text(node_name)
+                    # Verifica se já existe contato com nome igual ou substring
+                    existing = next((c for c in all_sql_contacts if clean_nname and (clean_nname in normalize_text(c.name) or normalize_text(c.name) in clean_nname)), None)
+
+                    phone = (node.get("phone") or "").strip()
                     if not existing:
+                        c_id = generate_contact_id(node_name.strip(), phone)
                         c_rec = ContactRecord(
                             id=c_id,
                             name=node_name.strip(),
                             phone_number=phone,
-                            role=node.get("role") or ("EXECUTIVE" if is_owner_interaction(node_name) else "UNKNOWN"),
+                            role=node.get("role") or "UNKNOWN",
                             company=node.get("company") or "",
                             projects_json=[node.get("details")] if node.get("details") else [],
                             notes=node.get("details") or "",
@@ -125,14 +206,12 @@ class ContactService:
                         )
                         db.add(c_rec)
                         db.commit()
-                    elif is_owner_interaction(node_name) and existing.phone_number != settings.USER_PHONE_NUMBER:
-                        existing.phone_number = settings.USER_PHONE_NUMBER
-                        db.commit()
+                        all_sql_contacts.append(c_rec)
             except Exception as e:
                 logger.warning(f"Aviso ao auto-sincronizar nós de pessoas do grafo: {e}")
                 db.rollback()
 
-            # 2. Busca contatos com filtros
+            # 3. Busca contatos com filtros
             query = db.query(ContactRecord)
             if only_unknown:
                 query = query.filter(ContactRecord.role == "UNKNOWN")
