@@ -249,7 +249,7 @@ async function loadStats() {
     const res = await fetch('/api/v1/memory/stats');
     if (res.ok) {
       const data = await res.json();
-      statGraphNodesEl.textContent = `${data.graph_nodes || 32} nós no Grafo`;
+      statGraphNodesEl.textContent = `${data.graph_nodes || 32} nós na MUSA`;
     }
   } catch (err) {
     console.error('Erro ao carregar métricas:', err);
@@ -557,7 +557,7 @@ function renderContacts() {
     contactsContainer.innerHTML = `
       <div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-muted);">
         <p style="font-size: 1.2rem; margin-bottom: 0.5rem;">Nenhum contato encontrado</p>
-        <small>Adicione novos contatos para expandir o Grafo Social do Hermes.</small>
+        <small>Adicione novos contatos para expandir o Grafo Neural MUSA.</small>
       </div>
     `;
     return;

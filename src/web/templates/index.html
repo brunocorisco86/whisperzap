@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hermes Control Hub — Copiloto de Voz & Memória</title>
+  <title>HERMES & MUSA — Voice Intelligence & Neural Memory Engine</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <!-- Vis.js Network for Interactive Graph -->
@@ -19,10 +19,14 @@
   <!-- Top Navbar -->
   <header class="navbar">
     <div class="nav-brand">
-      <span class="brand-icon">🏛️</span>
+      <img src="/static/favicon.svg" alt="MUSA Icon" class="brand-logo-img" style="width: 36px; height: 36px; filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.45));">
       <div class="brand-text">
-        <h1>HERMES CONTROL HUB</h1>
-        <span class="brand-subtitle">Voice Memory & Knowledge Graph System</span>
+        <h1 class="brand-title">
+          <span class="hermes-brand">HERMES</span>
+          <span class="ampersand">&</span>
+          <span class="musa-brand">MUSA</span>
+        </h1>
+        <span class="brand-subtitle">Voice Intelligence & Neural Knowledge Graph</span>
       </div>
     </div>
 
@@ -33,7 +37,7 @@
       </div>
       <div class="status-badge status-online" id="status-db">
         <span class="dot"></span>
-        <span id="stat-graph-nodes">... nós no Grafo</span>
+        <span id="stat-graph-nodes">... nós na MUSA</span>
       </div>
       <button class="btn btn-secondary btn-sm" id="btn-refresh-all" title="Recarregar Dados da VPS">
         🔄 Atualizar
@@ -50,7 +54,7 @@
         👥 Contatos (<span id="count-contacts">0</span>)
       </button>
       <button class="tab-btn" data-tab="tab-graph">
-        🕸️ Grafo Interativo NetworkX
+        🕸️ Grafo MUSA (NetworkX)
       </button>
       <button class="tab-btn" data-tab="tab-tasks">
         📋 Tarefas (<span id="count-tasks">0</span>)
@@ -65,10 +69,10 @@
         📖 Dicionário Léxico (<span id="count-dict">0</span>)
       </button>
       <button class="tab-btn" data-tab="tab-sentiment">
-        🌡️ Sentimentos & Série Temporal
+        🌡️ Sentimentos & Humor
       </button>
       <button class="tab-btn" data-tab="tab-query">
-        🧠 Testador RAG
+        🧠 Agente Hermes (Q&A)
       </button>
       <button class="tab-btn" data-tab="tab-infra">
         ⚙️ Infra & Topologia
@@ -106,6 +110,17 @@
 
     <!-- Tab 2: Interactive NetworkX Knowledge Graph -->
     <section id="tab-graph" class="tab-content">
+      <div style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+          <h2 style="font-family: var(--font-display); font-size: 1.35rem; display: flex; align-items: center; gap: 0.5rem; color: #fef08a;">
+            🕸️ Grafo de Conhecimento Neural MUSA
+          </h2>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.2rem;">
+            Mapeamento relacional vivo de pessoas, fazendas, cooperativas e fluxos de decisão do Homelab.
+          </p>
+        </div>
+      </div>
+
       <div class="graph-toolbar">
         <div class="graph-legend">
           <span class="legend-item"><span class="legend-dot" style="background:#10b981"></span> Pessoas & Contatos</span>
@@ -682,6 +697,12 @@
       </form>
     </div>
   </div>
+
+  <!-- Footer Executivo -->
+  <footer style="margin-top: 3rem; margin-bottom: 2rem; padding: 1.5rem 0; border-top: 1px solid var(--border-subtle); text-align: center; color: var(--text-muted); font-size: 0.82rem;">
+    <div><strong style="font-family: var(--font-display); letter-spacing: 0.05em; color: var(--text-secondary);"><span class="hermes-brand">HERMES</span> & <span class="musa-brand">MUSA</span></strong> • Voice Intelligence & Neural Memory Engine</div>
+    <div style="margin-top: 0.35rem; font-size: 0.75rem; color: var(--text-muted);">Proprietário & Arquiteto: <strong style="color: #fef08a;">Bruno Conter</strong> • Homelab & Gestão Estratégica</div>
+  </footer>
 
   <!-- Toast Notification -->
   <div class="toast" id="toast">
