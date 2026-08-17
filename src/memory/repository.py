@@ -85,7 +85,7 @@ class MemoryRepository:
                 db=db,
             )
             if drop_active:
-                logger.info(f"Mensagem DESCARTADA (não salva na memória): remetente='{data.speaker}', motivo='{drop_reason}', texto='{text_to_check[:40]}'")
+                logger.info(f"🛡️ [Privilégio] Mensagem DESCARTADA (não salva na MUSA): remetente='{data.speaker}', motivo='{drop_reason}', texto='{text_to_check[:40]}'")
                 return None
 
             msg_id = str(uuid4())
@@ -100,7 +100,7 @@ class MemoryRepository:
             )
 
             if bypass_active:
-                logger.info(f"Bypass de IA ativado para mensagem de '{data.speaker}': motivo='{bypass_reason}'")
+                logger.info(f"⚡ [AI Gateway] Bypass de IA ativado para remetente='{data.speaker}': motivo='{bypass_reason}'")
                 from src.ai_gateway.schemas import SemanticExtractionResponse
                 extracted = SemanticExtractionResponse(
                     intent="NOTE",
