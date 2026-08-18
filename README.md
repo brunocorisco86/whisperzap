@@ -135,10 +135,31 @@ flowchart TD
   - Prestadores pontuais ou terceiros sem estrela têm análise emocional dispensada (`NEUTRAL` / `0.0`), poupando tokens e mantendo o termômetro de humor focado no que é estratégico.
 - **Bloqueio de Mensagens Triviais**: Expressões de baixa relevância (*"bom dia"*, *"ok"*, *"blz"*, *"valeu"*, *"Sem texto disponível"*) são descartadas antes de chamar a IA.
 
-### 4. 🧹 Agente Zeladora do Grafo (`GraphJanitor`)
-- **Faxina Programada & Sob Demanda**: Roda todo Domingo às 23:00 ou via API.
-- **Deduplicação Inteligente de Cartões**: Mescla duplicatas por telefone ou variações fonéticas de nome, religando arestas no Grafo MUSA.
-- **Purga Implacável de Pessoas sem Cartão**: Deleta áudios, mensagens, tarefas, nós e snapshots de sentimentos de remetentes não cadastrados.
+### 4. 🎙️ Whisper com Dynamic Prompt Priming & Silero VAD Calibrado
+- **Condicionamento de Vocabulário na Fonte**: Injeta termos oficiais (`C.Vale, eProdutor, Mtech, Agrocenter, Silo, Balança, Granja, Aviário, FAL, TMS, BRIM, FMIM, GASP, Plasson`) e contatos favoritos diretamente no `initial_prompt` do Whisper.
+- **Eliminação de Alucinações Fonéticas**: O Whisper já transcreve sabendo quais palavras técnicas e nomes próprios existem no domínio.
+- **VAD Tuned**: Silero VAD calibrado para ambientes com ruídos de aviários, compressores e trânsito.
+
+### 5. 🕸️ GraphRAG Híbrido (pgvector + NetworkX 2-Hop + spaCy)
+- **Extração Semântica da Query**: O spaCy extrai entidades, cargos, equipamentos e sintagmas nominais da pergunta do usuário.
+- **Subgrafo Topológico de 2 Saltos**: Realiza travessia de 2 graus no NetworkX recuperando conexões estruturais completas (ex: `Valdecir` ➔ `SUPERVISIONA` ➔ `Granja` ➔ `CONTAINS` ➔ `Aviário 4` ➔ `EQUIPMENT` ➔ `Silo 3`).
+- **Boost de Relevância**: Mensagens vetoriais correlacionadas às entidades do subgrafo ganham prioridade no re-ranqueamento.
+
+### 6. ✂️ Compressão Extrativa com spaCy & Cache Semântico Local
+- **Extractive Sentence Compressor (TextRank)**: Pontua e retém apenas as orações com alta densidade informacional (entidades, prazos, números e ações), podando fillers e reduzindo em **30% a 50% o consumo de tokens** em áudios longos.
+- **Cache Semântico Local**: Responde perguntas frequentes com matching fuzzy ($\ge 94\%$) em $< 5\text{ms}$ com **Zero tokens**.
+
+### 7. 🛡️ Guardrail Universal de Ortografia & Bloqueio Estrito de Nós
+- **Validação Fonotática Universal**: Detecção de dígrafos invertidos (`hl`, `hn`), repetições ilegais (`bb`, `ff`, `xx`) e sequências sem vogais.
+- **Auto-correção Fuzzy**: Termos com typos são auto-corrigidos para sua forma canônica (`senosr` ➔ `Sensor`, `fihlos` ➔ `Filho`).
+- **Zero Nós com Erro**: Qualquer erro ortográfico não corrigível é sumariamente impedido de virar nó no grafo.
+
+### 8. ⛏️ Mineração de Jargões & Gerador Fonético do Dicionário
+- **Descoberta Autônoma**: O spaCy varre as mensagens e descobre jargões e siglas inéditas (`C-Value` / `Termhood`) sem supervisão.
+- **Gerador Fonético**: Gera automaticamente variações fonéticas prováveis do Whisper para qualquer termo novo.
+
+### 9. 🇧🇷 Alinhamento de Fuso Horário de Brasília (America/Sao_Paulo)
+- Conversão precisa de todos os timestamps do banco para o Horário de Brasília (UTC-3), garantindo que consultas sobre "hoje" e "ontem" operem no fuso brasileiro sem distorções de UTC.
 
 ---
 
@@ -172,7 +193,8 @@ pytest tests/ -v
 
 | Método | Endpoint | Descrição |
 | :--- | :--- | :--- |
-| `POST` | `/transcribe` | Transcrição de áudio via Faster-Whisper |
+| `POST` | `/transcribe` | Transcrição de áudio via Faster-Whisper com Dynamic Prompt Priming |
+| `POST` | `/transcribe/base64` | Transcrição de áudio base64 com suporte a speaker e prompt |
 | `POST` | `/ai/revise` | Revisão contextual de texto com jargões técnicos via AI Gateway |
 | `GET` | `/api/v1/contacts` | Lista contatos reais com pesos calculados, status de favorito e sentimentos |
 | `PATCH`| `/api/v1/contacts/{id}/favorite` | Alterna o status de favorito do contato (+10% de peso) |
@@ -180,9 +202,15 @@ pytest tests/ -v
 | `POST` | `/api/v1/memory/messages` | Salva mensagem com extração semântica e nós no Grafo |
 | `GET` | `/api/v1/memory/tasks` | Lista tarefas com ancoragem de solicitante e anotações |
 | `PATCH`| `/api/v1/memory/tasks/{id}` | Atualiza status (`DONE`, `CANCELLED`, `PENDING`) e anotações |
-| `GET` | `/api/v1/analytics/dashboard` | KPIs executivos, séries temporais, WordMap e Heatmap 24x7 |
+| `POST` | `/api/v1/memory/tasks/optimize-learner` | Dispara otimizador de tarefas com spaCy e agente LLM |
+| `GET` | `/api/v1/memory/tasks/learner-rules` | Consulta regras ativas anti-ruído de tarefas |
 | `POST` | `/api/v1/memory/graph/clean` | Dispara faxina da Zeladora (podas, fusão de aliases, deduplicação de cards e purga de órfãos) |
-| `POST` | `/api/v1/memory/query` | Consulta ao Hermes com RAG Híbrido e citação de fontes |
+| `POST` | `/api/v1/memory/graph/hybrid-search` | Inspeção de subgrafo 2-hop e entidades extraídas para qualquer consulta |
+| `POST` | `/api/v1/memory/query` | Consulta ao Hermes com GraphRAG Híbrido, cache semântico e citação de fontes |
+| `GET` | `/api/v1/memory/token-savings` | Métricas em tempo real de tokens economizados |
+| `GET` | `/api/v1/dictionary/suggestions` | Sugestões inteligentes de termos minerados com spaCy |
+| `POST` | `/api/v1/dictionary/generate-phonetics` | Gerador de variações fonéticas para o Whisper |
+| `GET` | `/api/v1/analytics/dashboard` | KPIs executivos, séries temporais, WordMap e Heatmap 24x7 |
 
 ---
 
