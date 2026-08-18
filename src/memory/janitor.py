@@ -126,6 +126,13 @@ class GraphJanitorService:
                     nodes_to_remove.add(node)
                     continue
 
+                # Regra de Erros Ortográficos e Lixo Fonotático Universal
+                from src.ai_gateway.entity_sanitizer import entity_sanitizer
+                is_valid_node, _, _ = entity_sanitizer.is_valid_node_entity(node, category)
+                if not is_valid_node:
+                    nodes_to_remove.add(node)
+                    continue
+
                 # Regra de Nós Isolados de Baixo Valor (grau 0 e mentions <= 1)
                 if prune_isolated:
                     degree = g.degree(node)
