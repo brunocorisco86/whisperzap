@@ -20,13 +20,15 @@ router = APIRouter(prefix="", tags=["Speech to Text"])
     "/transcribe",
     response_model=TranscriptionResponse,
     status_code=status.HTTP_200_OK,
-    summary="Transcreve arquivo de áudio para texto",
-    description="Recebe arquivo de áudio (WhatsApp .ogg/.opus, .mp3, .wav, .m4a) e processa via faster-whisper.",
+    summary="Transcreve arquivo de áudio para texto com Dynamic Priming",
+    description="Recebe arquivo de áudio (WhatsApp .ogg/.opus, .mp3, .wav, .m4a) e processa via faster-whisper com Dynamic Prompt Priming.",
 )
 async def transcribe_audio_file(
     file: UploadFile = File(..., description="Arquivo de áudio para transcrição"),
     language: Optional[str] = Query(default="pt", description="Código do idioma (ex: pt, en)"),
     audio_id: Optional[str] = Query(default=None, description="Identificador único customizado do áudio"),
+    speaker: Optional[str] = Query(default=None, description="Nome ou identificador do interlocutor para Dynamic Priming"),
+    prompt: Optional[str] = Query(default=None, description="Contexto ou vocabulário adicional opcional"),
 ) -> TranscriptionResponse:
     """Endpoint para transcrição de áudio."""
     start_time = time.perf_counter()
@@ -49,6 +51,8 @@ async def transcribe_audio_file(
         text, detected_lang, lang_prob, duration, segments = await whisper_service.transcribe_audio(
             audio_path_or_file=tmp_path,
             language=language,
+            speaker=speaker,
+            custom_prompt=prompt,
         )
     except Exception as exc:
         logger.error(f"Erro ao transcrever arquivo de áudio '{file.filename}': {exc}")
@@ -124,6 +128,8 @@ async def transcribe_audio_base64(
         text, detected_lang, lang_prob, duration, segments = await whisper_service.transcribe_audio(
             audio_path_or_file=tmp_path,
             language=payload.language,
+            speaker=payload.speaker,
+            custom_prompt=payload.prompt,
         )
     except Exception as exc:
         logger.error(f"Erro ao transcrever áudio base64: {exc}")

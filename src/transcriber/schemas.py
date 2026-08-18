@@ -34,4 +34,6 @@ class TranscriptionBase64Request(BaseModel):
     base64: str = Field(..., description="Conteúdo do arquivo de áudio codificado em base64")
     language: Optional[str] = Field(default="pt", description="Código do idioma (ex: pt, en)")
     audio_id: Optional[str] = Field(default=None, description="Identificador único opcional")
+    speaker: Optional[str] = Field(default=None, description="Nome ou telefone do locutor para Dynamic Prompt Priming")
+    prompt: Optional[str] = Field(default=None, description="Contexto ou termos adicionais para orientar o Whisper")
 
