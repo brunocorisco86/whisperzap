@@ -570,86 +570,29 @@ class MemoryRepository:
             if is_today:
                 sources.sort(key=lambda s: s.created_at or "", reverse=True)
 
-            # 3. Extração de conexões e metadados no Grafo de Conhecimento e Contatos
+            # 3. GraphRAG Híbrido: Extração de entidades com spaCy e Expansão Topológica de 2 Saltos
             related_entities = []
             if include_graph:
-                # Se a pergunta for em 1ª pessoa ("minha", "meu", "eu", "esposa", "família"), expande o nó do usuário (Bruno)
-                is_first_person = any(t in ("minha", "meu", "eu", "esposa", "marido", "familia", "família", "minhas", "meus") for t in query_tokens)
-                if is_first_person and "bruno" not in query_tokens:
-                    query_tokens.extend(["bruno", "user"])
+                from src.memory.hybrid_graph_rag import hybrid_graph_rag
 
-                # Mapeamento de sinônimos de papéis
-                role_filter = set()
-                if any(t in ("esposa", "marido", "conjuge", "cônjuge", "familia", "família", "filho", "filha", "mãe", "pai") for t in query_tokens):
-                    role_filter.add("FAMILY_CORE")
-                if any(t in ("produtor", "associado", "cooperado", "integrado", "granjeiro", "avicultor") for t in query_tokens):
-                    role_filter.add("PRODUCER_COOPERATED")
-                if any(t in ("diretor", "gestor", "chefe", "gerente", "lider", "líder", "executivo") for t in query_tokens):
-                    role_filter.add("EXECUTIVE")
-                if any(t in ("consultor", "consultoria", "stakeholder", "especialista") for t in query_tokens):
-                    role_filter.add("STAKEHOLDER")
+                # 3.1 Extrai entidades da query e expande subgrafo de 2 graus no NetworkX
+                seed_entities = hybrid_graph_rag.extract_query_entities(query)
+                # Inclui também tokens brutos caso o spaCy não tenha pego
+                seed_entities.extend([t for t in query_tokens if len(t) > 3])
+                
+                subgraph_data = hybrid_graph_rag.expand_subgraph_2_hop(seed_entities, max_hops=2)
+                related_entities.extend(subgraph_data.get("node_details", []))
+                related_entities.extend(subgraph_data.get("triples", []))
 
-                all_nodes = knowledge_graph.list_nodes()
-                for node in all_nodes:
-                    node_name = node.get("name", "")
-                    node_details = str(node.get("details", "")).lower()
-                    node_role = str(node.get("role", "")).upper()
-                    node_phone = str(node.get("phone", "")).lower()
-
-                    matches = (
-                        any(t in node_name.lower() for t in query_tokens)
-                        or any(t in node_details for t in query_tokens)
-                        or any(t in node_role.lower() for t in query_tokens)
-                        or any(t in node_phone for t in query_tokens)
-                        or (node_role in role_filter)
-                    )
-
-                    if matches:
-                        # Adiciona metadados estruturados do próprio nó
-                        node_parts = [f"Entidade: {node_name}"]
-                        if node.get("role"):
-                            node_parts.append(f"Cargo/Role: {node.get('role')}")
-                        if node.get("phone"):
-                            node_parts.append(f"Telefone: {node.get('phone')}")
-                        if node.get("company"):
-                            node_parts.append(f"Empresa: {node.get('company')}")
-                        if node.get("details"):
-                            node_parts.append(f"Detalhes: {node.get('details')}")
-                        related_entities.append(" | ".join(node_parts))
-
-                        neighborhood = knowledge_graph.get_neighborhood(node_name, depth=1)
-                        if neighborhood.get("found"):
-                            for n_node in neighborhood.get("nodes", []):
-                                n_id = n_node.get("id")
-                                if n_id and n_id != node_name and (n_node.get("phone") or n_node.get("role") or n_node.get("details")):
-                                    parts = [f"Contato Vinculado: {n_id}"]
-                                    if n_node.get("role"):
-                                        parts.append(f"Role: {n_node.get('role')}")
-                                    if n_node.get("phone"):
-                                        parts.append(f"Telefone: {n_node.get('phone')}")
-                                    if n_node.get("company"):
-                                        parts.append(f"Empresa: {n_node.get('company')}")
-                                    if n_node.get("details"):
-                                        parts.append(f"Detalhes: {n_node.get('details')}")
-                                    related_entities.append(" | ".join(parts))
-
-                            conn_strs = [
-                                f"{edge.get('source')} -[{edge.get('relation')}]-> {edge.get('target')}"
-                                for edge in neighborhood.get("edges", [])
-                            ]
-                            related_entities.extend(conn_strs)
-
-                # Busca cruzada na tabela SQL de Contatos
+                # 3.2 Busca cruzada na tabela SQL de Contatos
                 from src.contacts.models import ContactRecord
                 sql_contacts = db.query(ContactRecord).all()
                 for c in sql_contacts:
-                    c_role = (c.role or "").upper()
                     c_matches = (
                         any(t in c.name.lower() for t in query_tokens)
                         or (c.nickname and any(t in c.nickname.lower() for t in query_tokens))
                         or (c.notes and any(t in c.notes.lower() for t in query_tokens))
                         or (c.company and any(t in c.company.lower() for t in query_tokens))
-                        or (c_role in role_filter)
                     )
                     if c_matches:
                         c_parts = [f"Contato Oficial: {c.name}"]
@@ -685,10 +628,22 @@ class MemoryRepository:
                     notes = f" (Notas: {t.notes})" if t.notes else ""
                     related_tasks.append(f"{speaker_info}{t.title}{assignee}{due}{notes} [Prioridade: {t.priority}]")
 
-            # 5. Chama o Agente Hermes para inferência e resposta estrita
+            # 5. Fusão e Re-ranqueamento com Boost de Subgrafo
+            if include_graph:
+                from src.memory.hybrid_graph_rag import hybrid_graph_rag
+                fused = hybrid_graph_rag.fuse_vector_and_graph_results(
+                    vector_sources=sources,
+                    subgraph_data=subgraph_data,
+                    pending_tasks=related_tasks,
+                )
+                final_sources = fused["sources"]
+            else:
+                final_sources = sources
+
+            # 6. Chama o Agente Hermes para inferência e resposta estrita
             return await hermes_agent_service.answer_hermes_query(
                 query=query,
-                sources=sources[:12],  # Limite confortável de fontes relevantes
+                sources=final_sources[:12],  # Limite confortável de fontes relevantes
                 related_entities=list(set(related_entities)),
                 pending_tasks=related_tasks,
             )

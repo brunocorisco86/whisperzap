@@ -544,4 +544,29 @@ async def get_task_learner_rules():
     return task_learner_engine._cached_rules or task_learner_engine._load_rules()
 
 
+# ===================== GraphRAG Híbrido (Inspeção & Debug) =====================
+
+
+@router.post(
+    "/graph/hybrid-search",
+    summary="Executa busca híbrida de subgrafo 2-Hop + entidades spaCy",
+    tags=["graph", "rag"],
+)
+async def hybrid_graph_search(
+    query: str = Query(..., description="Pergunta ou termos de busca"),
+    max_hops: int = Query(default=2, ge=1, le=3, description="Grau máximo de saltos no subgrafo"),
+):
+    """Retorna as entidades extraídas pela spaCy e o subgrafo induzido de 2 saltos do NetworkX."""
+    from src.memory.hybrid_graph_rag import hybrid_graph_rag
+
+    entities = hybrid_graph_rag.extract_query_entities(query)
+    subgraph = hybrid_graph_rag.expand_subgraph_2_hop(entities, max_hops=max_hops)
+    return {
+        "query": query,
+        "extracted_entities": entities,
+        "subgraph": subgraph,
+    }
+
+
+
 
