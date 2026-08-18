@@ -169,10 +169,10 @@ async def get_entity_neighborhood(name: str, depth: int = Query(default=1, ge=1,
 @router.get("/graph/full")
 async def get_full_graph(
     main_only: bool = Query(default=True, description="Exibir apenas nós principais e conectados (padrão)"),
-    days_cutoff: int = Query(default=30, description="Ocultar contatos sem interação há mais de X dias (padrão: 30)"),
+    days_cutoff: int = Query(default=7, description="Ocultar contatos sem interação há mais de X dias (padrão: 7)"),
     db: Session = Depends(get_db),
 ):
-    """Retorna o grafo estruturado e otimizado para o frontend, aplicando filtros de relevância e corte temporal padrão."""
+    """Retorna o grafo estruturado e otimizado para o frontend, aplicando filtros de relevância e corte temporal padrão (7 dias)."""
     from datetime import datetime, timezone, timedelta
     from src.contacts.models import ContactRecord
     from src.memory.models import MessageRecord
@@ -190,7 +190,12 @@ async def get_full_graph(
     }
 
     now = datetime.now(timezone.utc)
-    cutoff_time = now - timedelta(days=days_cutoff) if days_cutoff > 0 else None
+    if days_cutoff == 1:
+        cutoff_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif days_cutoff > 1:
+        cutoff_time = now - timedelta(days=days_cutoff)
+    else:
+        cutoff_time = None
 
     # 1. Conjunto estrito de identificadores de pessoas que CONVERSARAM no banco de dados
     active_conversations_people = set()

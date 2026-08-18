@@ -106,7 +106,7 @@ async def test_task_creation_permission_enforcement():
 
 
 def test_graph_cutoff_and_main_only_default():
-    """Testa se o endpoint /api/v1/memory/graph/full aplica corte de 30 dias e nós principais por padrão."""
+    """Testa se o endpoint /api/v1/memory/graph/full aplica corte de 7 dias e nós principais por padrão."""
     db = SessionLocal()
     try:
         now = datetime.now(timezone.utc)
@@ -151,7 +151,7 @@ def test_graph_cutoff_and_main_only_default():
         knowledge_graph.add_node("Contato Ativo Recente", category="PERSON", last_interaction_at=recent_date.isoformat())
         knowledge_graph.add_edge("Contato Ativo Recente", "Granja Central", relation="SUPERVISES")
 
-        # 1. Chamada Padrão (main_only=True, days_cutoff=30)
+        # 1. Chamada Padrão (main_only=True, days_cutoff=7)
         res_default = client.get("/api/v1/memory/graph/full")
         assert res_default.status_code == 200
         data_default = res_default.json()
@@ -159,10 +159,19 @@ def test_graph_cutoff_and_main_only_default():
 
         assert "Contato Ativo Recente" in node_ids_default
         assert "Contato Inativo Antigo" not in node_ids_default
-        assert data_default["stats"]["days_cutoff"] == 30
+        assert data_default["stats"]["days_cutoff"] == 7
         assert data_default["stats"]["main_only"] is True
 
-        # 2. Chamada Completa (main_only=False, days_cutoff=0)
+        # 2. Chamadas explícitas com opções [1, 7, 30, 60]
+        res_30 = client.get("/api/v1/memory/graph/full?days_cutoff=30")
+        assert res_30.status_code == 200
+        assert res_30.json()["stats"]["days_cutoff"] == 30
+
+        res_60 = client.get("/api/v1/memory/graph/full?days_cutoff=60")
+        assert res_60.status_code == 200
+        assert res_60.json()["stats"]["days_cutoff"] == 60
+
+        # 3. Chamada Completa (main_only=False, days_cutoff=0)
         res_all = client.get("/api/v1/memory/graph/full?main_only=false&days_cutoff=0")
         assert res_all.status_code == 200
         data_all = res_all.json()

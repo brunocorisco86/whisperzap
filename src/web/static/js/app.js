@@ -363,11 +363,12 @@ let isGraphPhysicsActive = false;
 async function loadGraphData() {
   try {
     const filterSelect = document.getElementById('graph-filter-mode');
-    const filterVal = filterSelect ? filterSelect.value : 'active_30d';
-    const mainOnly = filterVal === 'active_30d';
-    const daysCutoff = filterVal === 'active_30d' ? 30 : 0;
+    const filterVal = filterSelect ? filterSelect.value : '7';
+    const daysCutoff = parseInt(filterVal, 10);
+    const mainOnly = isNaN(daysCutoff) || daysCutoff > 0;
+    const effectiveCutoff = isNaN(daysCutoff) ? 7 : daysCutoff;
 
-    const res = await fetch(`/api/v1/memory/graph/full?main_only=${mainOnly}&days_cutoff=${daysCutoff}`);
+    const res = await fetch(`/api/v1/memory/graph/full?main_only=${mainOnly}&days_cutoff=${effectiveCutoff}`);
     if (res.ok) {
       graphRawData = await res.json();
       if (document.getElementById('tab-graph').classList.contains('active')) {

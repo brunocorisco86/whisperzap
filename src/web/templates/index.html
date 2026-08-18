@@ -170,9 +170,12 @@
           <span class="legend-item"><span class="legend-dot" style="background:#f97316"></span> Equipamentos (Silos)</span>
         </div>
         <div class="graph-controls">
-          <select id="graph-filter-mode" class="graph-filter-select" title="Filtro de visualização do grafo">
-            <option value="active_30d" selected>⭐ Nós Principais (&lt; 30 dias)</option>
-            <option value="all">🌐 Grafo Completo (Todos os Nós)</option>
+          <select id="graph-filter-mode" class="graph-filter-select" title="Filtro de período dos contatos no grafo">
+            <option value="1">📅 Hoje</option>
+            <option value="7" selected>⭐ Últimos 7 dias (Padrão)</option>
+            <option value="30">📆 Últimos 30 dias</option>
+            <option value="60">🗓️ Últimos 60 dias</option>
+            <option value="0">🌐 Todos os Contatos</option>
           </select>
           <input type="text" id="graph-search-node" placeholder="🔍 Focar em nó..." class="graph-search-input" title="Digite o nome de uma entidade ou pessoa para dar zoom">
           <button class="btn btn-secondary btn-sm" id="btn-toggle-physics" title="Alterna física ativa / congelada para máxima performance mobile">
