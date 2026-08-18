@@ -24,6 +24,8 @@ class ContactRecord(Base):
     avatar_url = Column(String(500), nullable=True)  # URL da foto de perfil do WhatsApp
     custom_weight = Column(Float, nullable=True)
     is_favorite = Column(Boolean, default=False, nullable=False, index=True)
+    can_generate_tasks = Column(Boolean, default=False, nullable=False, index=True)
     notes = Column(Text, nullable=True)
+    last_interaction_at = Column(DateTime, nullable=True, index=True)  # Data/hora da última mensagem/interação
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)

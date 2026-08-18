@@ -23,6 +23,7 @@ const statGraphNodesEl = document.getElementById('stat-graph-nodes');
 
 const contactSearchInput = document.getElementById('contact-search');
 const contactFilterRole = document.getElementById('contact-filter-role');
+const contactFilterPeriod = document.getElementById('contact-filter-period');
 const dictSearchInput = document.getElementById('dict-search');
 const dictFilterCategory = document.getElementById('dict-filter-category');
 const tasksSearchInput = document.getElementById('tasks-search');
@@ -84,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Search & Filter Listeners
   contactSearchInput.addEventListener('input', renderContacts);
   contactFilterRole.addEventListener('change', renderContacts);
+  if (contactFilterPeriod) contactFilterPeriod.addEventListener('change', renderContacts);
   dictSearchInput.addEventListener('input', renderDictionary);
   dictFilterCategory.addEventListener('change', renderDictionary);
   
@@ -131,6 +133,35 @@ document.addEventListener('DOMContentLoaded', () => {
     btnReloadGraph.addEventListener('click', () => {
       loadGraphData();
       showToast('Grafo NetworkX recarregado!');
+    });
+  }
+
+  const btnTogglePhysics = document.getElementById('btn-toggle-physics');
+  if (btnTogglePhysics) {
+    btnTogglePhysics.addEventListener('click', toggleGraphPhysics);
+  }
+
+  const graphFilterMode = document.getElementById('graph-filter-mode');
+  if (graphFilterMode) {
+    graphFilterMode.addEventListener('change', () => {
+      loadGraphData();
+      showToast('Filtro do grafo atualizado!');
+    });
+  }
+
+  const graphSearchNode = document.getElementById('graph-search-node');
+  if (graphSearchNode) {
+    graphSearchNode.addEventListener('input', (e) => {
+      const term = (e.target.value || '').toLowerCase().trim();
+      if (!term || !graphRawData || !visNetworkInstance) return;
+      const matchedNode = graphRawData.nodes.find(n => (n.label && n.label.toLowerCase().includes(term)) || (n.id && n.id.toLowerCase().includes(term)));
+      if (matchedNode) {
+        visNetworkInstance.focus(matchedNode.id, {
+          scale: 1.2,
+          animation: { duration: 500, easingFunction: 'easeInOutQuad' }
+        });
+        showNodeDetails(matchedNode.id);
+      }
     });
   }
 
@@ -327,9 +358,16 @@ async function loadMessages() {
   }
 }
 
+let isGraphPhysicsActive = false;
+
 async function loadGraphData() {
   try {
-    const res = await fetch('/api/v1/memory/graph/full');
+    const filterSelect = document.getElementById('graph-filter-mode');
+    const filterVal = filterSelect ? filterSelect.value : 'active_30d';
+    const mainOnly = filterVal === 'active_30d';
+    const daysCutoff = filterVal === 'active_30d' ? 30 : 0;
+
+    const res = await fetch(`/api/v1/memory/graph/full?main_only=${mainOnly}&days_cutoff=${daysCutoff}`);
     if (res.ok) {
       graphRawData = await res.json();
       if (document.getElementById('tab-graph').classList.contains('active')) {
@@ -337,9 +375,32 @@ async function loadGraphData() {
       }
     }
   } catch (err) {
-    console.error('Erro ao carregar grafo completo:', err);
+    console.error('Erro ao carregar grafo:', err);
   }
 }
+
+function updatePhysicsButtonState(active) {
+  const btn = document.getElementById('btn-toggle-physics');
+  if (!btn) return;
+  if (active) {
+    btn.innerHTML = '⚡ Física: Ativa';
+    btn.classList.remove('btn-secondary');
+    btn.classList.add('btn-primary');
+  } else {
+    btn.innerHTML = '🧊 Física: Congelada';
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-secondary');
+  }
+}
+
+function toggleGraphPhysics() {
+  if (!visNetworkInstance) return;
+  isGraphPhysicsActive = !isGraphPhysicsActive;
+  visNetworkInstance.setOptions({ physics: { enabled: isGraphPhysicsActive } });
+  updatePhysicsButtonState(isGraphPhysicsActive);
+  showToast(isGraphPhysicsActive ? '⚡ Simulação de física ativada!' : '🧊 Grafo congelado (modo de alta performance mobile).');
+}
+window.toggleGraphPhysics = toggleGraphPhysics;
 
 // --- Interactive Graph NetworkX Engine ---
 
@@ -378,13 +439,15 @@ function renderInteractiveGraph() {
         springConstant: 0.18,
         damping: 0.75
       },
-      stabilization: { iterations: 120 }
+      stabilization: { iterations: 60, updateInterval: 20 }
     },
     interaction: {
       hover: true,
       tooltipDelay: 100,
       zoomView: true,
-      dragView: true
+      dragView: true,
+      hideEdgesOnDrag: true,
+      hideEdgesOnZoom: true
     }
   };
 
@@ -393,6 +456,13 @@ function renderInteractiveGraph() {
   }
 
   visNetworkInstance = new vis.Network(container, data, options);
+
+  // Congelamento automático de física após estabilizar para economia total de bateria/CPU em smartphones
+  visNetworkInstance.on('stabilizationIterationsDone', () => {
+    visNetworkInstance.setOptions({ physics: { enabled: false } });
+    isGraphPhysicsActive = false;
+    updatePhysicsButtonState(false);
+  });
 
   visNetworkInstance.on('click', (params) => {
     if (params.nodes.length > 0) {
@@ -538,11 +608,38 @@ function formatPhoneNumber(phone) {
   return phone;
 }
 
+function formatLastInteractionBadge(dtStr) {
+  if (!dtStr) return '<span style="color: var(--text-muted); font-size: 0.75rem;">💬 Sem mensagens recentes</span>';
+  const dt = new Date(dtStr);
+  const now = new Date();
+  const diffMs = now - dt;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const timeStr = dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  if (diffDays === 0 && dt.getDate() === now.getDate()) {
+    return `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.72rem;" title="${dt.toLocaleString('pt-BR')}">🟢 Hoje às ${timeStr}</span>`;
+  } else if (diffDays <= 1) {
+    return `<span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; font-size: 0.72rem;" title="${dt.toLocaleString('pt-BR')}">Ontem às ${timeStr}</span>`;
+  } else if (diffDays <= 7) {
+    return `<span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #c084fc; font-size: 0.72rem;" title="${dt.toLocaleString('pt-BR')}">Há ${diffDays} dias</span>`;
+  } else if (diffDays <= 30) {
+    return `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; font-size: 0.72rem;" title="${dt.toLocaleString('pt-BR')}">Há ${Math.round(diffDays / 7)} sem</span>`;
+  } else {
+    return `<span class="badge" style="background: rgba(100, 116, 139, 0.15); color: #94a3b8; font-size: 0.72rem;" title="${dt.toLocaleString('pt-BR')}">${dt.toLocaleDateString('pt-BR')}</span>`;
+  }
+}
+
 function renderContacts() {
   const searchTerm = contactSearchInput.value.toLowerCase().trim();
   const filterRole = contactFilterRole.value.toUpperCase();
+  const filterPeriod = (contactFilterPeriod ? contactFilterPeriod.value : 'today').toLowerCase();
 
-  const filtered = allContacts.filter(c => {
+  const now = new Date();
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const start7d = now.getTime() - (7 * 24 * 60 * 60 * 1000);
+  const start30d = now.getTime() - (30 * 24 * 60 * 60 * 1000);
+
+  let filtered = allContacts.filter(c => {
     const matchSearch = (
       c.name.toLowerCase().includes(searchTerm) ||
       (c.company && c.company.toLowerCase().includes(searchTerm)) ||
@@ -550,14 +647,40 @@ function renderContacts() {
       (c.role && c.role.toLowerCase().includes(searchTerm))
     );
     const matchRole = !filterRole || (c.role && c.role.toUpperCase() === filterRole);
-    return matchSearch && matchRole;
+
+    let matchPeriod = true;
+    if (filterPeriod !== 'all') {
+      if (!c.last_interaction_at) {
+        matchPeriod = false;
+      } else {
+        const itemTime = new Date(c.last_interaction_at).getTime();
+        if (filterPeriod === 'today') {
+          matchPeriod = itemTime >= startToday;
+        } else if (filterPeriod === '7d') {
+          matchPeriod = itemTime >= start7d;
+        } else if (filterPeriod === '30d') {
+          matchPeriod = itemTime >= start30d;
+        }
+      }
+    }
+
+    return matchSearch && matchRole && matchPeriod;
   });
+
+  // Se filtrado por período ou busca, ordena por data de interação mais recente
+  if (filterPeriod !== 'all') {
+    filtered.sort((a, b) => {
+      const timeA = a.last_interaction_at ? new Date(a.last_interaction_at).getTime() : 0;
+      const timeB = b.last_interaction_at ? new Date(b.last_interaction_at).getTime() : 0;
+      return timeB - timeA;
+    });
+  }
 
   if (filtered.length === 0) {
     contactsContainer.innerHTML = `
       <div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-muted);">
-        <p style="font-size: 1.2rem; margin-bottom: 0.5rem;">Nenhum contato encontrado</p>
-        <small>Adicione novos contatos para expandir o Grafo Neural MUSA.</small>
+        <p style="font-size: 1.2rem; margin-bottom: 0.5rem;">Nenhum contato encontrado no período selecionado (${filterPeriod === 'today' ? 'Hoje' : filterPeriod === '7d' ? 'Últimos 7 dias' : 'Último Mês'})</p>
+        <small>Mude o filtro para <strong>"Todos os Contatos"</strong> ou aguarde novas interações no WhatsApp.</small>
       </div>
     `;
     return;
@@ -573,6 +696,7 @@ function renderContacts() {
     const badgeClass = getRoleBadgeClass(c.role);
     const roleLabel = getRoleLabel(c.role);
     const latestSentInfo = getSentimentInfo(c.latest_sentiment);
+    const interactionBadgeHtml = formatLastInteractionBadge(c.last_interaction_at);
     const projectsHtml = (c.projects || []).map(p => `<span class="project-chip">${p}</span>`).join('');
 
     const recentSentimentsHtml = (c.recent_sentiments && c.recent_sentiments.length > 0)
@@ -588,6 +712,7 @@ function renderContacts() {
       : '';
 
     const isFav = Boolean(c.is_favorite);
+    const canGenTasks = Boolean(c.can_generate_tasks);
     const weightPercent = Math.round((c.effective_weight || 0.4) * 100);
 
     return `
@@ -609,18 +734,28 @@ function renderContacts() {
               ${isFav ? `<span class="badge badge-owner" style="font-size: 0.68rem;">⭐ +10% Fav</span>` : ''}
               <span class="badge badge-vendor" style="font-size: 0.68rem;" title="Peso efetivo de prioridade">${weightPercent}% Peso</span>
               <span class="sentiment-badge ${latestSentInfo.class}" title="Sentimento mais recente">${latestSentInfo.emoji} ${latestSentInfo.label}</span>
+              
+              <!-- Toggle de Permissão para Gerar Tarefas -->
+              <label class="toggle-tasks-wrapper ${canGenTasks ? 'active' : ''}" title="Permitir que mensagens deste contato gerem tarefas acionáveis para você">
+                <span class="toggle-switch-ui">
+                  <input type="checkbox" ${canGenTasks ? 'checked' : ''} onchange="toggleContactTasks('${c.id || cleanPhone || c.name}')">
+                  <span class="toggle-switch-slider"></span>
+                </span>
+                <span class="toggle-tasks-label">${canGenTasks ? '⚡ Cria Tarefas' : '⚡ Tarefas OFF'}</span>
+              </label>
             </div>
           </div>
         </div>
 
         <div class="contact-details">
-          ${hasValidPhone ? `
-            <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+            ${hasValidPhone ? `
               <a href="${whatsappLink}" target="_blank" class="contact-phone-link" title="Abrir conversa no WhatsApp">
                 📱 ${displayPhone}
               </a>
-            </div>
-          ` : '<span class="text-muted" style="font-size: 0.8rem;">📱 Sem telefone cadastrado</span>'}
+            ` : '<span class="text-muted" style="font-size: 0.8rem;">📱 Sem telefone</span>'}
+            ${interactionBadgeHtml}
+          </div>
 
           ${c.notes ? `<div style="font-size: 0.8rem; color: var(--text-muted);">${c.notes}</div>` : ''}
 
@@ -665,6 +800,23 @@ async function toggleContactFavorite(contactId) {
   }
 }
 window.toggleContactFavorite = toggleContactFavorite;
+
+async function toggleContactTasks(contactId) {
+  try {
+    const res = await fetch(`/api/v1/contacts/${encodeURIComponent(contactId)}/toggle-tasks`, { method: 'PATCH' });
+    if (!res.ok) throw new Error('Falha ao alternar permissão de tarefas');
+    const updated = await res.json();
+    const idx = allContacts.findIndex(c => c.id === updated.id || c.name === updated.name || c.phone_number === updated.phone_number);
+    if (idx !== -1) {
+      allContacts[idx] = updated;
+    }
+    renderContacts();
+    showToast(updated.can_generate_tasks ? `⚡ ${updated.name} agora PODE gerar tarefas!` : `🔒 ${updated.name} NÃO gerará mais tarefas.`);
+  } catch (err) {
+    showToast('Erro ao atualizar permissão de tarefas: ' + err.message, 'error');
+  }
+}
+window.toggleContactTasks = toggleContactTasks;
 
 function renderTasks() {
   if (!tasksContainer) return;
@@ -744,12 +896,68 @@ function renderTasks() {
           </div>
         </div>
 
-        <!-- Contexto da Mensagem de Origem -->
-        ${(t.message_summary || t.source_text_snippet) ? `
-          <div class="task-source-context" title="Contexto original da conversa de onde esta tarefa surgiu">
-            💡 <b>Contexto da Conversa:</b> "${t.message_summary || t.source_text_snippet}"
+        <!-- Menu Sanfona (Accordion) de Contexto Original "De quem foi ➔ Pra quem foi" -->
+        <div class="task-accordion" id="task-accordion-${t.id}">
+          <button class="task-accordion-header" type="button" onclick="toggleTaskAccordion('${t.id}')">
+            <div class="task-accordion-header-left">
+              <span class="accordion-chevron" id="chevron-${t.id}">▶</span>
+              <span class="accordion-title-text">
+                <b>Origem do Disparo & Contexto</b>
+              </span>
+            </div>
+            <div class="task-flow-pills">
+              <span class="flow-pill flow-from" title="Remetente da mensagem que disparou a tarefa">
+                🗣️ De: <b>${speakerName}</b>
+              </span>
+              <span class="flow-arrow">➔</span>
+              <span class="flow-pill flow-to" title="Destinatário / Atribuído a">
+                🎯 Para: <b>${t.assignee || 'Bruno Conter'}</b>
+              </span>
+            </div>
+          </button>
+
+          <div class="task-accordion-content" id="task-accordion-body-${t.id}" style="display: none;">
+            <div class="task-participants-bar">
+              <div>
+                <span style="color: var(--text-muted); font-size: 0.72rem; display: block;">🗣️ Remetente:</span>
+                <div><b>${speakerName}</b> ${roleBadge ? `<span class="badge" style="font-size: 0.65rem; margin-left: 0.2rem;">${roleBadge}</span>` : ''}</div>
+              </div>
+              <div>
+                <span style="color: var(--text-muted); font-size: 0.72rem; display: block;">🎯 Destinatário / Responsável:</span>
+                <div><b>${t.assignee || 'Bruno Conter'}</b> ${t.due_date ? `(Prazo: ${t.due_date})` : ''}</div>
+              </div>
+              ${t.message_time ? `
+                <div>
+                  <span style="color: var(--text-muted); font-size: 0.72rem; display: block;">⏱️ Horário do Disparo:</span>
+                  <div>${t.message_time}</div>
+                </div>
+              ` : ''}
+              ${t.audio_duration_s ? `
+                <div>
+                  <span style="color: var(--text-muted); font-size: 0.72rem; display: block;">🎙️ Duração do Áudio:</span>
+                  <div>${Math.round(t.audio_duration_s)}s</div>
+                </div>
+              ` : ''}
+            </div>
+
+            <!-- Caixa de Transcrição / Mensagem Original -->
+            <div class="task-original-box">
+              <div class="task-original-header">
+                <span>📜 <b>Transcrição / Mensagem Original do Gatilho:</b></span>
+                <button class="btn btn-secondary btn-xs" type="button" onclick="copyTaskOriginalText('${t.id}')" title="Copiar transcrição completa">
+                  📋 Copiar
+                </button>
+              </div>
+              <p class="task-original-text" id="task-text-${t.id}">"${t.revised_text || t.raw_text || t.source_text_snippet || 'Texto não disponível'}"</p>
+            </div>
+
+            ${t.message_summary ? `
+              <div class="task-summary-callout">
+                💡 <b>Resumo Cognitivo da Conversa:</b> ${t.message_summary}
+              </div>
+            ` : ''}
           </div>
-        ` : ''}
+        </div>
 
         <!-- Caixa de Anotações & Observações Futuras -->
         <div class="task-notes-section">
@@ -804,6 +1012,35 @@ function renderTasks() {
     `;
   }).join('');
 }
+
+function toggleTaskAccordion(taskId) {
+  const body = document.getElementById(`task-accordion-body-${taskId}`);
+  const chevron = document.getElementById(`chevron-${taskId}`);
+  if (!body) return;
+
+  const isHidden = body.style.display === 'none' || !body.style.display;
+  body.style.display = isHidden ? 'flex' : 'none';
+  if (chevron) {
+    if (isHidden) {
+      chevron.classList.add('expanded');
+    } else {
+      chevron.classList.remove('expanded');
+    }
+  }
+}
+window.toggleTaskAccordion = toggleTaskAccordion;
+
+function copyTaskOriginalText(taskId) {
+  const textEl = document.getElementById(`task-text-${taskId}`);
+  if (!textEl) return;
+  const raw = textEl.textContent.replace(/^"|"$/g, '').trim();
+  navigator.clipboard.writeText(raw).then(() => {
+    showToast('📋 Transcrição copiada para a área de transferência!');
+  }).catch(err => {
+    showToast('Erro ao copiar texto: ' + err, 'error');
+  });
+}
+window.copyTaskOriginalText = copyTaskOriginalText;
 
 function renderMessages() {
   if (!messagesContainer) return;

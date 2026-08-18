@@ -74,6 +74,7 @@ def init_db() -> None:
             ("ALTER TABLE messages ADD COLUMN IF NOT EXISTS sentiment VARCHAR(32) DEFAULT 'NEUTRAL'" if not is_sqlite else "ALTER TABLE messages ADD COLUMN sentiment VARCHAR(32) DEFAULT 'NEUTRAL'"),
             ("ALTER TABLE messages ADD COLUMN IF NOT EXISTS sentiment_score FLOAT DEFAULT 0.0" if not is_sqlite else "ALTER TABLE messages ADD COLUMN sentiment_score FLOAT DEFAULT 0.0"),
             ("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500)" if not is_sqlite else "ALTER TABLE contacts ADD COLUMN avatar_url VARCHAR(500)"),
+            ("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS last_interaction_at TIMESTAMP WITH TIME ZONE" if not is_sqlite else "ALTER TABLE contacts ADD COLUMN last_interaction_at TIMESTAMP"),
             ("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS notes TEXT" if not is_sqlite else "ALTER TABLE tasks ADD COLUMN notes TEXT"),
         ]
 

@@ -24,10 +24,20 @@ async def list_contacts(
     role: Optional[str] = Query(default=None, description="Filtrar por papel: EXECUTIVE, FAMILY_CORE, etc."),
     company: Optional[str] = Query(default=None, description="Filtrar por empresa"),
     only_unknown: bool = Query(default=False, description="Listar apenas contatos não classificados"),
+    interaction_period: Optional[str] = Query(
+        default=None,
+        description="Filtrar por período da última interação: 'today', '7d', '30d', 'all'",
+    ),
     db: Session = Depends(get_db),
 ):
-    """Lista contatos cadastrados com filtros opcionais."""
-    return contact_service.list_contacts(role=role, company=company, only_unknown=only_unknown, db=db)
+    """Lista contatos cadastrados com filtros opcionais (papel, empresa, período de interação)."""
+    return contact_service.list_contacts(
+        role=role,
+        company=company,
+        only_unknown=only_unknown,
+        interaction_period=interaction_period,
+        db=db,
+    )
 
 
 @router.get("/markdown-table", response_class=Response)
@@ -83,10 +93,14 @@ async def update_contact(contact_id: str, payload: ContactUpdate, db: Session = 
         rec.projects_json = payload.projects
     if payload.is_favorite is not None:
         rec.is_favorite = payload.is_favorite
+    if payload.can_generate_tasks is not None:
+        rec.can_generate_tasks = payload.can_generate_tasks
     if payload.custom_weight is not None:
         rec.custom_weight = payload.custom_weight
     if payload.notes is not None:
         rec.notes = payload.notes
+    if payload.last_interaction_at is not None:
+        rec.last_interaction_at = payload.last_interaction_at
 
     rec.updated_at = datetime.now(timezone.utc)
     db.commit()
@@ -108,6 +122,15 @@ async def toggle_favorite(contact_id: str, db: Session = Depends(get_db)):
     """Alterna o status de favorito de um contato (+10% de peso de prioridade)."""
     try:
         return contact_service.toggle_favorite(contact_id=contact_id, db=db)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.patch("/{contact_id}/toggle-tasks", response_model=ContactResponse)
+async def toggle_tasks(contact_id: str, db: Session = Depends(get_db)):
+    """Alterna se o contato pode gerar tarefas acionáveis no sistema."""
+    try:
+        return contact_service.toggle_can_generate_tasks(contact_id=contact_id, db=db)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

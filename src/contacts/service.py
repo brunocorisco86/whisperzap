@@ -2,7 +2,7 @@
 
 import logging
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Literal, Optional, Tuple
 from uuid import uuid4
 from sqlalchemy.orm import Session
@@ -82,10 +82,12 @@ def record_to_response(
         avatar_url=rec.avatar_url,
         custom_weight=rec.custom_weight,
         is_favorite=bool(rec.is_favorite),
+        can_generate_tasks=bool(getattr(rec, "can_generate_tasks", False)),
         notes=rec.notes,
         effective_weight=calculate_effective_weight(rec),
         latest_sentiment=latest_sentiment,
         recent_sentiments=recent_sentiments or [],
+        last_interaction_at=rec.last_interaction_at,
         created_at=rec.created_at,
         updated_at=rec.updated_at,
     )
@@ -99,10 +101,17 @@ class ContactService:
         role: Optional[str] = None,
         company: Optional[str] = None,
         only_unknown: bool = False,
+        interaction_period: Optional[str] = None,
         db: Session | None = None,
     ) -> list[ContactResponse]:
-        """Lista contatos com filtros opcionais e enriquecimento de sentimentos."""
-        return self.get_contacts(role=role, company=company, only_unknown=only_unknown, db=db)
+        """Lista contatos com filtros opcionais de papel, empresa e período da última interação."""
+        return self.get_contacts(
+            role=role,
+            company=company,
+            only_unknown=only_unknown,
+            interaction_period=interaction_period,
+            db=db,
+        )
 
     def deduplicate_and_merge_contacts(self, db: Session) -> None:
         """Deduplica, funde e expurga contatos de grupos, inválidos ou fora do padrão de telefone."""
@@ -138,8 +147,9 @@ class ContactService:
             # 2. Expurga contatos com telefone fora do padrão (que não sejam o proprietário)
             all_recs = db.query(ContactRecord).all()
             for c in all_recs:
-                if not is_owner_interaction(c.name) and not is_valid_contact_phone(c.phone_number):
-                    db.delete(c)
+                if not is_owner_interaction(c.name) and not is_owner_interaction(c.phone_number):
+                    if not is_valid_contact_phone(c.phone_number):
+                        db.delete(c)
             db.commit()
 
             # 3. Funde contatos com mesmo número de telefone (últimos 8 dígitos)
@@ -173,9 +183,10 @@ class ContactService:
         role: str | None = None,
         company: str | None = None,
         only_unknown: bool = False,
+        interaction_period: str | None = None,
         db: Session | None = None,
     ) -> List[ContactResponse]:
-        """Retorna lista de contatos enriquecida com deduplicação automática e histórico emocional."""
+        """Retorna lista de contatos enriquecida com filtros temporais de interação ('today', '7d', '30d', 'all')."""
         should_close = False
         if db is None:
             db = SessionLocal()
@@ -195,8 +206,27 @@ class ContactService:
             if company:
                 query = query.filter(ContactRecord.company.ilike(f"%{company}%"))
 
-            # Ordena favoritos no topo, depois por nome
-            records = query.order_by(ContactRecord.is_favorite.desc(), ContactRecord.name.asc()).all()
+            # 2.1 Filtro por período da última interação
+            now = datetime.now(timezone.utc)
+            if interaction_period == "today":
+                start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                query = query.filter(ContactRecord.last_interaction_at >= start_of_today)
+            elif interaction_period in ("7d", "week", "7_days"):
+                start_7d = now - timedelta(days=7)
+                query = query.filter(ContactRecord.last_interaction_at >= start_7d)
+            elif interaction_period in ("30d", "month", "30_days"):
+                start_30d = now - timedelta(days=30)
+                query = query.filter(ContactRecord.last_interaction_at >= start_30d)
+
+            # Ordena por última interação mais recente (se filtrado), favoritos no topo, depois nome
+            if interaction_period in ("today", "7d", "30d", "week", "month"):
+                records = query.order_by(
+                    ContactRecord.last_interaction_at.desc(),
+                    ContactRecord.is_favorite.desc(),
+                    ContactRecord.name.asc(),
+                ).all()
+            else:
+                records = query.order_by(ContactRecord.is_favorite.desc(), ContactRecord.name.asc()).all()
 
             # 3. Enriquece com as últimas 3 mensagens e sentimentos de cada pessoa
             from src.memory.models import MessageRecord
@@ -328,10 +358,16 @@ class ContactService:
                     existing.projects_json = data.projects
                 if data.is_favorite is not None:
                     existing.is_favorite = data.is_favorite
+                if data.can_generate_tasks is not None:
+                    existing.can_generate_tasks = data.can_generate_tasks
+                if data.avatar_url is not None:
+                    existing.avatar_url = data.avatar_url
                 if data.custom_weight is not None:
                     existing.custom_weight = data.custom_weight
                 if data.notes:
                     existing.notes = data.notes
+                if data.last_interaction_at is not None:
+                    existing.last_interaction_at = data.last_interaction_at
                 existing.updated_at = datetime.now(timezone.utc)
                 db.commit()
                 db.refresh(existing)
@@ -348,9 +384,12 @@ class ContactService:
                     role=data.role.value if isinstance(data.role, ContactRole) else str(data.role),
                     company=data.company,
                     projects_json=data.projects,
+                    avatar_url=data.avatar_url,
                     custom_weight=data.custom_weight,
                     is_favorite=bool(data.is_favorite),
+                    can_generate_tasks=bool(data.can_generate_tasks),
                     notes=data.notes,
+                    last_interaction_at=data.last_interaction_at,
                     created_at=datetime.now(timezone.utc),
                     updated_at=datetime.now(timezone.utc),
                 )
@@ -398,6 +437,38 @@ class ContactService:
             if should_close:
                 db.close()
 
+    def toggle_can_generate_tasks(
+        self, contact_id: str, can_generate_tasks: Optional[bool] = None, db: Session | None = None
+    ) -> ContactResponse:
+        """Alterna ou define se o contato possui permissão para gerar tarefas acionáveis."""
+        should_close = False
+        if db is None:
+            db = SessionLocal()
+            should_close = True
+
+        try:
+            rec = db.query(ContactRecord).filter(
+                (ContactRecord.id == contact_id)
+                | (ContactRecord.name == contact_id)
+                | (ContactRecord.phone_number == contact_id)
+            ).first()
+            if not rec:
+                raise ValueError(f"Contato '{contact_id}' não encontrado.")
+
+            if can_generate_tasks is not None:
+                rec.can_generate_tasks = can_generate_tasks
+            else:
+                rec.can_generate_tasks = not bool(rec.can_generate_tasks)
+
+            rec.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            db.refresh(rec)
+            self._sync_contact_to_graph(rec)
+            return record_to_response(rec)
+        finally:
+            if should_close:
+                db.close()
+
     def _sync_contact_to_graph(self, contact: ContactRecord) -> None:
         """Cria/atualiza conexões ricas no Grafo NetworkX para o contato."""
         try:
@@ -408,6 +479,8 @@ class ContactService:
                 phone=contact.phone_number,
                 company=contact.company,
                 weight=calculate_effective_weight(contact),
+                can_generate_tasks=bool(getattr(contact, "can_generate_tasks", False)),
+                last_interaction_at=contact.last_interaction_at.isoformat() if contact.last_interaction_at else None,
             )
 
             if contact.company:

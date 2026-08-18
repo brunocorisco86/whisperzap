@@ -121,6 +121,12 @@
           <input type="text" id="contact-search" placeholder="Buscar por nome, cargo, empresa ou telefone...">
         </div>
         <div class="filter-group">
+          <select id="contact-filter-period" title="Filtrar contatos pela data da última mensagem recebida">
+            <option value="today">📅 Interação: Hoje (Padrão)</option>
+            <option value="7d">📅 Últimos 7 dias</option>
+            <option value="30d">📅 Último Mês</option>
+            <option value="all">📅 Todos os Contatos</option>
+          </select>
           <select id="contact-filter-role">
             <option value="">Todos os Papéis</option>
             <option value="PRODUCER_COOPERATED">Produtor Rural / Associado (PRODUCER_COOPERATED)</option>
@@ -164,8 +170,16 @@
           <span class="legend-item"><span class="legend-dot" style="background:#f97316"></span> Equipamentos (Silos)</span>
         </div>
         <div class="graph-controls">
-          <button class="btn btn-secondary btn-sm" id="btn-reset-graph">🎯 Centralizar Visão</button>
-          <button class="btn btn-secondary btn-sm" id="btn-reload-graph">🔄 Recarregar Grafo</button>
+          <select id="graph-filter-mode" class="graph-filter-select" title="Filtro de visualização do grafo">
+            <option value="active_30d" selected>⭐ Nós Principais (&lt; 30 dias)</option>
+            <option value="all">🌐 Grafo Completo (Todos os Nós)</option>
+          </select>
+          <input type="text" id="graph-search-node" placeholder="🔍 Focar em nó..." class="graph-search-input" title="Digite o nome de uma entidade ou pessoa para dar zoom">
+          <button class="btn btn-secondary btn-sm" id="btn-toggle-physics" title="Alterna física ativa / congelada para máxima performance mobile">
+            🧊 Física: Congelada
+          </button>
+          <button class="btn btn-secondary btn-sm" id="btn-reset-graph" title="Centralizar visão">🎯 Centralizar</button>
+          <button class="btn btn-secondary btn-sm" id="btn-reload-graph" title="Recarregar dados do grafo">🔄 Recarregar</button>
           <button class="btn btn-primary btn-sm" id="btn-trigger-janitor" title="Aciona a Zeladora para podar termos efêmeros, ruídos e desambiguar aliases no grafo">
             🧹 Faxina da Zeladora
           </button>

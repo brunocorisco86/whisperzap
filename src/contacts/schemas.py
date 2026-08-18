@@ -106,7 +106,9 @@ class ContactBase(BaseModel):
         default=None, ge=0.0, le=1.0, description="Peso manual customizado de 0.0 a 1.0 (opcional)"
     )
     is_favorite: bool = Field(default=False, description="Contato marcado como favorito (+10% de peso de prioridade)")
+    can_generate_tasks: bool = Field(default=False, description="Permite que mensagens deste contato gerem tarefas acionáveis")
     notes: Optional[str] = Field(default=None, description="Anotações e observações adicionais")
+    last_interaction_at: Optional[datetime] = Field(default=None, description="Data e hora da última interação/mensagem")
 
 
 class ContactCreate(ContactBase):
@@ -123,7 +125,9 @@ class ContactUpdate(BaseModel):
     avatar_url: Optional[str] = None
     custom_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     is_favorite: Optional[bool] = None
+    can_generate_tasks: Optional[bool] = None
     notes: Optional[str] = None
+    last_interaction_at: Optional[datetime] = None
 
 
 class ContactResponse(ContactBase):
@@ -133,6 +137,7 @@ class ContactResponse(ContactBase):
     effective_weight: float = Field(..., description="Peso final calculado para priorização")
     latest_sentiment: Optional[str] = Field(default="NEUTRAL", description="Sentimento mais recente do contato")
     recent_sentiments: list[dict] = Field(default_factory=list, description="Últimos sentimentos e resumos de mensagens")
+    last_interaction_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

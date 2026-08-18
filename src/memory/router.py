@@ -167,9 +167,16 @@ async def get_entity_neighborhood(name: str, depth: int = Query(default=1, ge=1,
 
 
 @router.get("/graph/full")
-async def get_full_graph():
-    """Retorna o grafo completo estruturado para renderização no frontend (vis-network / force-directed)."""
-    nodes = []
+async def get_full_graph(
+    main_only: bool = Query(default=True, description="Exibir apenas nós principais e conectados (padrão)"),
+    days_cutoff: int = Query(default=30, description="Ocultar contatos sem interação há mais de X dias (padrão: 30)"),
+    db: Session = Depends(get_db),
+):
+    """Retorna o grafo estruturado e otimizado para o frontend, aplicando filtros de relevância e corte temporal padrão."""
+    from datetime import datetime, timezone, timedelta
+    from src.contacts.models import ContactRecord
+    from src.ai_gateway.bypass import is_owner_interaction
+
     category_colors = {
         "PERSON": {"background": "#10b981", "border": "#059669", "highlight": "#34d399"},
         "LOCATION": {"background": "#3b82f6", "border": "#2563eb", "highlight": "#60a5fa"},
@@ -180,11 +187,61 @@ async def get_full_graph():
         "OTHER": {"background": "#64748b", "border": "#475569", "highlight": "#94a3b8"},
     }
 
+    # Mapa de contatos e suas últimas datas de interação
+    contacts_list = db.query(ContactRecord).all()
+    contact_interaction_map = {}
+    contact_fav_map = {}
+    for c in contacts_list:
+        if c.name:
+            contact_interaction_map[c.name.lower()] = c.last_interaction_at
+            contact_fav_map[c.name.lower()] = c.is_favorite
+        if c.phone_number:
+            contact_interaction_map[c.phone_number] = c.last_interaction_at
+            contact_fav_map[c.phone_number] = c.is_favorite
+
+    now = datetime.now(timezone.utc)
+    cutoff_time = now - timedelta(days=days_cutoff) if days_cutoff > 0 else None
+
+    kept_nodes = []
+    kept_node_ids = set()
+
     for n, attrs in knowledge_graph.graph.nodes(data=True):
         cat = attrs.get("category", "OTHER").upper()
-        colors = category_colors.get(cat, category_colors["OTHER"])
         mentions = attrs.get("mentions", 1)
-        size = 18 + min(mentions * 2, 32)
+        degree = knowledge_graph.graph.degree(n) if knowledge_graph.graph.has_node(n) else 0
+        is_owner = is_owner_interaction(n)
+
+        # 1. Filtro Temporal de Inatividade (> 30 dias para contatos/pessoas)
+        if days_cutoff > 0 and cutoff_time and not is_owner:
+            last_interaction = contact_interaction_map.get(n.lower())
+            if not last_interaction and attrs.get("last_interaction_at"):
+                try:
+                    last_interaction = datetime.fromisoformat(attrs["last_interaction_at"])
+                except Exception:
+                    pass
+
+            if cat == "PERSON" or n.lower() in contact_interaction_map:
+                is_fav = contact_fav_map.get(n.lower(), False) or attrs.get("is_favorite", False)
+                if last_interaction:
+                    # Garante timezone aware
+                    if last_interaction.tzinfo is None:
+                        last_interaction = last_interaction.replace(tzinfo=timezone.utc)
+                    if last_interaction < cutoff_time and not is_fav:
+                        continue  # Oculta contato inativo há mais de 30 dias
+                elif not is_fav and degree <= 0:
+                    continue  # Contato sem interação e desconectado
+
+        # 2. Filtro de Nós Principais (main_only)
+        if main_only and not is_owner:
+            # Oculta nós órfãos desconectados (degree 0) exceto se for muito mencionado
+            if degree == 0 and mentions < 3:
+                continue
+            # Oculta termos conceituais isolados de 1 única menção
+            if cat in ("CONCEPT", "OTHER") and degree <= 1 and mentions <= 1:
+                continue
+
+        colors = category_colors.get(cat, category_colors["OTHER"])
+        size = 18 + min(mentions * 2 + degree * 2, 36)
 
         title_parts = [f"<b>{n}</b> ({cat})"]
         if attrs.get("role"):
@@ -195,8 +252,9 @@ async def get_full_graph():
             title_parts.append(f"Empresa: {attrs.get('company')}")
         if attrs.get("details"):
             title_parts.append(f"Detalhes: {attrs.get('details')}")
+        title_parts.append(f"Conexões: {degree} | Menções: {mentions}")
 
-        nodes.append({
+        kept_nodes.append({
             "id": n,
             "label": n,
             "category": cat,
@@ -204,23 +262,38 @@ async def get_full_graph():
             "size": size,
             "title": "<br>".join(title_parts),
             "attributes": attrs,
+            "degree": degree,
+            "mentions": mentions,
         })
+        kept_node_ids.add(n)
 
-    edges = []
+    kept_edges = []
     for u, v, attrs in knowledge_graph.graph.edges(data=True):
-        rel = attrs.get("relation", "RELATED_TO")
-        weight = float(attrs.get("weight", 1.0))
-        edges.append({
-            "from": u,
-            "to": v,
-            "label": rel,
-            "arrows": "to",
-            "font": {"size": 9, "color": "#94a3b8", "strokeWidth": 2, "strokeColor": "#090d16"},
-            "color": {"color": "#334155", "highlight": "#10b981"},
-            "width": 1.0 + min(weight / 20.0, 3.0),
-        })
+        if u in kept_node_ids and v in kept_node_ids:
+            rel = attrs.get("relation", "RELATED_TO")
+            weight = float(attrs.get("weight", 1.0))
+            kept_edges.append({
+                "from": u,
+                "to": v,
+                "label": rel,
+                "arrows": "to",
+                "font": {"size": 9, "color": "#94a3b8", "strokeWidth": 2, "strokeColor": "#090d16"},
+                "color": {"color": "#334155", "highlight": "#10b981"},
+                "width": 1.0 + min(weight / 20.0, 3.0),
+            })
 
-    return {"nodes": nodes, "edges": edges, "stats": knowledge_graph.stats()}
+    return {
+        "nodes": kept_nodes,
+        "edges": kept_edges,
+        "stats": {
+            "total_nodes_in_graph": knowledge_graph.stats()["nodes"],
+            "total_edges_in_graph": knowledge_graph.stats()["edges"],
+            "filtered_nodes": len(kept_nodes),
+            "filtered_edges": len(kept_edges),
+            "main_only": main_only,
+            "days_cutoff": days_cutoff,
+        },
+    }
 
 
 @router.get("/messages")

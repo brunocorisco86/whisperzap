@@ -157,7 +157,7 @@ class HermesAgentService:
             logger.warning(f"Aviso no Resumo Diário da IA ({e}). Gerando síntese estruturada resiliente.")
             from src.reports.daily import deduplicate_list
 
-            raw_events = [m.get("summary", m.get("revised_text", ""))[:80] for m in messages]
+            raw_events = [(m.get("summary") or m.get("revised_text") or "")[:80] for m in messages]
             raw_done = [t.get("title", "") for t in tasks if t.get("status") == "DONE"]
             raw_pending = [t.get("title", "") for t in tasks if t.get("status") == "PENDING"]
 

@@ -98,3 +98,41 @@ def test_contacts_to_markdown_table():
     assert "44999991234" in table_str
     assert "João Silva" in table_str
     assert "EXECUTIVE" in table_str
+
+
+def test_parse_vcard_text():
+    vcard_sample = """BEGIN:VCARD
+VERSION:3.0
+FN:Carlos Eduardo Gerente
+N:Gerente;Carlos;Eduardo;;
+ORG:Agro Cooperativa
+item1.TEL:044 99916-2543
+item1.X-ABLabel:
+item2.EMAIL;TYPE=INTERNET:carlos@agro.com
+CATEGORIES:Trabalho,myContacts
+NOTE:Responsável pelo setor de insumos
+PHOTO:https://lh3.googleusercontent.com/contacts/sample_avatar
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+ORG:Fast Burger Palotina
+TEL;TYPE=CELL:+55 44 99970-6727
+END:VCARD"""
+
+    contacts = parse_contact_batch(vcard_sample)
+    assert len(contacts) == 2
+
+    # Contato 1
+    c1 = contacts[0]
+    assert c1.name == "Carlos Eduardo Gerente"
+    assert c1.phone_number == "5544999162543"
+    assert c1.company == "Agro Cooperativa"
+    assert "carlos@agro.com" in c1.notes
+    assert "Trabalho" in c1.notes
+    assert "Responsável pelo setor de insumos" in c1.notes
+
+    # Contato 2 (sem FN, usando ORG como nome e normalizando +55)
+    c2 = contacts[1]
+    assert c2.name == "Fast Burger Palotina"
+    assert c2.phone_number == "5544999706727"
+

@@ -1828,3 +1828,247 @@ select:focus {
   padding: 0.1rem 0.4rem;
   border-radius: 10px;
 }
+
+/* =========================================================================
+   Toggle Switch para Cartões de Contato (Permissão de Tarefas)
+   ========================================================================= */
+.toggle-tasks-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.6rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.toggle-tasks-wrapper:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
+.toggle-tasks-wrapper.active {
+  background: rgba(14, 165, 233, 0.1);
+  border-color: rgba(14, 165, 233, 0.4);
+}
+
+.toggle-switch-ui {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.toggle-switch-ui input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-switch-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #334155;
+  transition: 0.2s;
+  border-radius: 18px;
+}
+
+.toggle-switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 12px;
+  width: 12px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #f8fafc;
+  transition: 0.2s;
+  border-radius: 50%;
+}
+
+.toggle-switch-ui input:checked + .toggle-switch-slider {
+  background-color: #0ea5e9;
+}
+
+.toggle-switch-ui input:checked + .toggle-switch-slider:before {
+  transform: translateX(14px);
+}
+
+.toggle-tasks-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.toggle-tasks-wrapper.active .toggle-tasks-label {
+  color: #38bdf8;
+}
+
+/* =========================================================================
+   Graph Controls & Filtros de Corte Temporal
+   ========================================================================= */
+.graph-filter-select, .graph-search-input {
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.graph-filter-select:focus, .graph-search-input:focus {
+  border-color: var(--color-primary);
+}
+
+/* =========================================================================
+   Task Accordion (Sanfona de Contexto Original "De quem foi ➔ Pra quem foi")
+   ========================================================================= */
+.task-accordion {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.task-accordion:hover {
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
+.task-accordion-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.85rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-primary);
+  text-align: left;
+  font-family: inherit;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  transition: background 0.15s;
+}
+
+.task-accordion-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.task-accordion-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.84rem;
+}
+
+.accordion-chevron {
+  display: inline-block;
+  font-size: 0.75rem;
+  color: var(--color-primary);
+  transition: transform 0.2s ease;
+}
+
+.accordion-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.task-flow-pills {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.74rem;
+  flex-wrap: wrap;
+}
+
+.flow-pill {
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.flow-pill.flow-from {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.flow-pill.flow-to {
+  background: rgba(14, 165, 233, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.25);
+}
+
+.flow-arrow {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.task-accordion-content {
+  border-top: 1px solid var(--border-subtle);
+  padding: 0.85rem;
+  background: rgba(15, 23, 42, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  font-size: 0.83rem;
+}
+
+.task-participants-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+}
+
+.task-original-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.task-original-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.task-original-text {
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.task-summary-callout {
+  padding: 0.5rem 0.75rem;
+  background: rgba(245, 158, 11, 0.08);
+  border-left: 3px solid #f59e0b;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 0.8rem;
+  color: #fde68a;
+  line-height: 1.4;
+}

@@ -188,29 +188,63 @@ class MemoryRepository:
             )
             db.add(message)
 
-            # 3. Salva Tarefas extraídas com prioridade ponderada
+            # 3. Salva Tarefas extraídas SOMENTE se permitido para o remetente (Proprietário ou contato com toggle ativo)
             extracted_tasks_dicts = []
-            for t in extracted.tasks:
-                task_id = str(uuid4())
-                weighted_task_priority = contact_service.calculate_priority_for_message(
-                    sender_phone_or_name=data.speaker,
-                    raw_urgency=t.priority,
-                    db=db,
-                )
-                task_rec = TaskRecord(
-                    id=task_id,
-                    message_id=msg_id,
-                    created_at=datetime.now(timezone.utc),
-                    title=t.title,
-                    assignee=t.assignee,
-                    due_date=t.due_date,
-                    priority=weighted_task_priority,
-                    status="PENDING",
-                )
-                db.add(task_rec)
-                t_dict = t.model_dump()
-                t_dict["priority"] = weighted_task_priority
-                extracted_tasks_dicts.append(t_dict)
+            allow_tasks_for_speaker = False
+
+            if is_owner_interaction(data.speaker, data.meta_info):
+                allow_tasks_for_speaker = True
+            else:
+                from src.contacts.models import ContactRecord
+                speaker_val = (data.speaker or "").strip()
+                phone_val = ""
+                if isinstance(data.meta_info, dict):
+                    phone_val = str(data.meta_info.get("phone") or data.meta_info.get("sender_phone") or data.meta_info.get("remoteJid") or "")
+                if not phone_val:
+                    phone_val = speaker_val
+
+                import re
+                digits = re.sub(r"\D", "", phone_val.split("@")[0]) if phone_val else ""
+
+                contact_match = None
+                if digits and len(digits) >= 8:
+                    contact_match = db.query(ContactRecord).filter(
+                        (ContactRecord.phone_number == digits)
+                        | (ContactRecord.phone_number.like(f"%{digits[-8:]}%"))
+                    ).first()
+                if not contact_match and speaker_val:
+                    contact_match = db.query(ContactRecord).filter(
+                        (ContactRecord.name.ilike(speaker_val))
+                        | (ContactRecord.nickname.ilike(speaker_val))
+                    ).first()
+
+                if contact_match and bool(getattr(contact_match, "can_generate_tasks", False)):
+                    allow_tasks_for_speaker = True
+
+            if allow_tasks_for_speaker:
+                for t in extracted.tasks:
+                    task_id = str(uuid4())
+                    weighted_task_priority = contact_service.calculate_priority_for_message(
+                        sender_phone_or_name=data.speaker,
+                        raw_urgency=t.priority,
+                        db=db,
+                    )
+                    task_rec = TaskRecord(
+                        id=task_id,
+                        message_id=msg_id,
+                        created_at=datetime.now(timezone.utc),
+                        title=t.title,
+                        assignee=t.assignee,
+                        due_date=t.due_date,
+                        priority=weighted_task_priority,
+                        status="PENDING",
+                    )
+                    db.add(task_rec)
+                    t_dict = t.model_dump()
+                    t_dict["priority"] = weighted_task_priority
+                    extracted_tasks_dicts.append(t_dict)
+            else:
+                logger.info(f"📋 [Tarefas] Geração de tarefas ignorada para '{data.speaker}' (toggle de tarefas desativado no cartão).")
 
 
             # 4. Salva Entidades extraídas
@@ -286,6 +320,7 @@ class MemoryRepository:
                             owner_rec.nickname = "Bruno Conter (Proprietário / Arquiteto)"
                             owner_rec.company = "Hermes Memory / Homelab"
                             owner_rec.notes = "Criador, Proprietário e Arquiteto Supremo do sistema Hermes Voice Memory."
+                            owner_rec.last_interaction_at = message.created_at
                             db.commit()
                         if owner_rec:
                             contact_service._sync_contact_to_graph(owner_rec)
@@ -315,14 +350,17 @@ class MemoryRepository:
                                     company="",
                                     projects_json=[],
                                     notes="Contato identificado via mensagem recebida.",
+                                    last_interaction_at=message.created_at,
                                     created_at=datetime.now(timezone.utc),
                                     updated_at=datetime.now(timezone.utc),
                                 )
                                 db.add(new_contact)
                                 db.commit()
                                 contact_service._sync_contact_to_graph(new_contact)
-                        elif push_name and existing_contact.name.isdigit():
-                            existing_contact.name = push_name
+                        else:
+                            if push_name and existing_contact.name.isdigit():
+                                existing_contact.name = push_name
+                            existing_contact.last_interaction_at = message.created_at
                             db.commit()
                             contact_service._sync_contact_to_graph(existing_contact)
 
@@ -708,6 +746,10 @@ class MemoryRepository:
                         speaker=speaker_name,
                         sender_phone=sender_phone,
                         sender_role=sender_role,
+                        message_time=msg.created_at.strftime("%d/%m/%Y %H:%M") if msg and msg.created_at else None,
+                        audio_duration_s=msg.audio_duration_s if msg else None,
+                        revised_text=msg.revised_text if msg else None,
+                        raw_text=msg.raw_text if msg else None,
                         message_summary=msg_summary,
                         source_text_snippet=source_snippet,
                     )
