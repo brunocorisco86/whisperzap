@@ -175,7 +175,9 @@ async def get_full_graph(
     """Retorna o grafo estruturado e otimizado para o frontend, aplicando filtros de relevância e corte temporal padrão."""
     from datetime import datetime, timezone, timedelta
     from src.contacts.models import ContactRecord
-    from src.ai_gateway.bypass import is_owner_interaction
+    from src.memory.models import MessageRecord
+    from src.ai_gateway.bypass import is_owner_interaction, normalize_text
+    import re
 
     category_colors = {
         "PERSON": {"background": "#10b981", "border": "#059669", "highlight": "#34d399"},
@@ -187,23 +189,46 @@ async def get_full_graph(
         "OTHER": {"background": "#64748b", "border": "#475569", "highlight": "#94a3b8"},
     }
 
-    # Mapa de contatos e suas últimas datas de interação
-    contacts_list = db.query(ContactRecord).all()
-    contact_interaction_map = {}
-    contact_fav_map = {}
-    for c in contacts_list:
-        if c.name:
-            contact_interaction_map[c.name.lower()] = c.last_interaction_at
-            contact_fav_map[c.name.lower()] = c.is_favorite
-        if c.phone_number:
-            contact_interaction_map[c.phone_number] = c.last_interaction_at
-            contact_fav_map[c.phone_number] = c.is_favorite
-
     now = datetime.now(timezone.utc)
     cutoff_time = now - timedelta(days=days_cutoff) if days_cutoff > 0 else None
 
-    kept_nodes = []
-    kept_node_ids = set()
+    # 1. Conjunto estrito de identificadores de pessoas que CONVERSARAM no banco de dados
+    active_conversations_people = set()
+    if cutoff_time:
+        recent_msgs = db.query(MessageRecord.speaker, MessageRecord.meta_info).filter(
+            MessageRecord.created_at >= cutoff_time
+        ).all()
+        for spk, meta in recent_msgs:
+            if spk:
+                spk_str = str(spk).strip()
+                active_conversations_people.add(spk_str.lower())
+                active_conversations_people.add(normalize_text(spk_str))
+                digits = re.sub(r"\D", "", spk_str)
+                if digits:
+                    active_conversations_people.add(digits)
+                    if len(digits) >= 8:
+                        active_conversations_people.add(digits[-8:])
+            if isinstance(meta, dict):
+                r_jid = str(meta.get("remoteJid") or meta.get("phone") or meta.get("sender_phone") or "")
+                if r_jid:
+                    r_digits = re.sub(r"\D", "", r_jid.split("@")[0])
+                    if r_digits:
+                        active_conversations_people.add(r_digits)
+                        if len(r_digits) >= 8:
+                            active_conversations_people.add(r_digits[-8:])
+                p_name = meta.get("pushName")
+                if p_name:
+                    p_str = str(p_name).strip()
+                    active_conversations_people.add(p_str.lower())
+                    active_conversations_people.add(normalize_text(p_str))
+
+    # Mapa de contatos cadastrados
+    contacts_list = db.query(ContactRecord).all()
+    contacts_by_name = {c.name.lower(): c for c in contacts_list if c.name}
+    contacts_by_phone = {c.phone_number: c for c in contacts_list if c.phone_number}
+
+    candidate_nodes = []
+    candidate_node_ids = set()
 
     for n, attrs in knowledge_graph.graph.nodes(data=True):
         cat = attrs.get("category", "OTHER").upper()
@@ -211,32 +236,36 @@ async def get_full_graph(
         degree = knowledge_graph.graph.degree(n) if knowledge_graph.graph.has_node(n) else 0
         is_owner = is_owner_interaction(n)
 
-        # 1. Filtro Temporal de Inatividade (> 30 dias para contatos/pessoas)
-        if days_cutoff > 0 and cutoff_time and not is_owner:
-            last_interaction = contact_interaction_map.get(n.lower())
-            if not last_interaction and attrs.get("last_interaction_at"):
-                try:
-                    last_interaction = datetime.fromisoformat(attrs["last_interaction_at"])
-                except Exception:
-                    pass
+        # Detecta se o nó é uma Pessoa / Contato
+        n_lower = n.strip().lower()
+        n_norm = normalize_text(n)
+        n_digits = re.sub(r"\D", "", n)
+        matching_contact = contacts_by_name.get(n_lower) or (contacts_by_phone.get(n_digits) if n_digits else None)
+        is_person = (cat == "PERSON") or (matching_contact is not None)
 
-            if cat == "PERSON" or n.lower() in contact_interaction_map:
-                is_fav = contact_fav_map.get(n.lower(), False) or attrs.get("is_favorite", False)
-                if last_interaction:
-                    # Garante timezone aware
-                    if last_interaction.tzinfo is None:
-                        last_interaction = last_interaction.replace(tzinfo=timezone.utc)
-                    if last_interaction < cutoff_time and not is_fav:
-                        continue  # Oculta contato inativo há mais de 30 dias
-                elif not is_fav and degree <= 0:
-                    continue  # Contato sem interação e desconectado
+        # 1. Poda Estrita de Pessoas por Conversas Reais no Banco de Dados
+        if days_cutoff > 0 and is_person and not is_owner:
+            c_phone_digits = re.sub(r"\D", "", matching_contact.phone_number) if (matching_contact and matching_contact.phone_number) else ""
+            c_name_norm = normalize_text(matching_contact.name) if matching_contact else ""
+            
+            has_talked = (
+                (n_lower in active_conversations_people)
+                or (n_norm in active_conversations_people)
+                or (n_digits and n_digits in active_conversations_people)
+                or (n_digits and len(n_digits) >= 8 and n_digits[-8:] in active_conversations_people)
+                or (c_phone_digits and c_phone_digits in active_conversations_people)
+                or (c_phone_digits and len(c_phone_digits) >= 8 and c_phone_digits[-8:] in active_conversations_people)
+                or (c_name_norm and c_name_norm in active_conversations_people)
+            )
+
+            # Se não conversou nos últimos X dias no banco de dados, é podado do grafo ativo
+            if not has_talked:
+                continue
 
         # 2. Filtro de Nós Principais (main_only)
         if main_only and not is_owner:
-            # Oculta nós órfãos desconectados (degree 0) exceto se for muito mencionado
             if degree == 0 and mentions < 3:
                 continue
-            # Oculta termos conceituais isolados de 1 única menção
             if cat in ("CONCEPT", "OTHER") and degree <= 1 and mentions <= 1:
                 continue
 
@@ -254,7 +283,7 @@ async def get_full_graph(
             title_parts.append(f"Detalhes: {attrs.get('details')}")
         title_parts.append(f"Conexões: {degree} | Menções: {mentions}")
 
-        kept_nodes.append({
+        candidate_nodes.append({
             "id": n,
             "label": n,
             "category": cat,
@@ -265,11 +294,13 @@ async def get_full_graph(
             "degree": degree,
             "mentions": mentions,
         })
-        kept_node_ids.add(n)
+        candidate_node_ids.add(n)
 
+    # Filtra arestas apenas entre os nós mantidos
     kept_edges = []
+    connected_node_ids = set()
     for u, v, attrs in knowledge_graph.graph.edges(data=True):
-        if u in kept_node_ids and v in kept_node_ids:
+        if u in candidate_node_ids and v in candidate_node_ids:
             rel = attrs.get("relation", "RELATED_TO")
             weight = float(attrs.get("weight", 1.0))
             kept_edges.append({
@@ -281,14 +312,29 @@ async def get_full_graph(
                 "color": {"color": "#334155", "highlight": "#10b981"},
                 "width": 1.0 + min(weight / 20.0, 3.0),
             })
+            connected_node_ids.add(u)
+            connected_node_ids.add(v)
+
+    # Se main_only=True, mantém nós conectados, pessoas com conversas ativas no período e o proprietário
+    if main_only:
+        final_nodes = [
+            n for n in candidate_nodes
+            if (
+                n["id"] in connected_node_ids
+                or is_owner_interaction(n["id"])
+                or (n.get("category") == "PERSON" and (n["id"].strip().lower() in active_conversations_people or normalize_text(n["id"]) in active_conversations_people))
+            )
+        ]
+    else:
+        final_nodes = candidate_nodes
 
     return {
-        "nodes": kept_nodes,
+        "nodes": final_nodes,
         "edges": kept_edges,
         "stats": {
             "total_nodes_in_graph": knowledge_graph.stats()["nodes"],
             "total_edges_in_graph": knowledge_graph.stats()["edges"],
-            "filtered_nodes": len(kept_nodes),
+            "filtered_nodes": len(final_nodes),
             "filtered_edges": len(kept_edges),
             "main_only": main_only,
             "days_cutoff": days_cutoff,

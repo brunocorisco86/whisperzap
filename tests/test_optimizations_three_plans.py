@@ -137,6 +137,16 @@ def test_graph_cutoff_and_main_only_default():
         db.merge(c_recent)
         db.commit()
 
+        from src.memory.models import MessageRecord
+        m_recent = MessageRecord(
+            id="msg_test_recent_contact",
+            speaker="Contato Ativo Recente",
+            revised_text="Olá Bruno, tudo bem? Vamos alinhar sobre a Granja Central.",
+            created_at=recent_date,
+        )
+        db.merge(m_recent)
+        db.commit()
+
         knowledge_graph.add_node("Contato Inativo Antigo", category="PERSON", last_interaction_at=old_date.isoformat())
         knowledge_graph.add_node("Contato Ativo Recente", category="PERSON", last_interaction_at=recent_date.isoformat())
         knowledge_graph.add_edge("Contato Ativo Recente", "Granja Central", relation="SUPERVISES")
