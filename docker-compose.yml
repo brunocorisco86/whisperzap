@@ -44,6 +44,7 @@ services:
       API_TITLE: "Hermes Voice Memory API (Production)"
     volumes:
       - ./src:/app/src
+      - ./scripts:/app/scripts
       - hermes_data:/app/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
