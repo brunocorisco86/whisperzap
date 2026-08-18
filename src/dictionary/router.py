@@ -100,6 +100,62 @@ async def manual_promote_candidate(
     return term
 
 
+# ===================== Sugestões Inteligentes de Dicionário com spaCy NLP =====================
+
+
+@router.get("/suggestions", summary="Retorna sugestões inteligentes de termos minerados com spaCy")
+async def get_spacy_dictionary_suggestions(
+    min_occurrences: int = Query(default=1, ge=1, description="Frequência mínima de ocorrência"),
+    limit_messages: int = Query(default=100, ge=10, le=500, description="Quantidade de mensagens recentes a analisar"),
+    db: Session = Depends(get_db),
+):
+    """Varre as mensagens recentes do banco de dados e sugere novos termos técnicos com spaCy."""
+    from src.memory.models import MessageRecord
+    from src.dictionary.spacy_suggester import spacy_term_miner
+
+    messages = (
+        db.query(MessageRecord)
+        .filter(MessageRecord.revised_text.isnot(None))
+        .order_by(MessageRecord.created_at.desc())
+        .limit(limit_messages)
+        .all()
+    )
+
+    texts_with_context = [
+        {
+            "text": msg.revised_text or msg.raw_text or "",
+            "speaker": msg.speaker or "",
+        }
+        for msg in messages
+    ]
+
+    existing_terms = {t.term for t in dictionary_service.list_terms()}
+    suggestions = spacy_term_miner.extract_candidate_terms_from_texts(
+        texts_with_context=texts_with_context,
+        existing_terms=existing_terms,
+        min_occurrences=min_occurrences,
+    )
+    return suggestions
+
+
+@router.post("/generate-phonetics", summary="Gera variações fonéticas prováveis para qualquer termo")
+async def generate_phonetic_variations(payload: dict):
+    """Gera variações fonéticas e transcrições prováveis do Whisper para um determinado termo."""
+    from src.dictionary.spacy_suggester import phonetic_variation_generator
+
+    term = str(payload.get("term") or "").strip()
+    if not term:
+        raise HTTPException(status_code=400, detail="Campo 'term' é obrigatório")
+
+    variations = phonetic_variation_generator.generate(term)
+    return {
+        "term": term,
+        "phonetic_variations": variations,
+        "total_variations": len(variations),
+    }
+
+
+
 @router.delete("/candidates/{candidate_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_or_reject_candidate(candidate_id: str, db: Session = Depends(get_db)):
     """Rejeita ou descarta um candidato a termo léxico."""
