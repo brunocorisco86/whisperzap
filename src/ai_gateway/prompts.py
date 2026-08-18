@@ -149,7 +149,9 @@ Sua função é responder às consultas utilizando **EXCLUSIVAMENTE** as memóri
 5. **FORMATO**: Responda em Português (pt-BR) de forma elegante, refinada e objetiva.
 """
 
-HERMES_QUERY_USER_TEMPLATE = """Pergunta do Usuário:
+HERMES_QUERY_USER_TEMPLATE = """Data/Hora Atual de Referência: {current_datetime} (Horário Oficial de Brasília / UTC-3)
+
+Pergunta do Usuário:
 \"\"\"{query}\"\"\"
 
 Contexto de Memória Recuperado:
@@ -161,7 +163,7 @@ Conexões do Grafo de Conhecimento:
 Tarefas Relacionadas no Sistema:
 {tasks_context}
 
-Responda à pergunta do usuário fundamentando-se nos fatos acima:"""
+Responda à pergunta do usuário fundamentando-se nos fatos acima, sempre respeitando a data e hora oficial de Brasília indicada:"""
 
 
 # ===================== Resumo Diário & Plano para Amanhã =====================

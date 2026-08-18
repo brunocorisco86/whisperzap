@@ -76,7 +76,11 @@ class HermesAgentService:
             "\n".join([f"- {t}" for t in pending_tasks]) if pending_tasks else "Nenhuma tarefa pendente relacionada."
         )
 
+        from src.memory.timezone_utils import get_now_brt
+        current_datetime_brt = get_now_brt().strftime("%d/%m/%Y %H:%M:%S (%A)")
+
         user_prompt = HERMES_QUERY_USER_TEMPLATE.format(
+            current_datetime=current_datetime_brt,
             query=query,
             retrieved_context=retrieved_context,
             graph_context=graph_context,

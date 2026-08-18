@@ -524,6 +524,8 @@ class MemoryRepository:
             seen_ids = set()
             sources: list[MemorySourceCitation] = []
 
+            from src.memory.timezone_utils import format_brt
+
             for sr in search_results:
                 seen_ids.add(sr.message_id)
                 sources.append(
@@ -532,7 +534,7 @@ class MemoryRepository:
                         speaker=sr.speaker,
                         text_snippet=sr.summary or sr.text[:140],
                         similarity=sr.similarity,
-                        created_at=sr.created_at.strftime("%Y-%m-%d %H:%M") if sr.created_at else None,
+                        created_at=format_brt(sr.created_at) if sr.created_at else None,
                     )
                 )
 
@@ -569,7 +571,7 @@ class MemoryRepository:
                                 speaker=pm.speaker or "Desconhecido",
                                 text_snippet=snippet,
                                 similarity=0.95 if (pm.speaker and tok in pm.speaker.lower()) else 0.85,
-                                created_at=pm.created_at.strftime("%Y-%m-%d %H:%M") if pm.created_at else None,
+                                created_at=format_brt(pm.created_at) if pm.created_at else None,
                             )
                         )
 
