@@ -146,21 +146,34 @@ class HybridGraphRAGService:
         # Aplica boost de relevância em fontes vetoriais que citam nós do subgrafo
         boosted_sources = []
         for src in vector_sources:
-            text = src.get("text", "") or ""
-            text_lower = text.lower()
+            if isinstance(src, dict):
+                text = src.get("text") or src.get("text_snippet") or ""
+                sim = src.get("similarity", 0.70)
+            else:
+                text = getattr(src, "text_snippet", "") or getattr(src, "text", "") or ""
+                sim = getattr(src, "similarity", 0.70)
+
+            text_lower = str(text).lower()
             matches_graph = any(n in text_lower for n in subgraph_nodes_lower if len(n) > 2)
             
-            # Copia com score ajustado
-            src_copy = dict(src)
-            if matches_graph:
-                src_copy["similarity"] = min(0.99, src.get("similarity", 0.70) + 0.15)
-                src_copy["graph_reinforced"] = True
+            if isinstance(src, dict):
+                src_copy = dict(src)
+                if matches_graph:
+                    src_copy["similarity"] = min(0.99, sim + 0.15)
+                    src_copy["graph_reinforced"] = True
+                else:
+                    src_copy["graph_reinforced"] = False
+                boosted_sources.append(src_copy)
             else:
-                src_copy["graph_reinforced"] = False
-            boosted_sources.append(src_copy)
+                if matches_graph:
+                    src.similarity = min(0.99, sim + 0.15)
+                boosted_sources.append(src)
 
         # Ordena fontes com boost
-        boosted_sources.sort(key=lambda s: s.get("similarity", 0), reverse=True)
+        boosted_sources.sort(
+            key=lambda s: s.get("similarity", 0) if isinstance(s, dict) else getattr(s, "similarity", 0),
+            reverse=True,
+        )
 
         return {
             "sources": boosted_sources,

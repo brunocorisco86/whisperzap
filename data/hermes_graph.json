@@ -5,7 +5,7 @@
   "nodes": [
     {
       "category": "PERSON",
-      "mentions": 317,
+      "mentions": 318,
       "role": "UNKNOWN",
       "phone": "",
       "company": "",
@@ -14,7 +14,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 345,
+      "mentions": 348,
       "details": "Contato de trabalho",
       "role": "UNKNOWN",
       "phone": "",
@@ -24,7 +24,7 @@
     },
     {
       "category": "EQUIPMENT",
-      "mentions": 367,
+      "mentions": 368,
       "details": "Armazenamento de ração",
       "id": "Silo 3"
     },
@@ -36,7 +36,7 @@
     },
     {
       "category": "SYSTEM",
-      "mentions": 363,
+      "mentions": 364,
       "details": "Ficha de Acompanhamento de Lote",
       "id": "FAL"
     },
@@ -23242,18 +23242,18 @@
     },
     {
       "category": "PERSON",
-      "mentions": 94,
+      "mentions": 95,
       "role": "OWNER",
       "phone": "554497604925",
       "company": "Hermes Memory / Homelab",
       "weight": 1.0,
       "can_generate_tasks": false,
-      "last_interaction_at": "2026-08-18T01:38:43.745415",
+      "last_interaction_at": null,
       "id": "Bruno Conter"
     },
     {
       "category": "LOCATION",
-      "mentions": 63,
+      "mentions": 64,
       "id": "Hermes Memory / Homelab"
     },
     {
@@ -23321,13 +23321,13 @@
   "links": [
     {
       "relation": "DELEGATED_TO",
-      "weight": 288.0,
+      "weight": 290.0,
       "source": "Bruno",
       "target": "João"
     },
     {
       "relation": "MENTIONED",
-      "weight": 266.0,
+      "weight": 267.0,
       "source": "Bruno",
       "target": "Silo 3"
     },
@@ -23339,7 +23339,7 @@
     },
     {
       "relation": "MENTIONED",
-      "weight": 263.0,
+      "weight": 264.0,
       "source": "Bruno",
       "target": "FAL"
     },
@@ -23363,7 +23363,7 @@
     },
     {
       "relation": "ASSIGNED_WITH",
-      "weight": 296.0,
+      "weight": 298.0,
       "source": "João",
       "target": "Silo 3"
     },
@@ -23375,7 +23375,7 @@
     },
     {
       "relation": "ASSIGNED_WITH",
-      "weight": 289.0,
+      "weight": 291.0,
       "source": "João",
       "target": "FAL"
     },
@@ -23393,7 +23393,7 @@
     },
     {
       "relation": "CO_OCCURRED",
-      "weight": 363.0,
+      "weight": 364.0,
       "source": "Silo 3",
       "target": "FAL"
     },
@@ -24941,7 +24941,7 @@
     },
     {
       "relation": "AFFILIATED_AS_OWNER",
-      "weight": 63.0,
+      "weight": 64.0,
       "source": "Bruno Conter",
       "target": "Hermes Memory / Homelab"
     },
