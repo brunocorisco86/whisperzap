@@ -356,6 +356,12 @@ def should_bypass_ai(
         if meta_info.get("bypass_ai") is True or meta_info.get("bypass") is True:
             return True, "explicit_bypass"
 
+    # 3. Economia de Tokens com spaCy: Mensagens puramente fáticas / saudações
+    from src.ai_gateway.token_economy import token_economy
+    is_phatic, phatic_reason = token_economy.is_phatic_or_trivial(text or "")
+    if is_phatic:
+        return True, f"token_economy_{phatic_reason}"
+
     return False, "process_ai"
 
 

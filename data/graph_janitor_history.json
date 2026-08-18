@@ -1,0 +1,22 @@
+[
+  {
+    "timestamp": "2026-08-18T01:10:41.918527+00:00",
+    "execution_time_ms": 88.42,
+    "dry_run": false,
+    "nodes_before": 3,
+    "nodes_after": 3,
+    "nodes_pruned_count": 0,
+    "edges_before": 0,
+    "edges_after": 0,
+    "edges_pruned_count": 0,
+    "nodes_merged_count": 0,
+    "contacts_merged_count": 0,
+    "orphan_messages_purged_count": 0,
+    "orphan_tasks_purged_count": 0,
+    "orphan_audio_files_deleted_count": 0,
+    "orphan_speakers_purged": [],
+    "pruned_nodes": [],
+    "merged_nodes": [],
+    "summary": "A Zeladora realizou a faxina: 0 nós efêmeros/órfãos podados, 0 aliases mesclados, 0 arestas otimizadas em 88.42ms."
+  }
+]

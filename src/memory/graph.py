@@ -50,19 +50,37 @@ class KnowledgeGraph:
                 logger.error(f"Erro ao salvar grafo de conhecimento: {e}")
 
     def add_node(self, name: str, category: str = "OTHER", **attrs) -> None:
-        """Adiciona ou atualiza um nó no grafo de forma thread-safe."""
+        """Adiciona ou atualiza um nó no grafo de forma thread-safe com sanitização e canonicidade."""
+        from src.ai_gateway.entity_sanitizer import entity_sanitizer
+        from src.memory.graph_enhancer import graph_enhancer
+
+        # 1. Sanitização de erros ortográficos e alucinações
+        clean_name, clean_cat, _ = entity_sanitizer.sanitize_entity_name(name, category)
+        if not clean_name:
+            return
+
         with self._lock:
-            name_clean = name.strip()
-            if not name_clean:
-                return
-            if not self.graph.has_node(name_clean):
-                self.graph.add_node(name_clean, category=category, mentions=1, **attrs)
+            # 2. Simplificação de compostas e busca de canônicos
+            existing_node_names = set(self.graph.nodes())
+            canonical_name, parent_concept = graph_enhancer.simplify_compound_node(clean_name, existing_node_names)
+            final_name = canonical_name or clean_name
+
+            if not self.graph.has_node(final_name):
+                self.graph.add_node(final_name, category=clean_cat, mentions=1, **attrs)
             else:
-                self.graph.nodes[name_clean]["mentions"] = self.graph.nodes[name_clean].get("mentions", 0) + 1
-                if category != "OTHER":
-                    self.graph.nodes[name_clean]["category"] = category
+                self.graph.nodes[final_name]["mentions"] = self.graph.nodes[final_name].get("mentions", 0) + 1
+                if clean_cat != "OTHER":
+                    self.graph.nodes[final_name]["category"] = clean_cat
                 for k, v in attrs.items():
-                    self.graph.nodes[name_clean][k] = v
+                    self.graph.nodes[final_name][k] = v
+
+            # Se for uma instância específica com pai (ex: 'Silo 3' -> 'Silo'), conecta hierarquicamente
+            if parent_concept and parent_concept != final_name:
+                if not self.graph.has_node(parent_concept):
+                    self.graph.add_node(parent_concept, category=clean_cat, mentions=1)
+                if not self.graph.has_edge(final_name, parent_concept):
+                    self.graph.add_edge(final_name, parent_concept, relation="INSTANCE_OF", weight=1.5)
+
             self._save()
 
     def remove_node(self, name: str) -> bool:
@@ -77,22 +95,34 @@ class KnowledgeGraph:
 
     def add_edge(self, source: str, target: str, relation: str = "RELATED_TO", weight: float = 1.0) -> None:
         """Adiciona ou incrementa uma aresta direcionada entre duas entidades de forma thread-safe."""
+        from src.ai_gateway.entity_sanitizer import entity_sanitizer
+        from src.memory.graph_enhancer import graph_enhancer
+
+        src_clean, _, _ = entity_sanitizer.sanitize_entity_name(source)
+        tgt_clean, _, _ = entity_sanitizer.sanitize_entity_name(target)
+        if not src_clean or not tgt_clean:
+            return
+
         with self._lock:
-            src_clean = source.strip()
-            tgt_clean = target.strip()
-            if not src_clean or not tgt_clean or src_clean.lower() == tgt_clean.lower():
+            existing = set(self.graph.nodes())
+            src_canonical, _ = graph_enhancer.simplify_compound_node(src_clean, existing)
+            tgt_canonical, _ = graph_enhancer.simplify_compound_node(tgt_clean, existing)
+            src_final = src_canonical or src_clean
+            tgt_final = tgt_canonical or tgt_clean
+
+            if not src_final or not tgt_final or src_final.lower() == tgt_final.lower():
                 return
 
-            if not self.graph.has_node(src_clean):
-                self.add_node(src_clean, category="CONCEPT")
-            if not self.graph.has_node(tgt_clean):
-                self.add_node(tgt_clean, category="CONCEPT")
+            if not self.graph.has_node(src_final):
+                self.add_node(src_final, category="CONCEPT")
+            if not self.graph.has_node(tgt_final):
+                self.add_node(tgt_final, category="CONCEPT")
 
-            if self.graph.has_edge(src_clean, tgt_clean):
-                self.graph[src_clean][tgt_clean]["weight"] = self.graph[src_clean][tgt_clean].get("weight", 1.0) + weight
-                self.graph[src_clean][tgt_clean]["relation"] = relation
+            if self.graph.has_edge(src_final, tgt_final):
+                self.graph[src_final][tgt_final]["weight"] = self.graph[src_final][tgt_final].get("weight", 1.0) + weight
+                self.graph[src_final][tgt_final]["relation"] = relation
             else:
-                self.graph.add_edge(src_clean, tgt_clean, relation=relation, weight=weight)
+                self.graph.add_edge(src_final, tgt_final, relation=relation, weight=weight)
             self._save()
 
     def add_interaction(self, speaker: str, entities: list[dict], tasks: list[dict], intent: str) -> None:

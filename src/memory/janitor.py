@@ -262,60 +262,80 @@ class GraphJanitorService:
         return sacred
 
     def _merge_alias_nodes(self, sacred_nodes: Set[str], dry_run: bool = False) -> List[Dict[str, Any]]:
-        """Identifica e mescla nós com pequenas variações de grafia / maiúsculas e minúsculas."""
+        """Identifica e mescla nós com pequenas variações de grafia, plurais, typos (spaCy) e casing."""
+        from src.ai_gateway.entity_sanitizer import entity_sanitizer
+        from src.memory.graph_enhancer import graph_enhancer
+
         g = self.kg.graph
         merged_list = []
         normalized_map: Dict[str, List[str]] = {}
 
+        # 1. Agrupamento por chave canônica via spaCy e Sanitizer
         for node in list(g.nodes()):
-            key = node.strip().lower()
-            if key not in normalized_map:
-                normalized_map[key] = []
-            normalized_map[key].append(node)
+            attrs = g.nodes[node]
+            cat = attrs.get("category", "OTHER")
+            sanitized_name, _, _ = entity_sanitizer.sanitize_entity_name(node, cat)
+            canonical_name, _ = graph_enhancer.simplify_compound_node(sanitized_name or node, set(g.nodes()))
+            target_key = (canonical_name or sanitized_name or node).strip().lower()
+
+            if target_key not in normalized_map:
+                normalized_map[target_key] = []
+            normalized_map[target_key].append(node)
 
         for key, variations in normalized_map.items():
             if len(variations) > 1:
-                # Escolhe o nó canônico (o que tem mais conexões/menções ou o que está na whitelist)
+                # Escolhe o nó canônico (o que está na whitelist, o mais conexo ou o que tem formato correto)
                 canonical = max(
                     variations,
                     key=lambda n: (
                         100 if n in sacred_nodes else 0,
+                        50 if not entity_sanitizer.sanitize_entity_name(n)[2] else 0,  # Não precisou de correção
                         g.nodes[n].get("mentions", 1),
                         g.degree(n),
-                        len(n),  # Prefere versões completas/capitalizadas
+                        len(n),
                     ),
                 )
+                # Garante que o canonical esteja sanitizado
+                clean_canonical, _, _ = entity_sanitizer.sanitize_entity_name(canonical)
+                if clean_canonical:
+                    canonical = clean_canonical
 
                 for var in variations:
                     if var == canonical:
                         continue
 
                     if not dry_run:
-                        # Transfere arestas de entrada
-                        for u, _, edge_data in list(g.in_edges(var, data=True)):
-                            if u != canonical:
-                                self.kg.add_edge(
-                                    source=u,
-                                    target=canonical,
-                                    relation=edge_data.get("relation", "RELATED_TO"),
-                                    weight=edge_data.get("weight", 1.0),
-                                )
-                        # Transfere arestas de saída
-                        for _, v, edge_data in list(g.out_edges(var, data=True)):
-                            if v != canonical:
-                                self.kg.add_edge(
-                                    source=canonical,
-                                    target=v,
-                                    relation=edge_data.get("relation", "RELATED_TO"),
-                                    weight=edge_data.get("weight", 1.0),
-                                )
+                        # Garante que canonical exista antes de transferir
+                        if not g.has_node(canonical):
+                            var_cat = g.nodes[var].get("category", "OTHER") if g.has_node(var) else "OTHER"
+                            g.add_node(canonical, category=var_cat, mentions=1)
 
-                        # Soma menções
-                        g.nodes[canonical]["mentions"] = (
-                            g.nodes[canonical].get("mentions", 1) + g.nodes[var].get("mentions", 1)
-                        )
-                        # Remove a variação secundária
-                        g.remove_node(var)
+                        if g.has_node(var):
+                            # Transfere arestas de entrada
+                            for u, _, edge_data in list(g.in_edges(var, data=True)):
+                                if u != canonical:
+                                    self.kg.add_edge(
+                                        source=u,
+                                        target=canonical,
+                                        relation=edge_data.get("relation", "RELATED_TO"),
+                                        weight=edge_data.get("weight", 1.0),
+                                    )
+                            # Transfere arestas de saída
+                            for _, v, edge_data in list(g.out_edges(var, data=True)):
+                                if v != canonical:
+                                    self.kg.add_edge(
+                                        source=canonical,
+                                        target=v,
+                                        relation=edge_data.get("relation", "RELATED_TO"),
+                                        weight=edge_data.get("weight", 1.0),
+                                    )
+
+                            # Soma menções
+                            g.nodes[canonical]["mentions"] = (
+                                g.nodes[canonical].get("mentions", 1) + g.nodes[var].get("mentions", 1)
+                            )
+                            # Remove a variação secundária
+                            g.remove_node(var)
 
                     merged_list.append({
                         "canonical": canonical,

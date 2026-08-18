@@ -73,11 +73,11 @@ def test_janitor_merges_alias_nodes(temp_graph):
     """Testa a desambiguação e fusão de variações quase-idênticas transferindo conexões."""
     kg, janitor = temp_graph
 
-    # Cria nós com pequenas diferenças de grafia
-    kg.add_node("Silo 3", category="FACILITY")
-    kg.add_node("silo 3", category="OTHER")
-    kg.add_edge("Bruno Conter", "silo 3", relation="INSPECTED")
-    kg.add_edge("Silo 3", "C.Vale", relation="LOCATED_AT")
+    # Cria nós com pequenas diferenças de grafia diretamente na estrutura bruta
+    kg.graph.add_node("Silo 3", category="FACILITY")
+    kg.graph.add_node("silo 3", category="OTHER")
+    kg.graph.add_edge("Bruno Conter", "silo 3", relation="INSPECTED")
+    kg.graph.add_edge("Silo 3", "C.Vale", relation="LOCATED_AT")
 
     report = janitor.clean_graph(dry_run=False, deduplicate_aliases=True)
 

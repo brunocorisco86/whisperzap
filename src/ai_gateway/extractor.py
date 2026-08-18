@@ -70,8 +70,12 @@ class SemanticExtractor:
         if context_block:
             context_block = f"Contexto de Apoio & Regras:\n{context_block}\n"
 
+        # 1. Poda de disfluências de áudio com spaCy para economia de tokens
+        from src.ai_gateway.token_economy import token_economy
+        cleaned_text, tokens_saved = token_economy.prune_disfluencies(request.text)
+
         prompt = EXTRACT_USER_TEMPLATE.format(
-            text=request.text,
+            text=cleaned_text,
             context_block=context_block,
         )
 
@@ -99,9 +103,14 @@ class SemanticExtractor:
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
 
+        # 2. Guardrail de Sanitização e Correção Ortográfica de Entidades (spaCy)
+        from src.ai_gateway.entity_sanitizer import entity_sanitizer
+        raw_entities = parsed_data.get("entities", [])
+        sanitized_entities_list = entity_sanitizer.sanitize_extracted_entities(raw_entities)
+
         # Normaliza tarefas, entidades, triplas semânticas e termos dúbios
         tasks = [ExtractedTask(**t) if isinstance(t, dict) else t for t in parsed_data.get("tasks", [])]
-        entities = [ExtractedEntity(**e) if isinstance(e, dict) else e for e in parsed_data.get("entities", [])]
+        entities = [ExtractedEntity(**e) if isinstance(e, dict) else e for e in sanitized_entities_list]
         raw_triples = parsed_data.get("triples", [])
         from src.ai_gateway.schemas import ExtractedTriple, UnclearTerm
         triples = [ExtractedTriple(**tr) if isinstance(tr, dict) else tr for tr in raw_triples if isinstance(tr, (dict, ExtractedTriple))]

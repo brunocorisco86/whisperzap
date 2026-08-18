@@ -12,14 +12,18 @@ def temp_graph(tmp_path):
 
 
 def test_add_nodes_and_edges(temp_graph):
-    """Testa criação manual de nós e arestas no grafo."""
+    """Testa criação manual de nós e arestas no grafo com ligação hierárquica automática."""
     temp_graph.add_node("Bruno", category="PERSON")
     temp_graph.add_node("Silo 3", category="EQUIPMENT")
     temp_graph.add_edge("Bruno", "Silo 3", relation="MONITORS")
 
     stats = temp_graph.stats()
-    assert stats["nodes"] == 2
-    assert stats["edges"] == 1
+    # 3 nós: Bruno, Silo 3 e o nó pai hierárquico Silo
+    assert stats["nodes"] == 3
+    assert temp_graph.graph.has_node("Silo")
+    assert temp_graph.graph.has_edge("Silo 3", "Silo")
+    # 2 arestas: MONITORS (Bruno -> Silo 3) e INSTANCE_OF (Silo 3 -> Silo)
+    assert stats["edges"] == 2
 
 
 def test_add_interaction(temp_graph):
