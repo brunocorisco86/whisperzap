@@ -19,6 +19,9 @@ networkx>=3.2.1
 # Context & Token Economy (Graphify)
 graphifyy>=0.1.0
 
+# Processamento de Linguagem Natural & Sentimento
+spacy>=3.7.0
+
 # Suite de Testes & Qualidade
 pytest>=8.1.0
 pytest-asyncio>=0.23.0

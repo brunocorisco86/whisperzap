@@ -1,0 +1,22 @@
+{
+  "version": "1.1",
+  "last_optimized_at": "2026-08-18T00:50:57.621362+00:00",
+  "total_cancelled_analyzed": 1,
+  "negative_guidelines": [
+    "NUNCA crie tarefas para observações de campo ou relatos passivos sem ação explícita (ex: 'Frango sentado', 'Nível de amônia alto'). Registre apenas como tópicos ou notas.",
+    "NUNCA crie tarefas para atualizações de status informando espera ou atraso (ex: 'Ainda não me responderam', 'Era pra hoje foi pra terça').",
+    "NUNCA crie tarefas para conversas conceituais ou itens de roadmap discutidos informalmente (ex: 'Tá no roadmap', 'Ideia para o futuro').",
+    "NUNCA crie tarefas para conselhos ou comentários condicionais hipotéticos (ex: 'A menos que eles exijam, mande o link')."
+  ],
+  "noise_taxonomies": {
+    "FIELD_OBSERVATION": "Frases nominais curtas descrevendo sintomas ou estados sem comando imperativo.",
+    "STATUS_UPDATE": "Mensagens relatando progresso, espera ou remarcação passiva de prazos.",
+    "ROADMAP_CHAT": "Discussões de ideias futuras ou brainstormings não atribuídos.",
+    "HYPOTHETICAL_ADVICE": "Sugestões que dependem de condições incertas não acionáveis no momento."
+  },
+  "metrics": {
+    "cancelled_count": 1,
+    "done_count": 0,
+    "actionability_filter_threshold": 0.45
+  }
+}

@@ -61,9 +61,14 @@ class SemanticExtractor:
             if dict_hint:
                 context_parts.append(dict_hint)
 
-        context_block = "\n".join(context_parts)
+        from src.ai_gateway.task_learner import task_learner_engine
+        pruning_hint = task_learner_engine.get_pruning_rules_prompt_hint()
+        if pruning_hint:
+            context_parts.append(pruning_hint)
+
+        context_block = "\n\n".join(context_parts)
         if context_block:
-            context_block = f"Contexto de Apoio:\n{context_block}\n"
+            context_block = f"Contexto de Apoio & Regras:\n{context_block}\n"
 
         prompt = EXTRACT_USER_TEMPLATE.format(
             text=request.text,

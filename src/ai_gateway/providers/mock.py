@@ -44,8 +44,17 @@ class MockProvider(BaseLLMProvider):
         # Se for um prompt de extração semântica
         if "extração semântica" in (system_instruction or "").lower() or "JSON de extração" in prompt:
             import json
-            # Analisa o texto para simular tarefas e entidades se encontradas
-            lower_prompt = prompt.lower()
+            # Analisa o texto do usuário para simular tarefas e entidades
+            user_text = prompt
+            if '"""' in prompt:
+                parts = prompt.split('"""')
+                if len(parts) >= 3:
+                    user_text = parts[1]
+            elif "Texto para Análise:" in prompt:
+                user_text = prompt.split("Texto para Análise:")[-1]
+            elif "Texto a ser analisado:" in prompt:
+                user_text = prompt.split("Texto a ser analisado:")[-1]
+            lower_prompt = user_text.lower()
             intent = "TASK" if any(w in lower_prompt for w in ["preciso", "falar", "comprar", "enviar", "fazer", "amanhã", "reunião"]) else "NOTE"
             if "ideia" in lower_prompt or "sugiro" in lower_prompt:
                 intent = "IDEA"

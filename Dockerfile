@@ -16,7 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Instala dependências Python em uma pasta de isolamento
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir --user -r requirements.txt && \
+    python -m pip install --no-cache-dir --user https://github.com/explosion/spacy-models/releases/download/pt_core_news_sm-3.8.0/pt_core_news_sm-3.8.0-py3-none-any.whl
 
 # ==============================================================================
 # Imagem Final de Execução

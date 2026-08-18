@@ -222,7 +222,18 @@ class MemoryRepository:
                     allow_tasks_for_speaker = True
 
             if allow_tasks_for_speaker:
+                from src.memory.task_sentiment_analyzer import task_sentiment_analyzer
+                source_msg_text = data.revised_text or data.raw_text or ""
+
                 for t in extracted.tasks:
+                    is_actionable = task_sentiment_analyzer.is_actionable_task(
+                        title=t.title,
+                        source_text=source_msg_text,
+                    )
+                    if not is_actionable:
+                        logger.info(f"🚫 [Tarefas] Candidata a tarefa '{t.title}' descartada pelo filtro spaCy NLP anti-ruído.")
+                        continue
+
                     task_id = str(uuid4())
                     weighted_task_priority = contact_service.calculate_priority_for_message(
                         sender_phone_or_name=data.speaker,

@@ -519,4 +519,29 @@ async def get_graph_janitor_logs():
     return graph_janitor_service.get_history()
 
 
+# ===================== Otimizador Inteligente de Tarefas (spaCy & LLM) =====================
+
+
+@router.post(
+    "/tasks/optimize-learner",
+    summary="Dispara a análise de tarefas ignoradas e otimização das regras pelo Agente LLM",
+    tags=["tasks", "optimizer"],
+)
+async def trigger_task_optimizer(db: Session = Depends(get_db)):
+    """Analisa as tarefas com status CANCELLED no PostgreSQL com spaCy e sintetiza regras anti-ruído."""
+    from src.ai_gateway.task_learner import task_learner_engine
+    return await task_learner_engine.run_feedback_optimization(db=db)
+
+
+@router.get(
+    "/tasks/learner-rules",
+    summary="Consulta as regras ativas de poda e métricas de aprendizado de tarefas",
+    tags=["tasks", "optimizer"],
+)
+async def get_task_learner_rules():
+    """Retorna as diretrizes negativas aprendidas e métricas de acionabilidade de tarefas."""
+    from src.ai_gateway.task_learner import task_learner_engine
+    return task_learner_engine._cached_rules or task_learner_engine._load_rules()
+
+
 
