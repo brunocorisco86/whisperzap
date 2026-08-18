@@ -568,5 +568,38 @@ async def hybrid_graph_search(
     }
 
 
+# ===================== Métricas de Economia de Tokens =====================
+
+
+@router.get(
+    "/token-savings",
+    summary="Consulta estatísticas em tempo real de tokens economizados",
+    tags=["tokens", "metrics"],
+)
+async def get_token_savings_metrics():
+    """Retorna o volume total de tokens poupados por bypass fático, compressão extrativa e cache semântico."""
+    from src.ai_gateway.token_economy import token_economy
+    from src.ai_gateway.context_compressor import extractive_context_compressor
+    from src.memory.semantic_cache import semantic_cache
+
+    cache_metrics = semantic_cache.get_metrics()
+    total_saved = (
+        token_economy.total_tokens_saved
+        + extractive_context_compressor.total_tokens_saved
+        + cache_metrics.get("total_tokens_saved", 0)
+    )
+
+    return {
+        "total_tokens_saved": total_saved,
+        "breakdown": {
+            "phatic_bypass_tokens_saved": token_economy.total_tokens_saved,
+            "extractive_compression_tokens_saved": extractive_context_compressor.total_tokens_saved,
+            "semantic_cache_tokens_saved": cache_metrics.get("total_tokens_saved", 0),
+        },
+        "semantic_cache_stats": cache_metrics,
+    }
+
+
+
 
 

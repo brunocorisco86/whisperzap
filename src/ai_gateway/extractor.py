@@ -70,9 +70,13 @@ class SemanticExtractor:
         if context_block:
             context_block = f"Contexto de Apoio & Regras:\n{context_block}\n"
 
-        # 1. Poda de disfluências de áudio com spaCy para economia de tokens
+        # 1. Poda de disfluências e compressão extrativa de contexto com spaCy para economia de tokens
         from src.ai_gateway.token_economy import token_economy
-        cleaned_text, tokens_saved = token_economy.prune_disfluencies(request.text)
+        from src.ai_gateway.context_compressor import extractive_context_compressor
+        
+        cleaned_text, _ = token_economy.prune_disfluencies(request.text)
+        if len(cleaned_text.split()) >= 40:
+            cleaned_text, _ = extractive_context_compressor.compress_text(cleaned_text)
 
         prompt = EXTRACT_USER_TEMPLATE.format(
             text=cleaned_text,

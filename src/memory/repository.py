@@ -506,6 +506,13 @@ class MemoryRepository:
             query_tokens = [w for w in re.findall(r"\w+", query.lower()) if len(w) >= 3]
             is_today = any(t in ("hoje", "atual", "recente") for t in query_tokens)
 
+            # Checagem de Cache Semântico Local (Zero Tokens)
+            from src.memory.semantic_cache import semantic_cache
+            from src.ai_gateway.schemas import HermesQueryResponse
+            cached_res = semantic_cache.get(query)
+            if cached_res:
+                return HermesQueryResponse(**cached_res)
+
             # 1. Busca Semântica Vetorial
             search_results = await self.search_memories(
                 query=query,
@@ -641,12 +648,15 @@ class MemoryRepository:
                 final_sources = sources
 
             # 6. Chama o Agente Hermes para inferência e resposta estrita
-            return await hermes_agent_service.answer_hermes_query(
+            result = await hermes_agent_service.answer_hermes_query(
                 query=query,
                 sources=final_sources[:12],  # Limite confortável de fontes relevantes
                 related_entities=list(set(related_entities)),
                 pending_tasks=related_tasks,
             )
+            # Armazena no cache semântico para consultas subsequentes (0 tokens)
+            semantic_cache.set(query, result.model_dump())
+            return result
         finally:
             if should_close:
                 db.close()

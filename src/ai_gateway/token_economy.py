@@ -40,6 +40,7 @@ class TokenEconomyEngine:
 
     def __init__(self):
         self.nlp = get_spacy_nlp()
+        self.total_tokens_saved = 0
 
     def is_phatic_or_trivial(self, text: str) -> Tuple[bool, str]:
         """Detecta se uma mensagem é puramente social/fática, dispensando chamada a LLM.
