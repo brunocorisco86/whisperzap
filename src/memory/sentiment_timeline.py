@@ -50,7 +50,8 @@ class SentimentTimelineService:
         target_date: Optional[str] = None,
         db: Session | None = None,
     ) -> DailySentimentCollectionResponse:
-        """Consolida as mensagens do dia 'as is', computa a distribuição emocional e persiste no banco SQL."""
+        """Consolida as mensagens do dia, computa a distribuição emocional e persiste no banco SQL."""
+        import re
         should_close = False
         if db is None:
             db = SessionLocal()
@@ -81,8 +82,11 @@ class SentimentTimelineService:
 
             from src.ai_gateway.bypass import is_owner_interaction
 
+            # Carrega catálogo de contatos para resolução flexível
+            all_contacts = db.query(ContactRecord).all()
+
             for speaker, msgs in person_messages.items():
-                # Ignora interações do próprio usuário/proprietário do termômetro de sentimentos de contatos
+                # Ignora interações do próprio usuário/proprietário
                 sample_meta = msgs[0].meta_info if (msgs and isinstance(msgs[0].meta_info, dict)) else {}
                 if is_owner_interaction(speaker, sample_meta):
                     continue
@@ -94,9 +98,9 @@ class SentimentTimelineService:
 
                 for msg in msgs:
                     sent = (msg.sentiment or "NEUTRAL").upper()
-                    if sent in ["POSITIVE", "POSITIVO"]:
+                    if sent in ["POSITIVE", "POSITIVO", "CONFIDENT", "CONFIANTE"]:
                         pos += 1
-                    elif sent in ["NEGATIVE", "NEGATIVO"]:
+                    elif sent in ["NEGATIVE", "NEGATIVO", "URGENT", "URGENTE", "ANXIOUS", "ANSIOSO", "FRUSTRATED", "FRUSTRADO"]:
                         neg += 1
                     else:
                         neu += 1
@@ -107,36 +111,47 @@ class SentimentTimelineService:
 
                 dominant_sent, avg_score = compute_dominant_sentiment(pos, neu, neg)
 
-                # Busca metadados do contato cadastrado (pessoas sem cartão ou abaixo do threshold de peso não deixam registros de sentimento)
-                contact = db.query(ContactRecord).filter(
-                    (ContactRecord.name.ilike(speaker)) | (ContactRecord.phone_number == speaker)
-                ).first()
+                # Resolução flexível do contato cadastrado
+                speaker_clean = speaker.strip().lower()
+                speaker_digits = re.sub(r"\D", "", speaker)
+                matched_contact = None
 
-                if not contact:
-                    continue
+                for c in all_contacts:
+                    c_name = (c.name or "").strip().lower()
+                    c_nick = (c.nickname or "").strip().lower()
+                    c_phone = re.sub(r"\D", "", c.phone_number or "")
 
-                from src.contacts.service import calculate_effective_weight
-                contact_weight = calculate_effective_weight(contact)
-                if contact_weight < getattr(settings, "SENTIMENT_WEIGHT_THRESHOLD", 0.70):
-                    continue
+                    if speaker_digits and c_phone:
+                        if speaker_digits == c_phone or (len(speaker_digits) >= 8 and len(c_phone) >= 8 and speaker_digits[-8:] == c_phone[-8:]):
+                            matched_contact = c
+                            break
 
-                role_val = contact.role
-                phone_val = contact.phone_number
+                    if c_name and (speaker_clean in c_name or c_name in speaker_clean):
+                        matched_contact = c
+                        break
+
+                    if c_nick and c_nick in speaker_clean:
+                        matched_contact = c
+                        break
+
+                role_val = matched_contact.role if matched_contact else "OTHER"
+                phone_val = matched_contact.phone_number if matched_contact else (speaker if speaker_digits else None)
+                display_speaker = matched_contact.name if matched_contact else speaker
 
                 # Gera síntese emocional breve
                 if dominant_sent == "POSITIVE":
-                    mood_summary = f"{len(msgs)} interação(ões) com tom colaborativo e receptivo."
+                    mood_summary = f"{len(msgs)} interação(ões) com tom positivo, confiante e colaborativo."
                 elif dominant_sent == "NEGATIVE":
-                    mood_summary = f"{len(msgs)} interação(ões) com tom de preocupação, atrito ou urgência crítica."
+                    mood_summary = f"{len(msgs)} interação(ões) com tom de preocupação, urgência ou atrito."
                 elif dominant_sent == "MIXED":
-                    mood_summary = f"{len(msgs)} interação(ões) com oscilação entre tópicos positivos e pontos de atenção."
+                    mood_summary = f"{len(msgs)} interação(ões) com oscilação entre momentos positivos e alertas críticos."
                 else:
-                    mood_summary = f"{len(msgs)} interação(ões) informativas e operacionais neutras."
+                    mood_summary = f"{len(msgs)} interação(ões) objetivas e operacionais neutras."
 
                 # Salva ou atualiza snapshot diário idempotente
                 existing_snapshot = db.query(DailySentimentSnapshotRecord).filter(
                     (DailySentimentSnapshotRecord.date == target_date)
-                    & (DailySentimentSnapshotRecord.speaker == speaker)
+                    & (DailySentimentSnapshotRecord.speaker == display_speaker)
                 ).first()
 
                 if existing_snapshot:
@@ -158,7 +173,7 @@ class SentimentTimelineService:
                     rec = DailySentimentSnapshotRecord(
                         id=rec_id,
                         date=target_date,
-                        speaker=speaker,
+                        speaker=display_speaker,
                         phone_number=phone_val,
                         role=role_val,
                         interactions_count=len(msgs),
@@ -209,7 +224,7 @@ class SentimentTimelineService:
         target_date: Optional[str] = None,
         db: Session | None = None,
     ) -> list[DailySentimentSnapshotResponse]:
-        """Retorna os snapshots gravados para uma data específica."""
+        """Retorna os snapshots gravados para uma data específica com auto-consolidação sob demanda."""
         should_close = False
         if db is None:
             db = SessionLocal()
@@ -231,19 +246,6 @@ class SentimentTimelineService:
                 collection = self.collect_daily_sentiments(target_date=target_date, db=db)
                 return collection.snapshots
 
-            # Filtra apenas registros de contatos que possuem cartão cadastrado
-            contacts = db.query(ContactRecord).all()
-            valid_names = {c.name.strip().lower() for c in contacts if c.name}
-            valid_phones = {re.sub(r"\D", "", c.phone_number or "") for c in contacts if c.phone_number}
-            valid_suffixes = {p[-8:] for p in valid_phones if len(p) >= 8}
-
-            valid_records = []
-            for r in records:
-                r_speaker_raw = str(r.speaker or "").strip()
-                r_digits = re.sub(r"\D", "", r_speaker_raw)
-                if r_speaker_raw.lower() in valid_names or (r_digits and (r_digits in valid_phones or any(len(r_digits) >= 8 and r_digits.endswith(suf) for suf in valid_suffixes))):
-                    valid_records.append(r)
-
             return [
                 DailySentimentSnapshotResponse(
                     id=r.id,
@@ -261,7 +263,7 @@ class SentimentTimelineService:
                     executive_summary=r.executive_summary,
                     created_at=r.created_at,
                 )
-                for r in valid_records
+                for r in records
             ]
         finally:
             if should_close:
@@ -281,24 +283,13 @@ class SentimentTimelineService:
             should_close = True
 
         try:
-            # Busca dados do contato cadastrado
+            # Busca dados do contato cadastrado (se houver)
             contact = db.query(ContactRecord).filter(
-                (ContactRecord.name.ilike(speaker)) | (ContactRecord.phone_number == speaker)
+                (ContactRecord.name.ilike(f"%{speaker.strip()}%")) | (ContactRecord.phone_number == speaker)
             ).first()
 
-            if not contact:
-                return PersonSentimentTimelineResponse(
-                    speaker=speaker,
-                    role="UNKNOWN",
-                    phone_number=None,
-                    total_days_tracked=0,
-                    overall_sentiment="NEUTRAL",
-                    avg_score=0.0,
-                    timeline=[],
-                )
-
-            role_val = contact.role
-            phone_val = contact.phone_number
+            role_val = contact.role if contact else "OTHER"
+            phone_val = contact.phone_number if contact else None
 
             query = db.query(DailySentimentSnapshotRecord).filter(
                 DailySentimentSnapshotRecord.speaker.ilike(f"%{speaker.strip()}%")

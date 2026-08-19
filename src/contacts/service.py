@@ -229,17 +229,33 @@ class ContactService:
                 records = query.order_by(ContactRecord.is_favorite.desc(), ContactRecord.name.asc()).all()
 
             # 3. Enriquece com as últimas 3 mensagens e sentimentos de cada pessoa
+            from sqlalchemy import or_
             from src.memory.models import MessageRecord
             responses = []
             for r in records:
-                msg_filters = [MessageRecord.speaker == r.name, MessageRecord.speaker.ilike(f"%{r.name}%")]
+                msg_filters = [
+                    MessageRecord.speaker == r.name,
+                    MessageRecord.speaker.ilike(f"%{r.name}%"),
+                ]
+                # Match se o nome do contato contiver o speaker (ex: 'Guilherme Bampi Righetto PLASSON' contém 'Guilherme Bampi Righetto')
+                first_name = r.name.split()[0] if r.name else ""
+                if len(first_name) >= 4:
+                    msg_filters.append(MessageRecord.speaker.ilike(f"%{first_name}%"))
+
+                if r.nickname and len(r.nickname.strip()) >= 3:
+                    msg_filters.append(MessageRecord.speaker.ilike(f"%{r.nickname.strip()}%"))
+
                 if r.phone_number and len(r.phone_number) >= 8:
+                    clean_phone = re.sub(r"\D", "", r.phone_number)
                     msg_filters.append(MessageRecord.speaker == r.phone_number)
-                    msg_filters.append(MessageRecord.speaker.like(f"%{r.phone_number[-8:]}%"))
+                    if clean_phone:
+                        msg_filters.append(MessageRecord.speaker == clean_phone)
+                    if len(clean_phone) >= 8:
+                        msg_filters.append(MessageRecord.speaker.like(f"%{clean_phone[-8:]}%"))
 
                 recent_msgs = (
                     db.query(MessageRecord)
-                    .filter(db.query(MessageRecord).filter(*msg_filters).whereclause)
+                    .filter(or_(*msg_filters))
                     .order_by(MessageRecord.created_at.desc())
                     .limit(3)
                     .all()
