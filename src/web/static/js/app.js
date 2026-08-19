@@ -1256,6 +1256,14 @@ function renderMessages() {
     };
     const sent = sentimentConfig[m.sentiment] || sentimentConfig['NEUTRAL'];
 
+    // Prosódia Acústica
+    const prosody = m.meta_info && m.meta_info.prosody;
+    const prosodyHtml = prosody ? `
+      <span class="badge ${prosody.tone_badge_class || 'badge-info'}" style="font-size: 0.72rem;" title="Prosódia Acústica: ${prosody.speech_rate_wps} pal/s • Pausas: ${Math.round(prosody.pause_ratio * 100)}% • Fala ativa: ${prosody.speech_duration_s}s">
+        ${prosody.tone_label} (${prosody.speech_rate_wps} pal/s)
+      </span>
+    ` : '';
+
     // Telefone / WhatsApp
     let phoneClean = '';
     if (m.meta_info && m.meta_info.remoteJid) {
@@ -1314,6 +1322,7 @@ function renderMessages() {
             <span class="badge" style="font-size: 0.72rem; background: rgba(255,255,255,0.06); color: ${sent.color};" title="Score emocional: ${m.sentiment_score || 0.0}">
               ${sent.emoji} ${sent.label} (${m.sentiment_score > 0 ? '+' : ''}${m.sentiment_score || 0.0})
             </span>
+            ${prosodyHtml}
           </div>
         </div>
 

@@ -158,7 +158,18 @@ class MemoryRepository:
                 db=db,
             )
 
-            # 2. Cria registro da mensagem
+            # 2. Computa prosódia acústica se houver áudio e meta_info não contiver
+            final_meta = dict(data.meta_info or {})
+            if data.audio_duration_s and "prosody" not in final_meta:
+                from src.transcriber.prosody_analyzer import prosody_analyzer
+                prosody_obj = prosody_analyzer.analyze_speech_prosody(
+                    duration=data.audio_duration_s,
+                    segments=[],
+                    text=data.revised_text or data.raw_text or "",
+                )
+                final_meta["prosody"] = prosody_obj.model_dump()
+
+            # 3. Cria registro da mensagem
             message = MessageRecord(
                 id=msg_id,
                 created_at=datetime.now(timezone.utc),
@@ -172,7 +183,7 @@ class MemoryRepository:
                 sentiment=extracted.sentiment or "NEUTRAL",
                 sentiment_score=extracted.sentiment_score or 0.0,
                 urgency=weighted_message_urgency,
-                meta_info=data.meta_info or {},
+                meta_info=final_meta,
             )
             db.add(message)
 

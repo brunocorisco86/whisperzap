@@ -65,6 +65,9 @@ def analyze_text_offline(text: str, summary: str = "", urgency: str = "MEDIUM") 
     return "NEUTRAL", 0.0
 
 
+from src.transcriber.prosody_analyzer import prosody_analyzer
+
+
 def run_backfill():
     """Executa a cura retroativa no banco de dados."""
     db = SessionLocal()
@@ -73,17 +76,35 @@ def run_backfill():
         print(f"📊 Total de mensagens no banco: {len(messages)}")
 
         updated_count = 0
+        prosody_count = 0
         for m in messages:
-            # Se a mensagem tiver sentimento neutro com score 0, tenta enriquecer
+            changed = False
+            meta = dict(m.meta_info or {})
+
+            # 1. Enriquecimento de Prosódia Acústica para áudios
+            if m.audio_duration_s and "prosody" not in meta:
+                prosody_obj = prosody_analyzer.analyze_speech_prosody(
+                    duration=m.audio_duration_s,
+                    segments=[],
+                    text=m.revised_text or m.raw_text or "",
+                )
+                meta["prosody"] = prosody_obj.model_dump()
+                m.meta_info = meta
+                changed = True
+                prosody_count += 1
+
+            # 2. Se a mensagem tiver sentimento neutro com score 0, tenta enriquecer
             if (not m.sentiment or m.sentiment == "NEUTRAL") and (m.sentiment_score is None or m.sentiment_score == 0.0):
                 new_sent, new_score = analyze_text_offline(m.revised_text or m.raw_text or "", m.summary or "", m.urgency or "MEDIUM")
                 if new_sent != "NEUTRAL":
                     m.sentiment = new_sent
                     m.sentiment_score = new_score
+                    changed = True
                     updated_count += 1
 
         db.commit()
         print(f"✨ Mensagens atualizadas com novos sentimentos: {updated_count}")
+        print(f"🎙️ Mensagens de áudio enriquecidas com Prosódia Acústica: {prosody_count}")
 
         # Identifica todas as datas presentes nas mensagens
         dates = (

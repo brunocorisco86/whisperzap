@@ -13,6 +13,9 @@ class TranscriptionSegment(BaseModel):
     text: str = Field(..., description="Texto falado no segmento")
 
 
+from src.transcriber.prosody_analyzer import ProsodyMetrics
+
+
 class TranscriptionResponse(BaseModel):
     """Resposta da transcrição de áudio."""
 
@@ -24,6 +27,10 @@ class TranscriptionResponse(BaseModel):
     segments: Optional[List[TranscriptionSegment]] = Field(
         default=None,
         description="Segmentos detalhados de áudio com timestamps",
+    )
+    prosody: Optional[ProsodyMetrics] = Field(
+        default=None,
+        description="Métricas de prosódia acústica e tom de voz",
     )
     processing_time_ms: float = Field(..., description="Tempo de processamento em milissegundos")
 

@@ -48,7 +48,7 @@ async def transcribe_audio_file(
         shutil.copyfileobj(file.file, tmp_file)
 
     try:
-        text, detected_lang, lang_prob, duration, segments = await whisper_service.transcribe_audio(
+        text, detected_lang, lang_prob, duration, segments, prosody = await whisper_service.transcribe_audio(
             audio_path_or_file=tmp_path,
             language=language,
             speaker=speaker,
@@ -76,6 +76,7 @@ async def transcribe_audio_file(
         duration=duration,
         text=text,
         segments=segments,
+        prosody=prosody,
         processing_time_ms=round(duration_ms, 2),
     )
 
@@ -125,7 +126,7 @@ async def transcribe_audio_base64(
         tmp_file.write(audio_bytes)
 
     try:
-        text, detected_lang, lang_prob, duration, segments = await whisper_service.transcribe_audio(
+        text, detected_lang, lang_prob, duration, segments, prosody = await whisper_service.transcribe_audio(
             audio_path_or_file=tmp_path,
             language=payload.language,
             speaker=payload.speaker,
@@ -153,6 +154,7 @@ async def transcribe_audio_base64(
         duration=duration,
         text=text,
         segments=segments,
+        prosody=prosody,
         processing_time_ms=round(duration_ms, 2),
     )
 

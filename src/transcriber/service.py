@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from src.config import settings
 from src.transcriber.schemas import TranscriptionSegment
+from src.transcriber.prosody_analyzer import prosody_analyzer, ProsodyMetrics
 from src.dictionary.service import dictionary_service
 from src.memory.database import SessionLocal
 
@@ -149,7 +150,13 @@ class WhisperService:
         lang_prob = round(info.language_probability, 4)
         duration = round(info.duration, 2)
 
-        return full_text, detected_lang, lang_prob, duration, segments_list
+        prosody = prosody_analyzer.analyze_speech_prosody(
+            duration=duration,
+            segments=segments_list,
+            text=full_text,
+        )
+
+        return full_text, detected_lang, lang_prob, duration, segments_list, prosody
 
     _semaphore: Optional[asyncio.Semaphore] = None
 
@@ -167,7 +174,7 @@ class WhisperService:
         speaker: Optional[str] = None,
         custom_prompt: Optional[str] = None,
         db: Optional[Session] = None,
-    ) -> Tuple[str, str, float, float, List[TranscriptionSegment]]:
+    ) -> Tuple[str, str, float, float, List[TranscriptionSegment], ProsodyMetrics]:
         """Executa a transcrição em thread pool controlando a concorrência máxima com semáforo e prompt dinâmico."""
         # Monta prompt inicial dinâmico para condicionamento de vocabulário
         initial_prompt = build_dynamic_initial_prompt(
