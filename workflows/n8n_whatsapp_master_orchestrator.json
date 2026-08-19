@@ -136,10 +136,10 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ number: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API)').item.json.body?.sender?.phone || '', text: '🎙️ James (Mordomo Virtual)\\n\\n_Transcrição_:\\n' + ($json.text_revised || $json.text || '') }) }}",
+        "jsonBody": "={{ JSON.stringify({ number: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API)').item.json.body?.sender?.phone || '', text: '🎙️ Calíope (Voz & Memória)\\n\\n_Transcrição_:\\n' + ($json.text_revised || $json.text || '') }) }}",
         "options": {}
       },
-      "name": "Envia Transcrição James (WhatsApp)",
+      "name": "Envia Transcrição Calíope (WhatsApp)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [1560, 120],
@@ -344,7 +344,7 @@
       "main": [
         [
           {
-            "node": "Envia Transcrição James (WhatsApp)",
+            "node": "Envia Transcrição Calíope (WhatsApp)",
             "type": "main",
             "index": 0
           },

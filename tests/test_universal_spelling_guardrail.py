@@ -75,3 +75,12 @@ def test_janitor_purges_legacy_orthographic_errors(tmp_path):
     # Nó legítimo preservado
     assert kg.graph.has_node("Silo")
     assert "asdfgh" in report.pruned_nodes or report.nodes_pruned_count >= 2
+
+
+def test_system_bot_entities_blocked_from_graph(tmp_path):
+    """Garante que personas de bot (James, Mordomo, Calíope, Mnemosine) são bloqueadas de virar nós."""
+    blocked_terms = ["James", "Mordomo", "mordomo virtual", "Calíope", "Mnemosine", "Hermes Agent", "bot"]
+    for term in blocked_terms:
+        is_valid, reason, _ = entity_sanitizer.is_valid_node_entity(term, "PERSON")
+        assert not is_valid, f"Termo {term} deveria ter sido bloqueado pelo guardrail"
+        assert reason == "system_bot_entity_blocked"

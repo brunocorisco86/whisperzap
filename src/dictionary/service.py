@@ -133,13 +133,6 @@ DEFAULT_TERMS = [
         "category": "TECNOLOGIA",
         "description": "Agente cognitivo com RAG híbrido, memória vetorial e grafo de conhecimento.",
     },
-    {
-        "term": "James",
-        "phonetic_variations": ["james", "djeimes", "jeimes", "mordomo james", "mordomo virtual"],
-        "expansion": "James (Mordomo de Transcrição de Voz)",
-        "category": "TECNOLOGIA",
-        "description": "Módulo de recepção, transcrição e revisão léxica de áudios do WhatsApp.",
-    },
 ]
 
 

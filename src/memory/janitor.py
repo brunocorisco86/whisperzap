@@ -24,7 +24,7 @@ from src.memory.graph import KnowledgeGraph, knowledge_graph
 
 logger = logging.getLogger(__name__)
 
-# Termos efêmeros que nunca devem ser nós permanentes de conhecimento no grafo
+# Termos efêmeros e nomes de bots/sistema que nunca devem ser nós permanentes de conhecimento no grafo
 EPHEMERAL_TERMS = {
     "hoje", "amanhã", "amanha", "ontem", "segunda", "segunda-feira", "terça", "terca",
     "terça-feira", "quarta", "quarta-feira", "quinta", "quinta-feira", "sexta",
@@ -34,6 +34,11 @@ EPHEMERAL_TERMS = {
     "bom dia", "boa tarde", "boa noite", "olá", "ola", "conversa", "número", "numero",
     "favor", "obrigado", "obrigada", "valeu", "falou", "ok", "tá bom", "ta bom", "blz",
     "beleza", "sim", "não", "nao", "coisa", "algo", "isso", "aquilo", "teste", "áudios",
+    "james", "djeimes", "jeimes", "mordomo", "mordomo virtual", "james mordomo",
+    "mnemosine", "mnemosyne", "calíope", "caliope", "urânia", "urania",
+    "terpsícore", "terpsicore", "erato", "polímnia", "polimnia", "tália", "thalia",
+    "clio", "euterpe", "melpômene", "melpomene", "hermes", "hermes agent",
+    "bot", "assistente", "transcrição", "transcricao", "sistema", "feedback",
 }
 
 # Categorias nobres que nunca devem ser excluídas

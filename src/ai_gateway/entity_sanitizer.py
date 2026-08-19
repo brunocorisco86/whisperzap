@@ -82,6 +82,16 @@ SUSPICIOUS_GEOGRAPHIC_HALLUCINATIONS = {
     "nova iorque", "paris", "londres", "berlim", "roma", "pequim",
 }
 
+# Entidades de sistema/bot que NUNCA devem virar nós ou poluir o Grafo de Conhecimento
+SYSTEM_BLOCKED_ENTITIES = {
+    "james", "djeimes", "jeimes", "mordomo", "mordomo virtual", "james mordomo",
+    "mnemosine", "mnemosyne", "calíope", "caliope", "urânia", "urania",
+    "terpsícore", "terpsicore", "erato", "polímnia", "polimnia", "tália", "thalia",
+    "clio", "euterpe", "melpômene", "melpomene", "hermes", "hermes agent",
+    "bot", "assistente", "transcrição", "transcricao", "áudio", "audio", "musa", "musas",
+    "sistema", "feedback", "transcrever", "gravação", "gravacao",
+}
+
 # Léxico de referência em Português para correção fuzzy de palavras
 REFERENCE_PORTUGUESE_LEXICON = [
     "abatedouro", "acerto", "acompanhamento", "administração", "agendamento", "agrocenter",
@@ -208,6 +218,11 @@ class EntitySanitizerGuardrail:
         clean_name = self.clean_raw_string(name)
         if not clean_name:
             return False, "empty_entity_name", None
+
+        # 0. Bloqueio estrito de personas de sistema/bot (ex: James, Mordomo, Mnemosine, Calíope, etc.)
+        lower_name = clean_name.lower().strip()
+        if lower_name in SYSTEM_BLOCKED_ENTITIES or any(lower_name == b for b in SYSTEM_BLOCKED_ENTITIES):
+            return False, "system_bot_entity_blocked", None
 
         # 1. Siglas e marcas consagradas são sempre aprovadas
         if clean_name in LEGITIMATE_ACRONYMS_AND_BRANDS or any(clean_name.lower() == b.lower() for b in LEGITIMATE_ACRONYMS_AND_BRANDS):
