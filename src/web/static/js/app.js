@@ -280,7 +280,7 @@ async function loadStats() {
     const res = await fetch('/api/v1/memory/stats');
     if (res.ok) {
       const data = await res.json();
-      statGraphNodesEl.textContent = `${data.graph_nodes || 32} nós na MUSA`;
+      statGraphNodesEl.textContent = `${data.graph_nodes || 32} nós na Memória`;
     }
   } catch (err) {
     console.error('Erro ao carregar métricas:', err);

@@ -54,7 +54,7 @@ body {
 }
 
 /* ==========================================================================
-   ELEGANT EXPANDABLE SIDEBAR (HERMES & MUSA)
+   ELEGANT EXPANDABLE SIDEBAR (MNEMOSINE & AS MUSAS)
    ========================================================================== */
 .app-sidebar {
   position: fixed;
@@ -163,13 +163,38 @@ body {
 }
 
 .tab-label {
-  font-size: 0.88rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 0.9rem;
   white-space: nowrap;
   opacity: 0;
   transform: translateX(-10px);
   transition: opacity 0.2s ease, transform 0.2s ease;
   flex: 1;
+}
+
+.tab-label strong {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  letter-spacing: 0.03em;
+  color: #f8fafc;
+}
+
+.tab-label small {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+}
+
+.sidebar-nav .tab-btn.active .tab-label strong {
+  color: #fef08a;
+}
+
+.sidebar-nav .tab-btn.active .tab-label small {
+  color: #93c5fd;
 }
 
 .app-sidebar:hover .tab-label {
@@ -275,6 +300,16 @@ body {
   line-height: 1.2;
 }
 
+.mnemosine-brand {
+  background: linear-gradient(135deg, #ffffff 0%, #fef08a 25%, #f59e0b 65%, #d97706 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  filter: drop-shadow(0 0 14px rgba(245, 158, 11, 0.4));
+}
+
 .hermes-brand {
   background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
   -webkit-background-clip: text;
@@ -300,10 +335,10 @@ body {
 }
 
 .brand-subtitle {
-  font-size: 0.75rem;
+  font-size: 0.73rem;
   color: var(--text-muted);
   font-weight: 500;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
