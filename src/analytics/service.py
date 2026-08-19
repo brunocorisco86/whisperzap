@@ -55,33 +55,69 @@ STOPWORDS_PT = {
     "todo", "todos", "trabalho", "tres", "três", "tudo", "um", "uma", "umas", "uns", "vai",
     "valer", "vamos", "vao", "vão", "vc", "vcs", "veja", "vem", "vendo", "ver", "verdade",
     "vez", "vezes", "vi", "viu", "você", "voces", "vocês", "vou",
+    # Preenchimentos conversacionais e saudações comuns
+    "cara", "mano", "gente", "olha", "tipo", "falou", "beleza", "valeu", "ok", "obrigado",
+    "obrigada", "tá", "ta", "né", "ne", "ah", "eh", "oh", "uh", "hum", "opa", "abraço",
+    "amanhã", "ontem", "bom", "dia", "boa", "tarde", "noite", "áudio", "audio", "mensagem",
+    "gravação", "gravacao", "whatsapp", "transcrição", "transcricao",
     # Ruídos técnicos de XML, drawio e diagramas que não pertencem a conversas
     "mxcell", "parent", "mxgeometry", "vertex", "style", "geometry", "target", "source",
     "edge", "value", "points", "array", "root", "model", "diagram", "page", "grid", "xml",
     "html", "http", "https", "drawio", "node", "label", "width", "height", "rel", "true",
-    "false", "null", "undefined", "none", "nan",
+    "false", "null", "undefined", "none", "nan", "xmlns", "doctype", "svg", "fill", "stroke",
 }
 
 CATEGORY_KEYWORDS = {
+    "AGRONEGOCIO": {
+        "c.vale", "cvale", "cooperativa", "produtor", "produtores", "associado", "associados",
+        "cooperado", "cooperados", "safra", "grãos", "graos", "milho", "soja", "campo", "fazenda",
+        "lavoura", "agronegócio", "agronegocio", "insumos", "sementes", "adubo", "defensivos",
+        "colheita", "balança", "balanca", "secador", "armazém", "armazem", "silo", "silos",
+    },
     "ZOOTECNIA": {
         "ração", "racao", "silo", "silos", "aviário", "aviario", "aviários", "aviarios",
-        "lote", "lotes", "frango", "frangos", "mortalidade", "conversão", "conversao",
-        "iep", "peso", "pesagem", "clima", "temperatura", "umidade", "ventilação", "ventilador",
-        "bebedouro", "comedouro", "nipple", "fal", "fau", "c.vale", "cvale", "integrado",
-        "granja", "caseiro", "placa", "evaporativa", "sensor", "sensorização", "amônia", "amonia",
+        "lote", "lotes", "frango", "frangos", "ave", "aves", "mortalidade", "conversão", "conversao",
+        "iep", "peso", "pesagem", "clima", "temperatura", "umidade", "ventilação", "ventilacao",
+        "ventilador", "ventiladores", "bebedouro", "bebedouros", "comedouro", "comedouros",
+        "nipple", "fal", "fau", "integrado", "integrados", "granja", "granjas", "caseiro",
+        "placa", "evaporativa", "sensor", "sensores", "sensorização", "amônia", "amonia",
+        "vacina", "vacinação", "pintainho", "pintainhos", "abate", "densidade", "cortina",
+        "aquecedor", "gerador", "geradores", "aquecimento",
     },
     "LOGISTICA": {
-        "caminhão", "caminhao", "entrega", "motorista", "descarga", "fábrica", "fabrica",
-        "rota", "pedido", "carregamento", "transporte", "prazo", "agendamento", "tms",
+        "caminhão", "caminhao", "caminhões", "caminhoes", "entrega", "entregas", "motorista",
+        "motoristas", "descarga", "fábrica", "fabrica", "rota", "rotas", "pedido", "pedidos",
+        "carregamento", "transporte", "prazo", "agendamento", "tms", "frete", "logística",
+        "logistica", "expedição", "expedicao", "frota", "carga", "cargas", "transbordo", "viagem",
+    },
+    "SISTEMAS": {
+        "agrocenter", "eprodutor", "e-produtor", "mtech", "portal", "erp", "aplicativo", "app",
+        "sistema", "sistemas", "software", "login", "chamado", "chamados", "suporte", "senha",
+        "acesso", "integração", "integracao", "api", "webhook", "banco de dados",
+    },
+    "TECNOLOGIA": {
+        "ia", "inteligência", "inteligencia", "modelo", "modelos", "gemini", "whisper", "faster-whisper",
+        "servidor", "vps", "hostinger", "docker", "linux", "raspberry", "tailscale", "python",
+        "grafo", "pgvector", "embedding", "embeddings", "neural", "rag", "oráculo", "oraculo",
     },
     "GESTAO": {
-        "reunião", "reuniao", "relatório", "relatorio", "diretoria", "gerência", "gerencia",
-        "meta", "resultado", "custo", "planejamento", "estratégia", "estrategia", "apresentação",
-        "indicador", "kpi", "orçamento", "orcamento", "aprovação", "aprovacao", "decisão", "decisao",
+        "reunião", "reuniao", "reuniões", "reunioes", "relatório", "relatorio", "relatórios",
+        "diretoria", "gerência", "gerencia", "gerente", "meta", "metas", "resultado", "resultados",
+        "custo", "custos", "planejamento", "estratégia", "estrategia", "apresentação", "apresentacao",
+        "indicador", "indicadores", "kpi", "kpis", "orçamento", "orcamento", "aprovação", "aprovacao",
+        "decisão", "decisao", "contrato", "contratos", "auditoria", "ata", "equipe", "projeto",
+        "projetos", "investimento", "receita", "margem", "despesa", "financeiro",
     },
     "PESSOAL": {
-        "família", "familia", "casa", "viagem", "consulta", "médico", "medico", "saúde", "saude",
-        "almoço", "almoco", "jantar", "pagamento", "banco", "compromisso", "pessoal", "aniversário",
+        "família", "familia", "esposa", "marido", "filho", "filha", "filhos", "pai", "mãe",
+        "casa", "viagem", "consulta", "médico", "medico", "saúde", "saude", "almoço", "almoco",
+        "jantar", "pagamento", "banco", "compromisso", "pessoal", "aniversário", "aniversario",
+        "férias", "ferias", "folga",
+    },
+    "OPERACOES": {
+        "tarefa", "tarefas", "atividade", "atividades", "verificação", "verificacao", "manutenção",
+        "manutencao", "conferência", "conferencia", "visita", "vistoria", "teste", "testes",
+        "ajuste", "ajustes", "conserto", "reparo", "limpeza", "troca", "substituição",
     },
 }
 
@@ -493,27 +529,48 @@ class AnalyticsService:
         return top_list[:15]
 
     def _generate_wordmap(self, messages: List[MessageRecord]) -> List[WordFrequencyItem]:
-        """Gera frequência de palavras significativas classificadas por categorias."""
+        """Gera frequência de palavras significativas classificadas por categorias ricas."""
         word_counts = Counter()
+
+        # Carrega termos do Dicionário Léxico para enriquecer as categorias dinamicamente
+        dynamic_categories: Dict[str, set] = {k: set(v) for k, v in CATEGORY_KEYWORDS.items()}
+        try:
+            dict_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "lexical_dictionary.json")
+            if os.path.exists(dict_path):
+                with open(dict_path, "r", encoding="utf-8") as f:
+                    dict_terms = json.load(f)
+                    for item in dict_terms:
+                        cat = (item.get("category") or "AGRONEGOCIO").upper()
+                        if cat not in dynamic_categories:
+                            dynamic_categories[cat] = set()
+                        term_tokens = re.findall(r"\b[a-zA-ZáéíóúâêîôûãõçÁÉÍÓÚÂÊÎÔÛÃÕÇ]{3,}\b", item.get("term", "").lower())
+                        for tok in term_tokens:
+                            dynamic_categories[cat].add(tok)
+                        for var in item.get("phonetic_variations", []):
+                            var_tokens = re.findall(r"\b[a-zA-ZáéíóúâêîôûãõçÁÉÍÓÚÂÊÎÔÛÃÕÇ]{3,}\b", var.lower())
+                            for tok in var_tokens:
+                                dynamic_categories[cat].add(tok)
+        except Exception:
+            pass
 
         for m in messages:
             text = (m.revised_text or "") + " " + (m.summary or "")
             tokens = re.findall(r"\b[a-zA-ZáéíóúâêîôûãõçÁÉÍÓÚÂÊÎÔÛÃÕÇ]{3,}\b", text.lower())
             for t in tokens:
-                if t not in STOPWORDS_PT:
+                if t not in STOPWORDS_PT and len(t) >= 3:
                     word_counts[t] += 1
 
         if not word_counts:
             return []
 
-        most_common = word_counts.most_common(40)
+        most_common = word_counts.most_common(50)
         max_freq = most_common[0][1] if most_common else 1
 
         items = []
         for word, count in most_common:
             # Classifica categoria
-            cat = "GERAL"
-            for category_name, kw_set in CATEGORY_KEYWORDS.items():
+            cat = "TEMAS"
+            for category_name, kw_set in dynamic_categories.items():
                 if word in kw_set:
                     cat = category_name
                     break

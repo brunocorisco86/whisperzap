@@ -2479,31 +2479,34 @@ function renderWordMapCloud(wordItems) {
   const container = document.getElementById('analytics-wordmap-container');
   if (!container) return;
 
-  const xmlGarbageRegex = /^(mxcell|parent|mxgeometry|vertex|style|geometry|target|source|edge|value|points|array|root|model|diagram|page|grid|xml|html|http|https|drawio|node|label|width|height|rel|true|false|null|undefined|none|nan)$/i;
+  const xmlGarbageRegex = /^(mxcell|parent|mxgeometry|vertex|style|geometry|target|source|edge|value|points|array|root|model|diagram|page|grid|xml|html|http|https|drawio|node|label|width|height|rel|true|false|null|undefined|none|nan|xmlns|doctype|svg|fill|stroke)$/i;
 
-  // Filtra itens da categoria 'GERAL' e ruídos técnicos de diagramas/XML
+  // Filtra itens vazios ou ruídos residuais de diagramas/XML
   const filtered = (wordItems || []).filter(item => {
-    if (!item.word) return false;
-    if (item.category === 'GERAL') return false;
+    if (!item.word || item.word.trim().length < 3) return false;
     if (xmlGarbageRegex.test(item.word.trim())) return false;
     return true;
   });
 
   if (filtered.length === 0) {
-    container.innerHTML = '<p class="text-muted" style="text-align:center; padding: 2rem;">Nenhum termo técnico categorizado (Zootecnia, Logística, Gestão, Pessoal) identificado no período.</p>';
+    container.innerHTML = '<p class="text-muted" style="text-align:center; padding: 2rem;">Nenhum termo relevante identificado no período.</p>';
     return;
   }
 
   const categoryStyles = {
+    'AGRONEGOCIO': 'legend-agronegocio',
     'ZOOTECNIA': 'legend-zootecnia',
     'LOGISTICA': 'legend-logistica',
     'GESTAO': 'legend-gestao',
+    'SISTEMAS': 'legend-sistemas',
+    'TECNOLOGIA': 'legend-tecnologia',
     'PESSOAL': 'legend-pessoal',
-    'TECNOLOGIA': 'legend-gestao',
+    'OPERACOES': 'legend-operacoes',
+    'TEMAS': 'legend-temas',
   };
 
   container.innerHTML = filtered.map(item => {
-    const chipClass = categoryStyles[item.category] || 'legend-zootecnia';
+    const chipClass = categoryStyles[item.category] || 'legend-temas';
     // Tamanho proporcional entre 0.85rem e 1.65rem
     const fontSize = 0.85 + (item.weight_pct / 100) * 0.75;
 
