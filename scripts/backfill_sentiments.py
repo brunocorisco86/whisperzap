@@ -65,6 +65,7 @@ def analyze_text_offline(text: str, summary: str = "", urgency: str = "MEDIUM") 
     return "NEUTRAL", 0.0
 
 
+from sqlalchemy.orm.attributes import flag_modified
 from src.transcriber.prosody_analyzer import prosody_analyzer
 
 
@@ -82,7 +83,7 @@ def run_backfill():
             meta = dict(m.meta_info or {})
 
             # 1. Enriquecimento de Prosódia Acústica para áudios
-            if m.audio_duration_s and "prosody" not in meta:
+            if m.audio_duration_s and ("prosody" not in meta or not meta["prosody"]):
                 prosody_obj = prosody_analyzer.analyze_speech_prosody(
                     duration=m.audio_duration_s,
                     segments=[],
@@ -90,6 +91,7 @@ def run_backfill():
                 )
                 meta["prosody"] = prosody_obj.model_dump()
                 m.meta_info = meta
+                flag_modified(m, "meta_info")
                 changed = True
                 prosody_count += 1
 
@@ -101,6 +103,9 @@ def run_backfill():
                     m.sentiment_score = new_score
                     changed = True
                     updated_count += 1
+
+            if changed:
+                db.add(m)
 
         db.commit()
         print(f"✨ Mensagens atualizadas com novos sentimentos: {updated_count}")
