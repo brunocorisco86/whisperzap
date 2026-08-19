@@ -45,8 +45,10 @@ class WordFrequencyItem(BaseModel):
     """Item de frequência de palavras/tópicos para o WordMap."""
     word: str
     count: int
-    category: str = "GERAL"  # ZOOTECNIA, LOGISTICA, GESTAO, PESSOAL, GERAL
+    category: str = "TEMAS"
     weight_pct: float = 0.0
+    is_compound: bool = False
+    sample_context: Optional[str] = None
 
 
 class HeatmapCell(BaseModel):

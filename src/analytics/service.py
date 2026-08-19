@@ -1,5 +1,5 @@
-"""Serviço de Processamento Analítico e Inteligência de Dados — Hermes Voice Memory."""
-
+import json
+import os
 import re
 import math
 from collections import Counter, defaultdict
@@ -8,6 +8,8 @@ from typing import List, Dict, Any, Optional, Tuple
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+
+from src.memory.task_sentiment_analyzer import get_spacy_nlp
 
 from src.analytics.schemas import (
     AnalyticsDashboardResponse,
@@ -68,6 +70,12 @@ STOPWORDS_PT = {
 }
 
 CATEGORY_KEYWORDS = {
+    "GARGALOS": {
+        "fila", "espera", "fila de espera", "atendimento", "chamado", "chamados", "suporte",
+        "dúvida", "duvida", "dúvidas", "duvidas", "problema", "problemas", "urgência", "urgencia",
+        "atraso", "atrasos", "reclamação", "reclamacao", "erro", "erros", "falha", "falhas",
+        "incidente", "bloqueio", "cobrança", "cobranca", "cancelamento", "pendência", "pendencia",
+    },
     "AGRONEGOCIO": {
         "c.vale", "cvale", "cooperativa", "produtor", "produtores", "associado", "associados",
         "cooperado", "cooperados", "safra", "grãos", "graos", "milho", "soja", "campo", "fazenda",
@@ -529,8 +537,10 @@ class AnalyticsService:
         return top_list[:15]
 
     def _generate_wordmap(self, messages: List[MessageRecord]) -> List[WordFrequencyItem]:
-        """Gera frequência de palavras significativas classificadas por categorias ricas."""
-        word_counts = Counter()
+        """Gera frequência de termos estratégicos e sintagmas nominais compostos utilizando spaCy NLP."""
+        term_counts = Counter()
+        term_contexts: Dict[str, str] = {}
+        is_compound_map: Dict[str, bool] = {}
 
         # Carrega termos do Dicionário Léxico para enriquecer as categorias dinamicamente
         dynamic_categories: Dict[str, set] = {k: set(v) for k, v in CATEGORY_KEYWORDS.items()}
@@ -553,27 +563,90 @@ class AnalyticsService:
         except Exception:
             pass
 
-        for m in messages:
-            text = (m.revised_text or "") + " " + (m.summary or "")
-            tokens = re.findall(r"\b[a-zA-ZáéíóúâêîôûãõçÁÉÍÓÚÂÊÎÔÛÃÕÇ]{3,}\b", text.lower())
-            for t in tokens:
-                if t not in STOPWORDS_PT and len(t) >= 3:
-                    word_counts[t] += 1
+        nlp = get_spacy_nlp()
+        xml_noise_regex = re.compile(r"^(mxcell|parent|mxgeometry|vertex|style|geometry|target|source|edge|value|points|array|root|model|diagram|page|grid|xml|html|http|https|drawio|node|label|width|height|rel|true|false|null|undefined|none|nan|xmlns|doctype|svg|fill|stroke)$", re.IGNORECASE)
+        noise_articles = {"o", "a", "os", "as", "um", "uma", "uns", "umas", "de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas", "para", "por", "com", "este", "esta", "esse", "essa", "aquele", "aquela"}
 
-        if not word_counts:
+        for m in messages:
+            text = ((m.revised_text or "") + " " + (m.summary or "")).strip()
+            if not text:
+                continue
+
+            # Contexto resumido para o tooltip
+            clean_snippet = re.sub(r"\s+", " ", text)[:110]
+
+            if nlp is not None:
+                doc = nlp(text)
+
+                # 1. Extração de Sintagmas Nominais Compostos (Noun Chunks)
+                if hasattr(doc, "noun_chunks"):
+                    for chunk in doc.noun_chunks:
+                        chunk_words = [t.text.lower() for t in chunk if not t.is_punct and not xml_noise_regex.match(t.text)]
+                        # Remove artigos e preposições do início e fim
+                        while chunk_words and chunk_words[0] in noise_articles:
+                            chunk_words.pop(0)
+                        while chunk_words and chunk_words[-1] in noise_articles:
+                            chunk_words.pop()
+
+                        if 2 <= len(chunk_words) <= 4:
+                            phrase = " ".join(chunk_words)
+                            # Verifica se tem substantivo relevante
+                            if not any(xml_noise_regex.match(w) for w in chunk_words) and all(len(w) >= 2 for w in chunk_words):
+                                term_counts[phrase] += 2
+                                is_compound_map[phrase] = True
+                                if phrase not in term_contexts:
+                                    term_contexts[phrase] = clean_snippet
+
+                # 2. Extração de Substantivos e Nomes Próprios Estratégicos (Lemmatized)
+                for token in doc:
+                    if token.pos_ in ("NOUN", "PROPN") and not token.is_punct:
+                        lemma = (token.lemma_ or token.text).lower().strip()
+                        if (
+                            len(lemma) >= 3
+                            and lemma not in STOPWORDS_PT
+                            and lemma not in noise_articles
+                            and not xml_noise_regex.match(lemma)
+                        ):
+                            term_counts[lemma] += 1
+                            if lemma not in term_contexts:
+                                term_contexts[lemma] = clean_snippet
+            else:
+                # Fallback sem spaCy
+                tokens = re.findall(r"\b[a-zA-ZáéíóúâêîôûãõçÁÉÍÓÚÂÊÎÔÛÃÕÇ]{3,}\b", text.lower())
+                for t in tokens:
+                    if t not in STOPWORDS_PT and not xml_noise_regex.match(t):
+                        term_counts[t] += 1
+                        if t not in term_contexts:
+                            term_contexts[t] = clean_snippet
+
+        if not term_counts:
             return []
 
-        most_common = word_counts.most_common(50)
+        # Seleciona os 50 termos/sintagmas mais expressivos
+        most_common = term_counts.most_common(50)
         max_freq = most_common[0][1] if most_common else 1
 
         items = []
         for word, count in most_common:
-            # Classifica categoria
+            # Classifica categoria analisando a expressão inteira ou subpalavras
             cat = "TEMAS"
+            matched = False
             for category_name, kw_set in dynamic_categories.items():
                 if word in kw_set:
                     cat = category_name
+                    matched = True
                     break
+
+            if not matched:
+                # Analisa palavras individuais do termo
+                for sub_w in word.split():
+                    for category_name, kw_set in dynamic_categories.items():
+                        if sub_w in kw_set:
+                            cat = category_name
+                            matched = True
+                            break
+                    if matched:
+                        break
 
             weight_pct = round((count / max_freq) * 100, 1)
             items.append(
@@ -582,6 +655,8 @@ class AnalyticsService:
                     count=count,
                     category=cat,
                     weight_pct=weight_pct,
+                    is_compound=is_compound_map.get(word, False),
+                    sample_context=term_contexts.get(word),
                 )
             )
 

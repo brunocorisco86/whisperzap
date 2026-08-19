@@ -1822,6 +1822,7 @@ select:focus {
   font-weight: 600;
 }
 
+.legend-gargalos { background: rgba(239, 68, 68, 0.18); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
 .legend-agronegocio { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); }
 .legend-zootecnia { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.35); }
 .legend-logistica { background: rgba(249, 115, 22, 0.15); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.35); }
@@ -1832,14 +1833,49 @@ select:focus {
 .legend-operacoes { background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.35); }
 .legend-temas { background: rgba(56, 189, 248, 0.12); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.25); }
 
+/* Barra de Filtros Estratégicos por Pilar */
+.wordmap-strategic-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.wordmap-filter-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  padding: 0.3rem 0.65rem;
+  border-radius: 14px;
+  font-size: 0.76rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.wordmap-filter-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.wordmap-filter-btn.active {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fef08a;
+  border-color: rgba(245, 158, 11, 0.5);
+  font-weight: 600;
+}
+
 .wordmap-cloud-box {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 0.6rem;
-  padding: 1.5rem;
-  min-height: 180px;
+  gap: 0.75rem;
+  padding: 1.75rem;
+  min-height: 200px;
   background: var(--bg-surface-elevated);
   border-radius: var(--radius-md);
 }
@@ -1847,24 +1883,31 @@ select:focus {
 .word-cloud-tag {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.35rem 0.75rem;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
   border-radius: 20px;
   font-weight: 600;
-  cursor: default;
-  transition: transform 0.15s, box-shadow 0.15s;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+  user-select: none;
+}
+
+.word-cloud-tag.is-compound {
+  border-width: 1.5px;
+  box-shadow: 0 0 8px rgba(254, 240, 138, 0.15);
+  font-weight: 700;
 }
 
 .word-cloud-tag:hover {
-  transform: translateY(-2px) scale(1.05);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transform: translateY(-3px) scale(1.06);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
 }
 
 .word-tag-count {
   font-size: 0.75em;
-  opacity: 0.8;
-  background: rgba(0, 0, 0, 0.2);
-  padding: 0.1rem 0.4rem;
+  opacity: 0.85;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.12rem 0.45rem;
   border-radius: 10px;
 }
 

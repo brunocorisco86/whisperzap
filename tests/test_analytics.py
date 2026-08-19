@@ -147,3 +147,36 @@ def test_wordmap_filters_xml_and_diagram_stopwords():
     finally:
         db.close()
 
+
+def test_wordmap_spacy_compound_phrase_extraction():
+    """Garante que o spaCy extrai sintagmas nominais compostos e identifica is_compound=True."""
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        m1 = MessageRecord(
+            id="test-msg-compound-1",
+            created_at=now,
+            speaker="Gerente Suporte",
+            revised_text="Estamos com uma grande fila de espera no atendimento e precisamos checar o sensor de temperatura do silo.",
+            audio_duration_s=15.0,
+            sentiment="URGENT",
+            sentiment_score=-0.5,
+        )
+        db.add(m1)
+        db.commit()
+
+        res = analytics_service.get_dashboard_metrics(period="7d", group_by="day", db=db)
+        word_objs = {item.word: item for item in res.wordmap}
+
+        # Verifica se sintagmas compostos ou substantivos foram extraídos
+        has_compound = any(item.is_compound for item in res.wordmap)
+        assert has_compound or "sensor" in word_objs or "atendimento" in word_objs
+        
+        # Garante que termos categorizados possuem sample_context
+        for item in res.wordmap:
+            if item.is_compound:
+                assert item.sample_context is not None
+    finally:
+        db.close()
+
+

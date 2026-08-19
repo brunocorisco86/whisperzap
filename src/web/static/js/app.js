@@ -18,6 +18,11 @@ const messagesPageSize = 10;
 let dictCurrentPage = 1;
 const dictPageSize = 50;
 
+// WordMap Strategic State
+let currentWordMapItems = [];
+let currentWordMapFilter = 'ALL';
+let selectedWordMapTopic = null;
+
 // DOM Elements
 const contactsContainer = document.getElementById('contacts-container');
 const dictionaryContainer = document.getElementById('dictionary-container');
@@ -83,6 +88,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     }
   });
 });
+
+function activateTab(tabId) {
+  const btn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+  if (btn) btn.click();
+}
+window.activateTab = activateTab;
 
 // Init
 document.addEventListener('DOMContentLoaded', () => {
@@ -167,6 +178,48 @@ document.addEventListener('DOMContentLoaded', () => {
   if (analyticsPeriodSelect) analyticsPeriodSelect.addEventListener('change', loadAnalyticsDashboard);
   if (analyticsGroupBySelect) analyticsGroupBySelect.addEventListener('change', loadAnalyticsDashboard);
   if (btnRefreshAnalytics) btnRefreshAnalytics.addEventListener('click', loadAnalyticsDashboard);
+
+  // WordMap Strategic Filter Buttons
+  document.querySelectorAll('.wordmap-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.wordmap-filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentWordMapFilter = btn.dataset.pillar;
+      renderWordMapCloud();
+    });
+  });
+
+  // WordMap Modal Actions
+  const btnCloseWordMapModal = document.getElementById('btn-close-wordmap-modal');
+  const modalWordMapAction = document.getElementById('modal-wordmap-action');
+  if (btnCloseWordMapModal && modalWordMapAction) {
+    btnCloseWordMapModal.addEventListener('click', () => modalWordMapAction.classList.remove('active'));
+  }
+
+  const btnWordMapMelpomene = document.getElementById('btn-wordmap-ask-melpomene');
+  if (btnWordMapMelpomene && modalWordMapAction) {
+    btnWordMapMelpomene.addEventListener('click', () => {
+      if (!selectedWordMapTopic) return;
+      modalWordMapAction.classList.remove('active');
+      activateTab('tab-query');
+      setQuery(`O que as conversas relatam sobre '${selectedWordMapTopic.word}'?`);
+      runHermesQuery();
+    });
+  }
+
+  const btnWordMapCaliope = document.getElementById('btn-wordmap-filter-caliope');
+  if (btnWordMapCaliope && modalWordMapAction) {
+    btnWordMapCaliope.addEventListener('click', () => {
+      if (!selectedWordMapTopic) return;
+      modalWordMapAction.classList.remove('active');
+      activateTab('tab-messages');
+      if (msgSearchInput) {
+        msgSearchInput.value = selectedWordMapTopic.word;
+        messagesCurrentPage = 1;
+        renderMessages();
+      }
+    });
+  }
 
   // Global Refresh
   document.getElementById('btn-refresh-all').addEventListener('click', () => {
@@ -2475,25 +2528,80 @@ function renderHeatmapGrid(cells) {
   container.innerHTML = hoursHeader + rowsHtml;
 }
 
+function openWordMapModal(itemEncoded) {
+  try {
+    const item = JSON.parse(decodeURIComponent(itemEncoded));
+    selectedWordMapTopic = item;
+
+    const modal = document.getElementById('modal-wordmap-action');
+    const titleEl = document.getElementById('wordmap-modal-title');
+    const metaEl = document.getElementById('wordmap-modal-meta');
+    const contextEl = document.getElementById('wordmap-modal-context');
+
+    if (!modal) return;
+
+    if (titleEl) {
+      titleEl.innerHTML = `${item.is_compound ? '🔗 ' : '🏷️ '} Tópico: <b>${item.word}</b>`;
+    }
+
+    if (metaEl) {
+      metaEl.innerHTML = `
+        <span><b>Categoria:</b> ${item.category}</span> • 
+        <span><b>Ocorrências:</b> ${item.count} menção(ões)</span>
+        ${item.is_compound ? ' • <span class="badge badge-info" style="font-size: 0.72rem;">Sintagma Composto</span>' : ''}
+      `;
+    }
+
+    if (contextEl) {
+      contextEl.innerHTML = item.sample_context
+        ? `"${item.sample_context}..."`
+        : 'Nenhum trecho textual específico isolado.';
+    }
+
+    modal.classList.add('active');
+  } catch (err) {
+    console.error('Erro ao abrir modal do WordMap:', err);
+  }
+}
+window.openWordMapModal = openWordMapModal;
+
 function renderWordMapCloud(wordItems) {
   const container = document.getElementById('analytics-wordmap-container');
+  const countTag = document.getElementById('wordmap-count-tag');
   if (!container) return;
+
+  if (wordItems) {
+    currentWordMapItems = wordItems;
+  }
 
   const xmlGarbageRegex = /^(mxcell|parent|mxgeometry|vertex|style|geometry|target|source|edge|value|points|array|root|model|diagram|page|grid|xml|html|http|https|drawio|node|label|width|height|rel|true|false|null|undefined|none|nan|xmlns|doctype|svg|fill|stroke)$/i;
 
   // Filtra itens vazios ou ruídos residuais de diagramas/XML
-  const filtered = (wordItems || []).filter(item => {
+  let validItems = (currentWordMapItems || []).filter(item => {
     if (!item.word || item.word.trim().length < 3) return false;
     if (xmlGarbageRegex.test(item.word.trim())) return false;
     return true;
   });
 
-  if (filtered.length === 0) {
-    container.innerHTML = '<p class="text-muted" style="text-align:center; padding: 2rem;">Nenhum termo relevante identificado no período.</p>';
+  // Aplica filtro do pilar selecionado
+  let displayed = validItems;
+  if (currentWordMapFilter === 'COMPOUND') {
+    displayed = validItems.filter(item => item.is_compound);
+  } else if (currentWordMapFilter !== 'ALL') {
+    displayed = validItems.filter(item => item.category === currentWordMapFilter);
+  }
+
+  if (countTag) {
+    countTag.textContent = `${displayed.length} Tópico(s) Exibido(s)`;
+  }
+
+  if (displayed.length === 0) {
+    container.innerHTML = `<p class="text-muted" style="text-align:center; padding: 2rem;">Nenhum termo encontrado para o filtro <strong>${currentWordMapFilter}</strong> no período.</p>`;
     return;
   }
 
   const categoryStyles = {
+    'GARGALOS': 'legend-gargalos',
     'AGRONEGOCIO': 'legend-agronegocio',
     'ZOOTECNIA': 'legend-zootecnia',
     'LOGISTICA': 'legend-logistica',
@@ -2505,13 +2613,19 @@ function renderWordMapCloud(wordItems) {
     'TEMAS': 'legend-temas',
   };
 
-  container.innerHTML = filtered.map(item => {
+  container.innerHTML = displayed.map(item => {
     const chipClass = categoryStyles[item.category] || 'legend-temas';
-    // Tamanho proporcional entre 0.85rem e 1.65rem
-    const fontSize = 0.85 + (item.weight_pct / 100) * 0.75;
+    // Tamanho proporcional entre 0.85rem e 1.70rem
+    const fontSize = 0.85 + (item.weight_pct / 100) * 0.85;
+    const compoundBadge = item.is_compound ? '<span style="font-size: 0.8em; opacity: 0.9;">🔗</span>' : '';
+    const itemEncoded = encodeURIComponent(JSON.stringify(item));
 
     return `
-      <span class="word-cloud-tag ${chipClass}" style="font-size: ${fontSize.toFixed(2)}rem;" title="Termo: '${item.word}' • Categoria: ${item.category} • ${item.count} menções">
+      <span class="word-cloud-tag ${chipClass} ${item.is_compound ? 'is-compound' : ''}" 
+            style="font-size: ${fontSize.toFixed(2)}rem;" 
+            title="Clique para ver ações • Termo: '${item.word}' • ${item.category} • ${item.count} menções"
+            onclick="openWordMapModal('${itemEncoded}')">
+        ${compoundBadge}
         <span>${item.word}</span>
         <span class="word-tag-count">${item.count}</span>
       </span>

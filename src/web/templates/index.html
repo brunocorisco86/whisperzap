@@ -434,11 +434,31 @@
         </div>
       </div>
 
-      <!-- Bloco Full-Width: WordMap Semântico -->
+      <!-- Bloco Full-Width: WordMap Semântico & SpaCy Intelligence -->
       <div class="chart-card" style="margin-top: 1.25rem;">
-        <div class="chart-card-header">
-          <h3>☁️ WordMap & Nuvem Semântica de Termos e Tópicos</h3>
+        <div class="chart-card-header" style="flex-direction: column; align-items: stretch; gap: 0.75rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+            <h3 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+              🧠 Tália — Nuvem Semântica & Sintagmas Estratégicos (spaCy NLP)
+            </h3>
+            <span class="chart-tag" id="wordmap-count-tag">50 Tópicos Ativos</span>
+          </div>
+
+          <!-- Filtros Estratégicos por Pilar -->
+          <div class="wordmap-strategic-bar">
+            <button class="wordmap-filter-btn active" data-pillar="ALL">🌟 Todos os Tópicos</button>
+            <button class="wordmap-filter-btn" data-pillar="COMPOUND">🔗 Expressões Compostas</button>
+            <button class="wordmap-filter-btn" data-pillar="GARGALOS">🚨 Gargalos & Demandas</button>
+            <button class="wordmap-filter-btn" data-pillar="ZOOTECNIA">🌾 Zootecnia & Silos</button>
+            <button class="wordmap-filter-btn" data-pillar="AGRONEGOCIO">🌱 Agro & Cooperativa</button>
+            <button class="wordmap-filter-btn" data-pillar="LOGISTICA">🚚 Logística & Cargas</button>
+            <button class="wordmap-filter-btn" data-pillar="GESTAO">👔 Gestão & Diretoria</button>
+            <button class="wordmap-filter-btn" data-pillar="SISTEMAS">💻 Sistemas & ERP</button>
+            <button class="wordmap-filter-btn" data-pillar="TECNOLOGIA">🤖 IA & Homelab</button>
+          </div>
+
           <div class="wordmap-legend">
+            <span class="legend-chip legend-gargalos">🚨 Gargalos / Dúvidas</span>
             <span class="legend-chip legend-agronegocio">🌱 Agro & Cooperativa</span>
             <span class="legend-chip legend-zootecnia">🌾 Zootecnia & Silos</span>
             <span class="legend-chip legend-logistica">🚚 Logística & Cargas</span>
@@ -931,6 +951,28 @@
           <button type="submit" class="btn btn-primary" id="btn-save-term">💾 Salvar Termo na VPS</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal: WordMap Topic Action (Calíope / Melpômene) -->
+  <div class="modal-overlay" id="modal-wordmap-action">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 id="wordmap-modal-title">Tópico: Exemplo</h3>
+        <button class="modal-close" id="btn-close-wordmap-modal">&times;</button>
+      </div>
+      <div style="padding: 1rem 0;">
+        <div id="wordmap-modal-meta" style="margin-bottom: 0.75rem; font-size: 0.88rem; color: var(--text-secondary);"></div>
+        <div id="wordmap-modal-context" style="background: var(--bg-surface); padding: 0.75rem; border-radius: var(--radius-sm); font-size: 0.84rem; font-style: italic; color: var(--text-primary); border-left: 3px solid var(--color-accent); margin-bottom: 1.25rem;"></div>
+        <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+          <button class="btn btn-primary" id="btn-wordmap-ask-melpomene" style="width: 100%; justify-content: center;">
+            🧠 Perguntar ao Oráculo Melpômene sobre este Tópico
+          </button>
+          <button class="btn btn-secondary" id="btn-wordmap-filter-caliope" style="width: 100%; justify-content: center;">
+            🎙️ Filtrar Mensagens com este Tópico em Calíope
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
