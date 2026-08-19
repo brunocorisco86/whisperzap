@@ -142,6 +142,20 @@
       <div class="contacts-grid" id="contacts-container">
         <!-- Rendered via JS -->
       </div>
+
+      <!-- Pagination / Limit Bar Clio -->
+      <div class="list-pagination-bar" id="contacts-pagination-bar">
+        <span class="pagination-info" id="contacts-pagination-info">Exibindo 0 de 0 contatos</span>
+        <div class="pagination-controls-group">
+          <label for="contacts-limit-select" style="font-size: 0.82rem; color: var(--text-muted);">Itens por página:</label>
+          <select id="contacts-limit-select" class="pagination-select">
+            <option value="20" selected>20 contatos</option>
+            <option value="50">50 contatos</option>
+            <option value="100">100 contatos</option>
+            <option value="all">Todos os contatos</option>
+          </select>
+        </div>
+      </div>
     </section>
 
     <!-- Tab 2: Interactive NetworkX Knowledge Graph (Urânia) -->
@@ -201,7 +215,7 @@
       </div>
     </section>
 
-    <!-- Tab 3: Tasks & Action Items -->
+    <!-- Tab 3: Tasks & Action Items (Terpsícore) -->
     <section id="tab-tasks" class="tab-content">
       <div class="section-toolbar">
         <div class="search-box">
@@ -211,7 +225,7 @@
         <div class="filter-group">
           <select id="tasks-filter-status">
             <option value="">Todos os Status</option>
-            <option value="PENDING">Pendentes (PENDING)</option>
+            <option value="PENDING" selected>Pendentes (PENDING)</option>
             <option value="DONE">Concluídas (DONE)</option>
             <option value="CANCELLED">Ignoradas (CANCELLED)</option>
           </select>
@@ -227,6 +241,21 @@
 
       <div class="tasks-list" id="tasks-container">
         <!-- Rendered via JS -->
+      </div>
+
+      <!-- Pagination / Limit Bar Terpsícore -->
+      <div class="list-pagination-bar" id="tasks-pagination-bar">
+        <span class="pagination-info" id="tasks-pagination-info">Exibindo 0 de 0 tarefas</span>
+        <div class="pagination-controls-group">
+          <label for="tasks-limit-select" style="font-size: 0.82rem; color: var(--text-muted);">Itens por página:</label>
+          <select id="tasks-limit-select" class="pagination-select">
+            <option value="10" selected>10 tarefas</option>
+            <option value="20">20 tarefas</option>
+            <option value="50">50 tarefas</option>
+            <option value="100">100 tarefas</option>
+            <option value="all">Todas as tarefas</option>
+          </select>
+        </div>
       </div>
     </section>
 
@@ -262,6 +291,13 @@
 
       <div class="messages-feed" id="messages-container">
         <!-- Rendered via JS -->
+      </div>
+
+      <!-- Pagination Bar Calíope -->
+      <div class="list-pagination-bar" id="messages-pagination-bar">
+        <button class="btn btn-secondary btn-sm" id="btn-msg-prev" disabled>⬅️ Anterior</button>
+        <span class="pagination-info" id="messages-pagination-info">Página 1 de 1</span>
+        <button class="btn btn-secondary btn-sm" id="btn-msg-next" disabled>Próxima ➡️</button>
       </div>
     </section>
 
@@ -461,6 +497,13 @@
       <div class="dictionary-grid" id="dictionary-container">
         <!-- Rendered via JS -->
       </div>
+
+      <!-- Pagination Bar Polímnia -->
+      <div class="list-pagination-bar" id="dict-pagination-bar">
+        <button class="btn btn-secondary btn-sm" id="btn-dict-prev" disabled>⬅️ Anterior</button>
+        <span class="pagination-info" id="dict-pagination-info">Página 1 de 1</span>
+        <button class="btn btn-secondary btn-sm" id="btn-dict-next" disabled>Próxima ➡️</button>
+      </div>
     </section>
 
     <!-- Tab: Sentimentos & Série Temporal -->
@@ -550,7 +593,7 @@
       </div>
     </section>
 
-    <!-- Tab 7: Infrastructure & Topology (Euterpe) -->
+    <!-- Tab 7: Infrastructure, Topology & Lore (Euterpe) -->
     <section id="tab-infra" class="tab-content">
       <div class="infra-grid">
         <div class="card stat-card">
@@ -625,6 +668,148 @@
             <strong>Grafo & pgvector</strong>
             <p>Persistência & RAG</p>
           </div>
+        </div>
+      </div>
+
+      <!-- Lore das 9 Musas de Mnemosine -->
+      <div class="card mt-4">
+        <div class="card-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+          <h2 style="font-family: var(--font-display); font-size: 1.35rem; display: flex; align-items: center; gap: 0.6rem; color: #fef08a;">
+            🏛️ O Panteão de Mnemosine — Lore & Guia dos Módulos
+          </h2>
+          <p class="text-muted" style="font-size: 0.88rem; margin-top: 0.3rem;">
+            Na mitologia grega, <strong>Mnemósine</strong> é a Titã da Memória que deu à luz as 9 Musas. Cada módulo do ecossistema é presidido por uma Musa, unindo poesia mitológica à inteligência operacional.
+          </p>
+        </div>
+
+        <div class="lore-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.25rem; padding: 1.5rem 0 0.5rem 0;">
+          
+          <div class="lore-card">
+            <div class="lore-card-header">
+              <span class="lore-icon">📜</span>
+              <div>
+                <h3 class="lore-musa-name">Clio</h3>
+                <span class="lore-musa-domain">Musa da História & Registros</span>
+              </div>
+            </div>
+            <div class="lore-card-body">
+              <strong>Módulo: Contatos & Linhagens</strong>
+              <p>Guarda a memória de relacionamentos, papéis hierárquicos (Produtor, Família, Diretoria) e histórico vivo de interações.</p>
+            </div>
+          </div>
+
+          <div class="lore-card">
+            <div class="lore-card-header">
+              <span class="lore-icon">✨</span>
+              <div>
+                <h3 class="lore-musa-name">Urânia</h3>
+                <span class="lore-musa-domain">Musa da Astronomia & Cosmos</span>
+              </div>
+            </div>
+            <div class="lore-card-body">
+              <strong>Módulo: Grafo de Conhecimento Neural</strong>
+              <p>Mapeia a constelação relacional de pessoas, fazendas, silos, cooperativas e fluxos de decisão em NetworkX vivo.</p>
+            </div>
+          </div>
+
+          <div class="lore-card">
+            <div class="lore-card-header">
+              <span class="lore-icon">⚡</span>
+              <div>
+                <h3 class="lore-musa-name">Terpsícore</h3>
+                <span class="lore-musa-domain">Musa da Dança & Ritmo</span>
+              </div>
+            </div>
+            <div class="lore-card-body">
+              <strong>Módulo: Tarefas & Cadência Operacional</strong>
+              <p>Rege o ritmo, a cadência e o fluxo de execução das tarefas e pendências acionáveis extraídas das conversas.</p>
+            </div>
+          </div>
+
+          <div class="lore-card">
+            <div class="lore-card-header">
+              <span class="lore-icon">🎙️</span>
+              <div>
+                <h3 class="lore-musa-name">Calíope</h3>
+                <span class="lore-musa-domain">Musa da Poesia Épica & Eloquência</span>
+              </div>
+            </div>
+            <div class="lore-card-body">
+              <strong>Módulo: Áudios & Memória Falada</strong>
+              <p>A mais nobre das musas. Transcreve com Faster-Whisper, revisa jargões e devolve a narrativa dos áudios no WhatsApp.</p>
+            </div>
+          </div>
+
+          <div class="lore-card">
+            <div class="lore-card-header">
+              <span class="lore-icon">📊</span>
+              <div>
+                <h3 class="lore-musa-name">Tália</h3>
+                <span class="lore-musa-domain">Musa da Celebração & Colheita</span>
+              </div>
+            </div>
+            <div class="lore-card-body">
+              <strong>Módulo: Dashboard & Analytics</strong>
+              <p>Apresenta a colheita dos dados: volumes, séries temporais, matriz de horários de pico 24x7 e nuvem semântica.</p>
+            </div>
+          </div>
+
+          <div class="lore-card">
+            <div class="lore-card-header">
+              <span class="lore-icon">💖</span>
+              <div>
+                <h3 class="lore-musa-name">Erato</h3>
+                <span class="lore-musa-domain">Musa da Poesia Lírica & Sentimentos</span>
+              </div>
+            </div>
+            <div class="lore-card-body">
+              <strong>Módulo: Humor & Termômetro Social</strong>
+              <p>Mede a temperatura afetiva, evolução emocional e o tom interpessoal dos interlocutores ativos ao longo dos dias.</p>
+            </div>
+          </div>
+
+          <div class="lore-card">
+            <div class="lore-card-header">
+              <span class="lore-icon">📖</span>
+              <div>
+                <h3 class="lore-musa-name">Polímnia</h3>
+                <span class="lore-musa-domain">Musa dos Hinos & Retórica Sagrada</span>
+              </div>
+            </div>
+            <div class="lore-card-body">
+              <strong>Módulo: Dicionário Léxico & Fonética</strong>
+              <p>Guardiã da precisão vocabular. Injeta jargões zootécnicos e nomes de sistemas no Whisper e modelos de IA.</p>
+            </div>
+          </div>
+
+          <div class="lore-card">
+            <div class="lore-card-header">
+              <span class="lore-icon">🧠</span>
+              <div>
+                <h3 class="lore-musa-name">Melpômene</h3>
+                <span class="lore-musa-domain">Musa do Pensamento Profundo & Razão</span>
+              </div>
+            </div>
+            <div class="lore-card-body">
+              <strong>Módulo: Oráculo de Inteligência & RAG</strong>
+              <p>Motor de consulta cognitivo. Realiza buscas híbridas vetoriais e de grafo para responder perguntas sobre as memórias.</p>
+            </div>
+          </div>
+
+          <div class="lore-card">
+            <div class="lore-card-header">
+              <span class="lore-icon">⚙️</span>
+              <div>
+                <h3 class="lore-musa-name">Euterpe</h3>
+                <span class="lore-musa-domain">Musa da Música & Harmonia dos Instrumentos</span>
+              </div>
+            </div>
+            <div class="lore-card-body">
+              <strong>Módulo: Topologia & Harmonia de Rede</strong>
+              <p>Rege a sincronia de toda a infraestrutura técnica: túnel Tailscale, Raspberry Pi, VPS Hostinger, Docker e n8n.</p>
+            </div>
+          </div>
+
         </div>
       </div>
     </section>

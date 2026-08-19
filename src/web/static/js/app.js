@@ -10,6 +10,14 @@ let allMessages = [];
 let visNetworkInstance = null;
 let graphRawData = null;
 
+// Performance & Pagination State
+let contactsLimit = 20;
+let tasksLimit = 10;
+let messagesCurrentPage = 1;
+const messagesPageSize = 10;
+let dictCurrentPage = 1;
+const dictPageSize = 50;
+
 // DOM Elements
 const contactsContainer = document.getElementById('contacts-container');
 const dictionaryContainer = document.getElementById('dictionary-container');
@@ -86,12 +94,71 @@ document.addEventListener('DOMContentLoaded', () => {
   contactSearchInput.addEventListener('input', renderContacts);
   contactFilterRole.addEventListener('change', renderContacts);
   if (contactFilterPeriod) contactFilterPeriod.addEventListener('change', renderContacts);
-  dictSearchInput.addEventListener('input', renderDictionary);
-  dictFilterCategory.addEventListener('change', renderDictionary);
   
+  const contactsLimitSelect = document.getElementById('contacts-limit-select');
+  if (contactsLimitSelect) {
+    contactsLimitSelect.addEventListener('change', (e) => {
+      contactsLimit = e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10);
+      renderContacts();
+    });
+  }
+
+  dictSearchInput.addEventListener('input', () => { dictCurrentPage = 1; renderDictionary(); });
+  dictFilterCategory.addEventListener('change', () => { dictCurrentPage = 1; renderDictionary(); });
+  
+  const btnDictPrev = document.getElementById('btn-dict-prev');
+  const btnDictNext = document.getElementById('btn-dict-next');
+  if (btnDictPrev) {
+    btnDictPrev.addEventListener('click', () => {
+      if (dictCurrentPage > 1) {
+        dictCurrentPage--;
+        renderDictionary();
+        if (dictionaryContainer) dictionaryContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  }
+  if (btnDictNext) {
+    btnDictNext.addEventListener('click', () => {
+      dictCurrentPage++;
+      renderDictionary();
+      if (dictionaryContainer) dictionaryContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
   if (tasksSearchInput) tasksSearchInput.addEventListener('input', renderTasks);
   if (tasksFilterStatus) tasksFilterStatus.addEventListener('change', renderTasks);
   if (tasksFilterPriority) tasksFilterPriority.addEventListener('change', renderTasks);
+
+  const tasksLimitSelect = document.getElementById('tasks-limit-select');
+  if (tasksLimitSelect) {
+    tasksLimitSelect.addEventListener('change', (e) => {
+      tasksLimit = e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10);
+      renderTasks();
+    });
+  }
+
+  if (msgSearchInput) msgSearchInput.addEventListener('input', () => { messagesCurrentPage = 1; renderMessages(); });
+  if (msgFilterIntent) msgFilterIntent.addEventListener('change', () => { messagesCurrentPage = 1; renderMessages(); });
+  if (msgFilterSentiment) msgFilterSentiment.addEventListener('change', () => { messagesCurrentPage = 1; renderMessages(); });
+
+  const btnMsgPrev = document.getElementById('btn-msg-prev');
+  const btnMsgNext = document.getElementById('btn-msg-next');
+  if (btnMsgPrev) {
+    btnMsgPrev.addEventListener('click', () => {
+      if (messagesCurrentPage > 1) {
+        messagesCurrentPage--;
+        renderMessages();
+        if (messagesContainer) messagesContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  }
+  if (btnMsgNext) {
+    btnMsgNext.addEventListener('click', () => {
+      messagesCurrentPage++;
+      renderMessages();
+      if (messagesContainer) messagesContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
 
   // Analytics Listeners
   const analyticsPeriodSelect = document.getElementById('analytics-period');
@@ -677,7 +744,12 @@ function renderContacts() {
     });
   }
 
-  if (filtered.length === 0) {
+  const totalFiltered = filtered.length;
+  const paginationBar = document.getElementById('contacts-pagination-bar');
+  const paginationInfo = document.getElementById('contacts-pagination-info');
+
+  if (totalFiltered === 0) {
+    if (paginationBar) paginationBar.style.display = 'none';
     contactsContainer.innerHTML = `
       <div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-muted);">
         <p style="font-size: 1.2rem; margin-bottom: 0.5rem;">Nenhum contato encontrado no período selecionado (${filterPeriod === 'today' ? 'Hoje' : filterPeriod === '7d' ? 'Últimos 7 dias' : 'Último Mês'})</p>
@@ -687,7 +759,14 @@ function renderContacts() {
     return;
   }
 
-  contactsContainer.innerHTML = filtered.map(c => {
+  const displayedList = contactsLimit === 'all' ? filtered : filtered.slice(0, contactsLimit);
+
+  if (paginationBar) paginationBar.style.display = 'flex';
+  if (paginationInfo) {
+    paginationInfo.innerHTML = `Exibindo <strong>${displayedList.length}</strong> de <strong>${totalFiltered}</strong> contatos`;
+  }
+
+  contactsContainer.innerHTML = displayedList.map(c => {
     const rawDigits = (c.phone_number || '').replace(/\D/g, '');
     const hasValidPhone = rawDigits.length >= 8;
     const cleanPhone = hasValidPhone ? ((rawDigits.length === 10 || rawDigits.length === 11) && !rawDigits.startsWith('55') ? `55${rawDigits}` : rawDigits) : '';
@@ -838,7 +917,12 @@ function renderTasks() {
     return matchSearch && matchStatus && matchPriority;
   });
 
-  if (filtered.length === 0) {
+  const totalFiltered = filtered.length;
+  const paginationBar = document.getElementById('tasks-pagination-bar');
+  const paginationInfo = document.getElementById('tasks-pagination-info');
+
+  if (totalFiltered === 0) {
+    if (paginationBar) paginationBar.style.display = 'none';
     tasksContainer.innerHTML = `
       <div class="empty-state" style="text-align: center; padding: 3rem; color: var(--text-muted);">
         <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">Nenhuma tarefa encontrada</p>
@@ -848,7 +932,14 @@ function renderTasks() {
     return;
   }
 
-  tasksContainer.innerHTML = filtered.map(t => {
+  const displayedList = tasksLimit === 'all' ? filtered : filtered.slice(0, tasksLimit);
+
+  if (paginationBar) paginationBar.style.display = 'flex';
+  if (paginationInfo) {
+    paginationInfo.innerHTML = `Exibindo <strong>${displayedList.length}</strong> de <strong>${totalFiltered}</strong> tarefas`;
+  }
+
+  tasksContainer.innerHTML = displayedList.map(t => {
     const isDone = t.status === 'DONE';
     const isCancelled = t.status === 'CANCELLED';
     const priorityColor = t.priority === 'URGENT' ? '#ef4444' : t.priority === 'HIGH' ? '#f59e0b' : '#10b981';
@@ -1066,7 +1157,14 @@ function renderMessages() {
     return matchSearch && matchIntent && matchSentiment;
   });
 
-  if (filtered.length === 0) {
+  const totalFiltered = filtered.length;
+  const paginationBar = document.getElementById('messages-pagination-bar');
+  const paginationInfo = document.getElementById('messages-pagination-info');
+  const btnPrev = document.getElementById('btn-msg-prev');
+  const btnNext = document.getElementById('btn-msg-next');
+
+  if (totalFiltered === 0) {
+    if (paginationBar) paginationBar.style.display = 'none';
     messagesContainer.innerHTML = `
       <div class="empty-state" style="text-align: center; padding: 3rem; color: var(--text-muted);">
         <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">Nenhuma mensagem encontrada</p>
@@ -1076,7 +1174,21 @@ function renderMessages() {
     return;
   }
 
-  messagesContainer.innerHTML = filtered.map(m => {
+  const totalPages = Math.ceil(totalFiltered / messagesPageSize) || 1;
+  if (messagesCurrentPage > totalPages) messagesCurrentPage = totalPages;
+  if (messagesCurrentPage < 1) messagesCurrentPage = 1;
+
+  const startIndex = (messagesCurrentPage - 1) * messagesPageSize;
+  const pageItems = filtered.slice(startIndex, startIndex + messagesPageSize);
+
+  if (paginationBar) paginationBar.style.display = 'flex';
+  if (paginationInfo) {
+    paginationInfo.innerHTML = `Página <strong>${messagesCurrentPage}</strong> de <strong>${totalPages}</strong> (Total: ${totalFiltered} conversas)`;
+  }
+  if (btnPrev) btnPrev.disabled = (messagesCurrentPage <= 1);
+  if (btnNext) btnNext.disabled = (messagesCurrentPage >= totalPages);
+
+  messagesContainer.innerHTML = pageItems.map(m => {
     const initials = (m.speaker || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     const urgencyColor = m.urgency === 'URGENT' ? '#ef4444' : m.urgency === 'HIGH' ? '#f59e0b' : '#10b981';
 
@@ -1258,6 +1370,29 @@ window.deleteMessage = async function(messageId) {
   }
 };
 
+function editTerm(idOrTerm) {
+  const termObj = allDictionaryTerms.find(t => t.id === idOrTerm || t.term === idOrTerm);
+  if (!termObj) return;
+
+  const modalTitle = document.getElementById('modal-term-title');
+  if (modalTitle) modalTitle.textContent = `Editar Termo: ${termObj.term}`;
+
+  const inputName = document.getElementById('term-name');
+  const inputCategory = document.getElementById('term-category');
+  const inputExpansion = document.getElementById('term-expansion');
+  const inputVariations = document.getElementById('term-variations');
+  const inputDesc = document.getElementById('term-description');
+
+  if (inputName) inputName.value = termObj.term || '';
+  if (inputCategory) inputCategory.value = termObj.category || 'AGRONEGOCIO';
+  if (inputExpansion) inputExpansion.value = termObj.expansion || '';
+  if (inputVariations) inputVariations.value = (termObj.phonetic_variations || []).join(', ');
+  if (inputDesc) inputDesc.value = termObj.description || '';
+
+  if (modalTerm) modalTerm.classList.add('active');
+}
+window.editTerm = editTerm;
+
 function renderDictionary() {
   const searchTerm = dictSearchInput.value.toLowerCase().trim();
   const filterCat = dictFilterCategory.value.toUpperCase();
@@ -1272,7 +1407,14 @@ function renderDictionary() {
     return matchSearch && matchCat;
   });
 
-  if (filtered.length === 0) {
+  const totalFiltered = filtered.length;
+  const paginationBar = document.getElementById('dict-pagination-bar');
+  const paginationInfo = document.getElementById('dict-pagination-info');
+  const btnPrev = document.getElementById('btn-dict-prev');
+  const btnNext = document.getElementById('btn-dict-next');
+
+  if (totalFiltered === 0) {
+    if (paginationBar) paginationBar.style.display = 'none';
     dictionaryContainer.innerHTML = `
       <div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-muted);">
         <p style="font-size: 1.2rem; margin-bottom: 0.5rem;">Nenhum termo encontrado</p>
@@ -1281,7 +1423,21 @@ function renderDictionary() {
     return;
   }
 
-  dictionaryContainer.innerHTML = filtered.map(t => {
+  const totalPages = Math.ceil(totalFiltered / dictPageSize) || 1;
+  if (dictCurrentPage > totalPages) dictCurrentPage = totalPages;
+  if (dictCurrentPage < 1) dictCurrentPage = 1;
+
+  const startIndex = (dictCurrentPage - 1) * dictPageSize;
+  const displayedTerms = filtered.slice(startIndex, startIndex + dictPageSize);
+
+  if (paginationBar) paginationBar.style.display = 'flex';
+  if (paginationInfo) {
+    paginationInfo.innerHTML = `Página <strong>${dictCurrentPage}</strong> de <strong>${totalPages}</strong> (Total: ${totalFiltered} termos)`;
+  }
+  if (btnPrev) btnPrev.disabled = (dictCurrentPage <= 1);
+  if (btnNext) btnNext.disabled = (dictCurrentPage >= totalPages);
+
+  dictionaryContainer.innerHTML = displayedTerms.map(t => {
     const variationsHtml = (t.phonetic_variations || []).map(v => `<span class="variation-chip">${v}</span>`).join('');
 
     return `
@@ -1299,7 +1455,8 @@ function renderDictionary() {
 
         ${t.description ? `<div class="dict-desc">${t.description}</div>` : ''}
 
-        <div style="display: flex; justify-content: flex-end; margin-top: auto; padding-top: 0.5rem; border-top: 1px solid var(--border-subtle);">
+        <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: auto; padding-top: 0.5rem; border-top: 1px solid var(--border-subtle);">
+          <button class="btn btn-secondary btn-sm" onclick="editTerm('${t.id || t.term}')" title="Editar este termo">✏️ Editar</button>
           <button class="btn btn-danger btn-sm" onclick="deleteTerm('${t.id || t.term}')">Remover</button>
         </div>
       </div>
@@ -1859,8 +2016,21 @@ async function populateSentimentSpeakers() {
     const res = await fetch('/api/v1/contacts');
     if (res.ok) {
       const contacts = await res.json();
-      select.innerHTML = '<option value="">Selecione uma pessoa para ver a Série Temporal...</option>' +
-        contacts.map(c => `<option value="${c.name}">${c.name} (${c.role})</option>`).join('');
+      const cutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
+      const activeContacts = contacts.filter(c => {
+        if (!c.last_interaction_at) return false;
+        return new Date(c.last_interaction_at).getTime() >= cutoff;
+      });
+
+      activeContacts.sort((a, b) => new Date(b.last_interaction_at).getTime() - new Date(a.last_interaction_at).getTime());
+
+      if (activeContacts.length === 0) {
+        select.innerHTML = '<option value="">Nenhuma pessoa com interação nos últimos 30 dias</option>';
+        return;
+      }
+
+      select.innerHTML = '<option value="">Selecione uma pessoa (contato nos últimos 30 dias)...</option>' +
+        activeContacts.map(c => `<option value="${c.name}">${c.name} (${c.role || 'Contato'})</option>`).join('');
     }
   } catch (err) {
     console.error('Erro ao popular lista de pessoas para sentimentos:', err);
@@ -2309,8 +2479,18 @@ function renderWordMapCloud(wordItems) {
   const container = document.getElementById('analytics-wordmap-container');
   if (!container) return;
 
-  if (!wordItems || wordItems.length === 0) {
-    container.innerHTML = '<p class="text-muted" style="text-align:center; padding: 2rem;">Nenhum termo relevante identificado no período.</p>';
+  const xmlGarbageRegex = /^(mxcell|parent|mxgeometry|vertex|style|geometry|target|source|edge|value|points|array|root|model|diagram|page|grid|xml|html|http|https|drawio|node|label|width|height|rel|true|false|null|undefined|none|nan)$/i;
+
+  // Filtra itens da categoria 'GERAL' e ruídos técnicos de diagramas/XML
+  const filtered = (wordItems || []).filter(item => {
+    if (!item.word) return false;
+    if (item.category === 'GERAL') return false;
+    if (xmlGarbageRegex.test(item.word.trim())) return false;
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<p class="text-muted" style="text-align:center; padding: 2rem;">Nenhum termo técnico categorizado (Zootecnia, Logística, Gestão, Pessoal) identificado no período.</p>';
     return;
   }
 
@@ -2319,16 +2499,16 @@ function renderWordMapCloud(wordItems) {
     'LOGISTICA': 'legend-logistica',
     'GESTAO': 'legend-gestao',
     'PESSOAL': 'legend-pessoal',
-    'GERAL': 'legend-geral',
+    'TECNOLOGIA': 'legend-gestao',
   };
 
-  container.innerHTML = wordItems.map(item => {
-    const chipClass = categoryStyles[item.category] || 'legend-geral';
+  container.innerHTML = filtered.map(item => {
+    const chipClass = categoryStyles[item.category] || 'legend-zootecnia';
     // Tamanho proporcional entre 0.85rem e 1.65rem
     const fontSize = 0.85 + (item.weight_pct / 100) * 0.75;
 
     return `
-      <span class="word-cloud-tag ${chipClass}" style="font-size: ${fontSize.toFixed(2)}rem;" title="Termo: '${item.word}' • ${item.count} menções no período">
+      <span class="word-cloud-tag ${chipClass}" style="font-size: ${fontSize.toFixed(2)}rem;" title="Termo: '${item.word}' • Categoria: ${item.category} • ${item.count} menções">
         <span>${item.word}</span>
         <span class="word-tag-count">${item.count}</span>
       </span>

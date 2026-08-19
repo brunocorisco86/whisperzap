@@ -116,3 +116,34 @@ def test_analytics_api_endpoint():
     assert "top_senders" in data
     assert "wordmap" in data
     assert "heatmap" in data
+
+
+def test_wordmap_filters_xml_and_diagram_stopwords():
+    """Garante que tags XML/DrawIO não poluem a nuvem de palavras."""
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        m = MessageRecord(
+            id="test-msg-xml-garbage",
+            created_at=now,
+            speaker="Diagram Bot",
+            revised_text="<mxGraphModel><root><mxCell id='0'/><mxCell id='1' parent='0'/><mxGeometry x='20' y='30' width='80' height='40' as='geometry'/></root></mxGraphModel> zootecnia lote aviário",
+            audio_duration_s=10.0,
+            sentiment="NEUTRAL",
+            sentiment_score=0.0,
+        )
+        db.add(m)
+        db.commit()
+
+        res = analytics_service.get_dashboard_metrics(period="7d", group_by="day", db=db)
+        words_found = {item.word for item in res.wordmap}
+
+        # Garante que termos de diagramas foram ignorados
+        assert "mxcell" not in words_found
+        assert "parent" not in words_found
+        assert "mxgeometry" not in words_found
+        assert "geometry" not in words_found
+        assert "root" not in words_found
+    finally:
+        db.close()
+

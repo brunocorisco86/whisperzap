@@ -55,6 +55,11 @@ STOPWORDS_PT = {
     "todo", "todos", "trabalho", "tres", "três", "tudo", "um", "uma", "umas", "uns", "vai",
     "valer", "vamos", "vao", "vão", "vc", "vcs", "veja", "vem", "vendo", "ver", "verdade",
     "vez", "vezes", "vi", "viu", "você", "voces", "vocês", "vou",
+    # Ruídos técnicos de XML, drawio e diagramas que não pertencem a conversas
+    "mxcell", "parent", "mxgeometry", "vertex", "style", "geometry", "target", "source",
+    "edge", "value", "points", "array", "root", "model", "diagram", "page", "grid", "xml",
+    "html", "http", "https", "drawio", "node", "label", "width", "height", "rel", "true",
+    "false", "null", "undefined", "none", "nan",
 }
 
 CATEGORY_KEYWORDS = {
