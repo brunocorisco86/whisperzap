@@ -565,7 +565,8 @@ class AnalyticsService:
 
         nlp = get_spacy_nlp()
         xml_noise_regex = re.compile(r"^(mxcell|parent|mxgeometry|vertex|style|geometry|target|source|edge|value|points|array|root|model|diagram|page|grid|xml|html|http|https|drawio|node|label|width|height|rel|true|false|null|undefined|none|nan|xmlns|doctype|svg|fill|stroke)$", re.IGNORECASE)
-        noise_articles = {"o", "a", "os", "as", "um", "uma", "uns", "umas", "de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas", "para", "por", "com", "este", "esta", "esse", "essa", "aquele", "aquela"}
+        noise_articles = {"o", "a", "os", "as", "um", "uma", "uns", "umas", "de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas", "para", "por", "com", "este", "esta", "esse", "essa", "aquele", "aquela", "seu", "sua", "seus", "suas", "como", "sobre"}
+        salutations = {"bom dia", "boa tarde", "boa noite", "olá", "ola", "obrigado", "obrigada", "valeu", "falou", "abraço", "abracos", "tudo bem", "como vai"}
 
         for m in messages:
             text = ((m.revised_text or "") + " " + (m.summary or "")).strip()
@@ -583,15 +584,14 @@ class AnalyticsService:
                     for chunk in doc.noun_chunks:
                         chunk_words = [t.text.lower() for t in chunk if not t.is_punct and not xml_noise_regex.match(t.text)]
                         # Remove artigos e preposições do início e fim
-                        while chunk_words and chunk_words[0] in noise_articles:
+                        while chunk_words and (chunk_words[0] in noise_articles or chunk_words[0] in STOPWORDS_PT):
                             chunk_words.pop(0)
-                        while chunk_words and chunk_words[-1] in noise_articles:
+                        while chunk_words and (chunk_words[-1] in noise_articles or chunk_words[-1] in STOPWORDS_PT):
                             chunk_words.pop()
 
                         if 2 <= len(chunk_words) <= 4:
                             phrase = " ".join(chunk_words)
-                            # Verifica se tem substantivo relevante
-                            if not any(xml_noise_regex.match(w) for w in chunk_words) and all(len(w) >= 2 for w in chunk_words):
+                            if phrase not in salutations and not any(xml_noise_regex.match(w) for w in chunk_words) and all(len(w) >= 2 for w in chunk_words):
                                 term_counts[phrase] += 2
                                 is_compound_map[phrase] = True
                                 if phrase not in term_contexts:
