@@ -530,29 +530,32 @@
       </div>
     </section>
 
-    <!-- Tab: Sentimentos & Série Temporal -->
+    <!-- Tab: Sentimentos & Série Temporal (Erato) -->
     <section id="tab-sentiment" class="tab-content">
       <div class="section-toolbar">
         <div class="filter-group">
+          <button class="btn btn-primary btn-sm" id="btn-erato-view-all">
+            🌟 Todos (Últimos 30 Dias)
+          </button>
           <label style="font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem;">
             📅 Data:
-            <input type="date" id="sentiment-date-picker" style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.4rem 0.6rem; border-radius: 6px;">
+            <input type="date" id="sentiment-date-picker" style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.35rem 0.5rem; border-radius: 6px;">
           </label>
-          <button class="btn btn-secondary btn-sm" id="btn-collect-today-sentiment">
-            ⚡ Consolidar Sentimentos
+          <button class="btn btn-secondary btn-sm" id="btn-collect-today-sentiment" title="Força a consolidação do dia selecionado">
+            ⚡ Consolidar Hoje
           </button>
         </div>
         <div class="filter-group">
-          <select id="sentiment-speaker-select" style="min-width: 200px;">
+          <select id="sentiment-speaker-select" style="min-width: 240px;">
             <option value="">Selecione uma pessoa para ver o histórico...</option>
           </select>
         </div>
       </div>
 
-      <!-- Overview do Dia (Termômetro Social) -->
+      <!-- Overview do Dia / Período (Termômetro Social) -->
       <div style="margin-bottom: 1.5rem;">
         <h3 style="font-size: 1.1rem; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem;">
-          🌡️ Termômetro das Interações do Dia <span id="sentiment-day-badge" class="badge badge-executive">Hoje</span>
+          🌡️ Termômetro das Interações <span id="sentiment-day-badge" class="badge badge-executive">Últimos 30 Dias</span>
         </h3>
         <div class="contacts-grid" id="sentiment-daily-container">
           <!-- Rendered via JS -->

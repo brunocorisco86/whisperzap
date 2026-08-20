@@ -111,7 +111,7 @@ class SentimentTimelineService:
 
                 dominant_sent, avg_score = compute_dominant_sentiment(pos, neu, neg)
 
-                # Resolução flexível do contato cadastrado
+                # Resolução estrita do contato cadastrado (evita colisões de substring)
                 speaker_clean = speaker.strip().lower()
                 speaker_digits = re.sub(r"\D", "", speaker)
                 matched_contact = None
@@ -121,22 +121,36 @@ class SentimentTimelineService:
                     c_nick = (c.nickname or "").strip().lower()
                     c_phone = re.sub(r"\D", "", c.phone_number or "")
 
+                    # 1. Match estrito por telefone
                     if speaker_digits and c_phone:
                         if speaker_digits == c_phone or (len(speaker_digits) >= 8 and len(c_phone) >= 8 and speaker_digits[-8:] == c_phone[-8:]):
                             matched_contact = c
                             break
 
-                    if c_name and (speaker_clean in c_name or c_name in speaker_clean):
+                    # 2. Match estrito por igualdade exata
+                    if c_name and speaker_clean == c_name:
                         matched_contact = c
                         break
 
-                    if c_nick and c_nick in speaker_clean:
+                    if c_nick and speaker_clean == c_nick:
+                        matched_contact = c
+                        break
+
+                    # 3. Match por limite de palavra (somente se nome tiver 5+ caracteres)
+                    if c_name and len(c_name) >= 5 and re.search(rf"\b{re.escape(c_name)}\b", speaker_clean):
                         matched_contact = c
                         break
 
                 role_val = matched_contact.role if matched_contact else "OTHER"
                 phone_val = matched_contact.phone_number if matched_contact else (speaker if speaker_digits else None)
-                display_speaker = matched_contact.name if matched_contact else speaker
+                
+                # Se o speaker já for um nome real (não apenas dígitos), SEMPRE preserva o speaker original!
+                if re.search(r"[a-zA-Z]", speaker):
+                    display_speaker = speaker.strip()
+                elif matched_contact:
+                    display_speaker = matched_contact.name
+                else:
+                    display_speaker = speaker.strip()
 
                 # Gera síntese emocional breve
                 if dominant_sent == "POSITIVE":
@@ -209,6 +223,9 @@ class SentimentTimelineService:
                     )
                 )
 
+            # Ordena decrescente por interações
+            snapshots_responses.sort(key=lambda x: x.interactions_count, reverse=True)
+
             return DailySentimentCollectionResponse(
                 date=target_date,
                 total_people=len(snapshots_responses),
@@ -222,17 +239,85 @@ class SentimentTimelineService:
     def get_daily_snapshots(
         self,
         target_date: Optional[str] = None,
+        days: int = 30,
         db: Session | None = None,
     ) -> list[DailySentimentSnapshotResponse]:
-        """Retorna os snapshots gravados para uma data específica com auto-consolidação sob demanda."""
+        """Retorna os snapshots gravados para uma data específica ou agregados dos últimos N dias."""
         should_close = False
         if db is None:
             db = SessionLocal()
             should_close = True
 
         try:
-            if not target_date:
-                target_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            is_all = not target_date or target_date.lower() in ("all", "todos", "")
+
+            if is_all:
+                from datetime import timedelta
+                start_dt = datetime.now(timezone.utc) - timedelta(days=days)
+                start_date_str = start_dt.strftime("%Y-%m-%d")
+
+                records = (
+                    db.query(DailySentimentSnapshotRecord)
+                    .filter(DailySentimentSnapshotRecord.date >= start_date_str)
+                    .all()
+                )
+
+                if not records:
+                    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                    self.collect_daily_sentiments(target_date=today_str, db=db)
+                    records = db.query(DailySentimentSnapshotRecord).all()
+
+                # Agrupa por speaker único
+                speaker_groups = defaultdict(list)
+                for r in records:
+                    speaker_groups[r.speaker].append(r)
+
+                aggregated: list[DailySentimentSnapshotResponse] = []
+                for spk, group in speaker_groups.items():
+                    total_interactions = sum(g.interactions_count for g in group)
+                    total_pos = sum(g.positive_count for g in group)
+                    total_neu = sum(g.neutral_count for g in group)
+                    total_neg = sum(g.negative_count for g in group)
+                    dominant_sent, avg_score = compute_dominant_sentiment(total_pos, total_neu, total_neg)
+
+                    all_highlights = []
+                    for g in group:
+                        for h in (g.highlights or []):
+                            if h not in all_highlights:
+                                all_highlights.append(h)
+
+                    last_rec = max(group, key=lambda x: x.date or "")
+
+                    if dominant_sent == "POSITIVE":
+                        mood_summary = f"{total_interactions} interação(ões) nos últimos {days} dias com tom colaborativo e positivo."
+                    elif dominant_sent == "NEGATIVE":
+                        mood_summary = f"{total_interactions} interação(ões) com tom de preocupação, urgência ou atrito."
+                    elif dominant_sent == "MIXED":
+                        mood_summary = f"{total_interactions} interação(ões) com oscilação entre momentos positivos e alertas."
+                    else:
+                        mood_summary = f"{total_interactions} interação(ões) objetivas e operacionais neutras."
+
+                    aggregated.append(
+                        DailySentimentSnapshotResponse(
+                            id=last_rec.id,
+                            date=f"Últimos {days} dias",
+                            speaker=spk,
+                            phone_number=last_rec.phone_number,
+                            role=last_rec.role,
+                            interactions_count=total_interactions,
+                            dominant_sentiment=dominant_sent,
+                            avg_sentiment_score=avg_score,
+                            positive_count=total_pos,
+                            neutral_count=total_neu,
+                            negative_count=total_neg,
+                            highlights=all_highlights[:6],
+                            executive_summary=mood_summary,
+                            created_at=last_rec.created_at,
+                        )
+                    )
+
+                aggregated.sort(key=lambda x: x.interactions_count, reverse=True)
+                return aggregated
 
             records = (
                 db.query(DailySentimentSnapshotRecord)
@@ -244,9 +329,11 @@ class SentimentTimelineService:
             # Se não houver snapshots previamente salvos, realiza a consolidação sob demanda
             if not records:
                 collection = self.collect_daily_sentiments(target_date=target_date, db=db)
-                return collection.snapshots
+                snapshots_res = collection.snapshots
+                snapshots_res.sort(key=lambda x: x.interactions_count, reverse=True)
+                return snapshots_res
 
-            return [
+            res = [
                 DailySentimentSnapshotResponse(
                     id=r.id,
                     date=r.date,
@@ -265,6 +352,8 @@ class SentimentTimelineService:
                 )
                 for r in records
             ]
+            res.sort(key=lambda x: x.interactions_count, reverse=True)
+            return res
         finally:
             if should_close:
                 db.close()

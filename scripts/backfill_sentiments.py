@@ -111,6 +111,11 @@ def run_backfill():
         print(f"✨ Mensagens atualizadas com novos sentimentos: {updated_count}")
         print(f"🎙️ Mensagens de áudio enriquecidas com Prosódia Acústica: {prosody_count}")
 
+        # Limpa snapshots antigos corrompidos por colisões de substring
+        deleted_snapshots = db.query(DailySentimentSnapshotRecord).delete()
+        db.commit()
+        print(f"🧹 Snapshots antigos higienizados do banco: {deleted_snapshots}")
+
         # Identifica todas as datas presentes nas mensagens
         dates = (
             db.query(func.date(MessageRecord.created_at))
@@ -119,7 +124,7 @@ def run_backfill():
             .all()
         )
 
-        print(f"📅 Gerando snapshots diários para {len(dates)} data(s) no Erato...")
+        print(f"📅 Gerando snapshots diários limpos para {len(dates)} data(s) no Erato...")
         total_snaps = 0
         for (d,) in dates:
             if d:

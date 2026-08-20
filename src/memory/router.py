@@ -457,14 +457,15 @@ async def collect_daily_sentiments(
     return sentiment_timeline_service.collect_daily_sentiments(target_date=date, db=db)
 
 
-@router.get("/sentiment/daily", summary="Consulta snapshots de sentimentos consolidados do dia")
+@router.get("/sentiment/daily", summary="Consulta snapshots de sentimentos consolidados do dia ou dos últimos 30 dias")
 async def get_daily_sentiment_snapshots(
-    date: str | None = Query(default=None, description="Data no formato YYYY-MM-DD (default: hoje)"),
+    date: str | None = Query(default="all", description="Data no formato YYYY-MM-DD ou 'all' para os últimos 30 dias"),
+    days: int = Query(default=30, description="Quantidade de dias para agregação quando date='all'"),
     db: Session = Depends(get_db),
 ):
-    """Retorna o panorama e métricas emocionais de todas as pessoas em um determinado dia."""
+    """Retorna o panorama e métricas emocionais de todas as pessoas em um determinado dia ou agregados."""
     from src.memory.sentiment_timeline import sentiment_timeline_service
-    return sentiment_timeline_service.get_daily_snapshots(target_date=date, db=db)
+    return sentiment_timeline_service.get_daily_snapshots(target_date=date, days=days, db=db)
 
 
 @router.get("/sentiment/timeline", summary="Consulta série temporal de sentimentos de uma pessoa")

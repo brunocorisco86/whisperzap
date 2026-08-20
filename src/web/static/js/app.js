@@ -337,10 +337,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Sentiment Tab Listeners
   const sentimentDatePicker = document.getElementById('sentiment-date-picker');
+  const btnEratoViewAll = document.getElementById('btn-erato-view-all');
+  if (btnEratoViewAll) {
+    btnEratoViewAll.addEventListener('click', () => {
+      if (sentimentDatePicker) sentimentDatePicker.value = '';
+      btnEratoViewAll.className = 'btn btn-primary btn-sm';
+      loadDailySentiments('all');
+    });
+  }
+
   if (sentimentDatePicker) {
-    const todayStr = new Date().toISOString().split('T')[0];
-    sentimentDatePicker.value = todayStr;
     sentimentDatePicker.addEventListener('change', (e) => {
+      if (btnEratoViewAll) btnEratoViewAll.className = 'btn btn-secondary btn-sm';
       loadDailySentiments(e.target.value);
     });
   }
@@ -348,7 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnCollectSentiment = document.getElementById('btn-collect-today-sentiment');
   if (btnCollectSentiment) {
     btnCollectSentiment.addEventListener('click', async () => {
-      const selectedDate = sentimentDatePicker ? sentimentDatePicker.value : '';
+      const selectedDate = sentimentDatePicker && sentimentDatePicker.value ? sentimentDatePicker.value : '';
       await collectSentiments(selectedDate);
     });
   }
@@ -1968,35 +1976,56 @@ async function runHermesQuery() {
 }
 window.runHermesQuery = runHermesQuery;
 
-// --- Subsistema de Sentimentos & Série Temporal ---
+// --- Subsistema de Sentimentos & Série Temporal (Erato) ---
 
-async function loadDailySentiments(targetDate = '') {
+async function loadDailySentiments(targetDate = 'all') {
   const container = document.getElementById('sentiment-daily-container');
   const badge = document.getElementById('sentiment-day-badge');
   if (!container) return;
 
-  const dateParam = targetDate ? `?date=${targetDate}` : '';
-  if (badge) badge.textContent = targetDate || 'Hoje';
+  const isAll = !targetDate || targetDate === 'all' || targetDate === 'todos';
+  const url = isAll ? '/api/v1/memory/sentiment/daily?date=all&days=30' : `/api/v1/memory/sentiment/daily?date=${targetDate}`;
+  
+  if (badge) {
+    badge.textContent = isAll ? 'Últimos 30 Dias' : targetDate;
+  }
+
+  container.innerHTML = `
+    <div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: var(--text-muted);">
+      <p>⏳ Carregando termômetro e análise de sentimentos...</p>
+    </div>
+  `;
 
   try {
-    const res = await fetch(`/api/v1/memory/sentiment/daily${dateParam}`);
+    const res = await fetch(url);
     if (res.ok) {
       const snapshots = await res.json();
-      renderDailySentiments(snapshots, targetDate);
+      renderDailySentiments(snapshots, isAll ? 'all' : targetDate);
+    } else {
+      container.innerHTML = `
+        <div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 2.5rem; color: var(--text-muted);">
+          <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">Falha ao carregar dados de sentimentos.</p>
+        </div>
+      `;
     }
   } catch (err) {
     console.error('Erro ao carregar sentimentos diários:', err);
+    container.innerHTML = `
+      <div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 2.5rem; color: var(--text-muted);">
+        <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">Erro de conexão ao carregar Erato.</p>
+      </div>
+    `;
   }
 }
 
 async function collectSentiments(targetDate = '') {
   try {
-    const dateParam = targetDate ? `?date=${targetDate}` : '';
+    const dateParam = (targetDate && targetDate !== 'all') ? `?date=${targetDate}` : '';
     const res = await fetch(`/api/v1/memory/sentiment/collect${dateParam}`, { method: 'POST' });
     if (res.ok) {
       const data = await res.json();
       showToast(`Consolidação concluída! ${data.total_people} pessoa(s) e ${data.total_interactions} interação(ões).`);
-      loadDailySentiments(targetDate);
+      loadDailySentiments(targetDate || 'all');
       populateSentimentSpeakers();
     }
   } catch (err) {
@@ -2010,21 +2039,26 @@ function renderDailySentiments(snapshots, targetDate) {
   if (!container) return;
 
   if (!snapshots || snapshots.length === 0) {
+    const periodLabel = (targetDate === 'all' || !targetDate) ? 'os últimos 30 dias' : targetDate;
     container.innerHTML = `
       <div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 2.5rem; color: var(--text-muted);">
-        <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">Nenhuma interação registrada para ${targetDate || 'esta data'}</p>
-        <small>Clique em "Consolidar Sentimentos" ou envie mensagens de voz no WhatsApp para alimentar o termômetro.</small>
+        <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">Nenhuma interação registrada para ${periodLabel}</p>
+        <small>Clique em "Consolidar Hoje" ou envie mensagens de voz no WhatsApp para alimentar o termômetro.</small>
       </div>
     `;
     return;
   }
 
-  container.innerHTML = snapshots.map(s => {
+  // Ordenação OBRIGATÓRIA: Mais interações primeiro
+  const sorted = [...snapshots].sort((a, b) => (b.interactions_count || 0) - (a.interactions_count || 0));
+
+  container.innerHTML = sorted.map((s, idx) => {
     const sInfo = getSentimentInfo(s.dominant_sentiment);
     const badgeClass = getRoleBadgeClass(s.role);
     const roleLabel = getRoleLabel(s.role);
     const scoreFormatted = (s.avg_sentiment_score > 0 ? '+' : '') + s.avg_sentiment_score.toFixed(2);
     const initials = getInitials(s.speaker);
+    const medal = idx === 0 ? '🥇 ' : idx === 1 ? '🥈 ' : idx === 2 ? '🥉 ' : '';
 
     const highlightsHtml = (s.highlights || []).map(h => `
       <div style="font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 0.25rem 0.4rem; border-radius: 4px; margin-top: 0.2rem;">
@@ -2032,12 +2066,14 @@ function renderDailySentiments(snapshots, targetDate) {
       </div>
     `).join('');
 
+    const periodText = (targetDate === 'all' || !targetDate) ? 'nos últimos 30 dias' : 'nesta data';
+
     return `
       <div class="contact-card" style="cursor: pointer;" onclick="selectSpeakerForTimeline('${s.speaker}')">
         <div class="contact-header">
           <div class="contact-avatar">${initials}</div>
           <div class="contact-title-group">
-            <div class="contact-name">${s.speaker}</div>
+            <div class="contact-name">${medal}${s.speaker}</div>
             <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap; margin-top: 0.2rem;">
               <span class="badge ${badgeClass}">${roleLabel}</span>
               <span class="sentiment-badge ${sInfo.class}">
@@ -2049,7 +2085,7 @@ function renderDailySentiments(snapshots, targetDate) {
 
         <div class="contact-details" style="margin-top: 0.6rem;">
           <div style="font-size: 0.8rem; color: var(--text-main); font-weight: 500;">
-            📊 <b>${s.interactions_count}</b> interações hoje:
+            📊 <b>${s.interactions_count}</b> interações ${periodText}:
             <span style="color: #4ade80;">+${s.positive_count}</span> / 
             <span style="color: #94a3b8;">~${s.neutral_count}</span> / 
             <span style="color: #f87171;">-${s.negative_count}</span>
@@ -2075,24 +2111,19 @@ async function populateSentimentSpeakers() {
   if (!select) return;
 
   try {
-    const res = await fetch('/api/v1/contacts');
+    const res = await fetch('/api/v1/memory/sentiment/daily?date=all&days=30');
     if (res.ok) {
-      const contacts = await res.json();
-      const cutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
-      const activeContacts = contacts.filter(c => {
-        if (!c.last_interaction_at) return false;
-        return new Date(c.last_interaction_at).getTime() >= cutoff;
-      });
-
-      activeContacts.sort((a, b) => new Date(b.last_interaction_at).getTime() - new Date(a.last_interaction_at).getTime());
-
-      if (activeContacts.length === 0) {
+      const speakers = await res.json();
+      if (!speakers || speakers.length === 0) {
         select.innerHTML = '<option value="">Nenhuma pessoa com interação nos últimos 30 dias</option>';
         return;
       }
 
-      select.innerHTML = '<option value="">Selecione uma pessoa (contato nos últimos 30 dias)...</option>' +
-        activeContacts.map(c => `<option value="${c.name}">${c.name} (${c.role || 'Contato'})</option>`).join('');
+      // Ordena por interações decrescente
+      speakers.sort((a, b) => (b.interactions_count || 0) - (a.interactions_count || 0));
+
+      select.innerHTML = '<option value="">Selecione uma pessoa (ordenada por mais interações)...</option>' +
+        speakers.map(s => `<option value="${s.speaker}">${s.speaker} (${s.interactions_count} msgs • ${s.dominant_sentiment})</option>`).join('');
     }
   } catch (err) {
     console.error('Erro ao popular lista de pessoas para sentimentos:', err);
