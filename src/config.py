@@ -1,6 +1,6 @@
 """Módulo de Configuração com Pydantic Settings."""
 
-from typing import Literal
+from typing import Literal, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -60,9 +60,10 @@ class Settings(BaseSettings):
     # WhatsApp / Evolution API & n8n
     N8N_WEBHOOK_URL: str = "http://localhost:5678/webhook/voice-received"
     WHATSAPP_API_TOKEN: str = ""
-    EVOLUTION_API_URL: str = "http://100.106.3.81:8080"
+    EVOLUTION_API_URL: str = "http://100.74.64.89:8080"
     EVOLUTION_API_KEY: str = "8c114ae397eb273edfe82e05728be8b4e17cc25649d7e26df40c438c67c368b0"
     EVOLUTION_INSTANCE: str = "hermes"
+    EVOLUTION_PROXY_URL: Optional[str] = None
 
     # Usuário Proprietário / Identificação
     USER_PHONE_NUMBER: str = "554497604925"

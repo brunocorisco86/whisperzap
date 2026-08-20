@@ -185,10 +185,13 @@ async def get_contact_profile(phone: str, db: Session = Depends(get_db)):
         "Content-Type": "application/json",
     }
 
+    from src.contacts.service import get_evolution_working_proxy
+
     picture_url = None
     push_name = None
 
-    async with httpx.AsyncClient(timeout=8.0) as client:
+    proxy = await get_evolution_working_proxy()
+    async with httpx.AsyncClient(proxy=proxy, timeout=6.0) as client:
         # 1. Busca foto de perfil
         try:
             url_pic = f"{settings.EVOLUTION_API_URL.rstrip('/')}/chat/fetchProfilePictureUrl/{settings.EVOLUTION_INSTANCE}"

@@ -93,6 +93,45 @@ def record_to_response(
     )
 
 
+_cached_working_proxy: Optional[str] = None
+_proxy_checked: bool = False
+
+async def get_evolution_working_proxy() -> Optional[str]:
+    """Descobre e armazena em cache o proxy funcional para conexão com a Evolution API."""
+    global _cached_working_proxy, _proxy_checked
+    import httpx
+    from src.config import settings
+
+    if _proxy_checked:
+        return _cached_working_proxy
+
+    headers = {
+        "apikey": settings.EVOLUTION_API_KEY,
+        "Content-Type": "application/json",
+    }
+    candidates = []
+    if settings.EVOLUTION_PROXY_URL:
+        candidates.append(settings.EVOLUTION_PROXY_URL)
+    candidates.extend([None, "http://172.17.0.1:1055", "http://127.0.0.1:1055", "http://172.18.0.1:1055", "http://172.19.0.1:1055", "http://host.docker.internal:1055"])
+
+    test_url = f"{settings.EVOLUTION_API_URL.rstrip('/')}/instance/connectionState/{settings.EVOLUTION_INSTANCE}"
+
+    for proxy in candidates:
+        try:
+            async with httpx.AsyncClient(proxy=proxy, timeout=2.0) as client:
+                res = await client.get(test_url, headers=headers)
+                if res.status_code in (200, 201, 401, 403, 404):
+                    _cached_working_proxy = proxy
+                    _proxy_checked = True
+                    return proxy
+        except Exception:
+            continue
+
+    _proxy_checked = True
+    _cached_working_proxy = None
+    return None
+
+
 class ContactService:
     """Serviço unificado de gestão de contatos e motor de priorização."""
 
@@ -920,6 +959,7 @@ class ContactService:
 
     async def sync_all_avatars_from_evolution(self, force_all: bool = False, db: Session | None = None) -> Dict[str, Any]:
         """Varre os contatos e sincroniza fotos de perfil (profilePicUrl) e pushName via Evolution API."""
+        import asyncio
         import httpx
         from src.config import settings
 
@@ -949,20 +989,19 @@ class ContactService:
                     "details": logs,
                 }
 
+            proxy = await get_evolution_working_proxy()
             headers = {
                 "apikey": settings.EVOLUTION_API_KEY,
                 "Content-Type": "application/json",
             }
 
-            updated_pics = 0
-            updated_names = 0
-            failed = 0
-
-            async with httpx.AsyncClient(timeout=2.5) as client:
-                # Teste rápido de conectividade com a Evolution API
+            # Valida conectividade com a instância
+            test_url = f"{settings.EVOLUTION_API_URL.rstrip('/')}/instance/connectionState/{settings.EVOLUTION_INSTANCE}"
+            async with httpx.AsyncClient(proxy=proxy, timeout=3.0) as check_client:
                 try:
-                    test_url = f"{settings.EVOLUTION_API_URL.rstrip('/')}/instance/connectionState/{settings.EVOLUTION_INSTANCE}"
-                    await client.get(test_url, headers=headers)
+                    res_state = await check_client.get(test_url, headers=headers)
+                    if res_state.status_code != 200:
+                        logs.append(f"⚠️ Instância '{settings.EVOLUTION_INSTANCE}' retornou status {res_state.status_code}.")
                 except Exception as ce:
                     logs.append(f"⚠️ Evolution API indisponível no momento ({settings.EVOLUTION_API_URL}): {ce}")
                     return {
@@ -973,16 +1012,23 @@ class ContactService:
                         "details": logs,
                     }
 
-                for idx, c in enumerate(contacts, 1):
-                    digits = re.sub(r"\D", "", c.phone_number or "")
-                    if len(digits) in (10, 11) and not digits.startswith("55"):
-                        digits = f"55{digits}"
-                    if not digits or len(digits) < 10:
-                        continue
+            updated_pics = 0
+            updated_names = 0
+            failed = 0
 
-                    pic_url = None
-                    push_name = None
+            sem = asyncio.Semaphore(15)
 
+            async def process_contact(c: ContactRecord, client: httpx.AsyncClient) -> tuple[Optional[str], Optional[str]]:
+                digits = re.sub(r"\D", "", c.phone_number or "")
+                if len(digits) in (10, 11) and not digits.startswith("55"):
+                    digits = f"55{digits}"
+                if not digits or len(digits) < 10:
+                    return None, None
+
+                pic_url = None
+                push_name = None
+
+                async with sem:
                     # 1. Foto de perfil
                     try:
                         url_pic = f"{settings.EVOLUTION_API_URL.rstrip('/')}/chat/fetchProfilePictureUrl/{settings.EVOLUTION_INSTANCE}"
@@ -991,7 +1037,7 @@ class ContactService:
                             data_pic = res_pic.json()
                             pic_url = data_pic.get("profilePictureUrl") or data_pic.get("url")
                     except Exception:
-                        failed += 1
+                        pass
 
                     # 2. PushName
                     try:
@@ -1006,23 +1052,34 @@ class ContactService:
                     except Exception:
                         pass
 
-                    changed = False
-                    if pic_url and pic_url != c.avatar_url:
-                        c.avatar_url = pic_url
-                        updated_pics += 1
-                        changed = True
-                    if push_name and (c.name.isdigit() or c.name.startswith("55") or c.name.startswith("wa_") or not c.nickname):
-                        if not c.nickname:
-                            c.nickname = push_name
-                        changed = True
-                        updated_names += 1
+                return pic_url, push_name
 
-                    if changed:
-                        c.updated_at = datetime.now(timezone.utc)
-                        logs.append(f"[{idx}/{len(contacts)}] 📸 {c.name} ({digits}): avatar/nome atualizado.")
+            async with httpx.AsyncClient(proxy=proxy, timeout=6.0) as client:
+                tasks = [process_contact(c, client) for c in contacts]
+                results = await asyncio.gather(*tasks, return_exceptions=True)
 
-                db.commit()
+            for idx, (c, res) in enumerate(zip(contacts, results), 1):
+                if isinstance(res, Exception):
+                    failed += 1
+                    continue
+                pic_url, push_name = res
+                changed = False
+                if pic_url and pic_url != c.avatar_url:
+                    c.avatar_url = pic_url
+                    updated_pics += 1
+                    changed = True
+                if push_name and (c.name.isdigit() or c.name.startswith("55") or c.name.startswith("wa_") or not c.nickname):
+                    if not c.nickname:
+                        c.nickname = push_name
+                    changed = True
+                    updated_names += 1
 
+                if changed:
+                    c.updated_at = datetime.now(timezone.utc)
+                    if updated_pics <= 30 or updated_pics % 50 == 0:
+                        logs.append(f"[{idx}/{len(contacts)}] 📸 {c.name}: avatar/nome atualizado.")
+
+            db.commit()
             logs.append(f"🎉 Concluído: {updated_pics} fotos sincronizadas, {updated_names} nomes atualizados.")
             return {
                 "total_checked": len(contacts),
@@ -1031,6 +1088,7 @@ class ContactService:
                 "failed_count": failed,
                 "details": logs,
             }
+
         except Exception as e:
             logger.error(f"Erro ao sincronizar avatares da Evolution API: {e}")
             logs.append(f"❌ Erro ao conectar na Evolution API: {e}")
