@@ -19,9 +19,12 @@
   <!-- Auth Overlay (Proteção com Senha WhisperZap) -->
   <div id="auth-overlay" class="auth-overlay" style="display: none;">
     <div class="auth-card">
-      <div class="auth-badge-icon">🔒</div>
-      <h2 class="auth-title">Acesso Restrito</h2>
-      <p class="auth-subtitle">Digite a senha para acessar o painel de controle executivo.</p>
+      <div class="auth-image-frame">
+        <img src="/static/images/mnemosine.jpg" alt="Mnemosine — Titã da Memória" class="auth-mnemosine-img">
+      </div>
+      <h2 class="auth-title">MNEMOSINE</h2>
+      <div class="auth-greek-tagline">“Never Forget”</div>
+      <p class="auth-subtitle">Digite a senha mestra para acessar a inteligência e memória.</p>
       <form id="auth-form" onsubmit="event.preventDefault(); window.handleAuthLogin();">
         <div class="auth-input-wrapper">
           <input type="password" id="auth-password-input" class="auth-input" placeholder="Digite sua senha..." autocomplete="current-password" autofocus>
