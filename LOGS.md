@@ -307,14 +307,51 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
      - **127 testes automatizados executados e aprovados com 100% de sucesso**.
   6. **Deploy em Produção na VPS Hostinger**:
      - Sincronização via Git na VPS (`/root/projetos/whisperzap`), injeção de segredos no `.env` e reinicialização com health check aprovado.
-     - Sincronização do Grafo de Conhecimento com Graphify (1650 nós, 2817 arestas, 124 comunidades).
+     - Sincronização do Grafo de Conhecimento com Graphify.
 - **Resultado**: Sistema 100% operacional, seguro, veloz e pronto para uso em produção.
 
+---
 
+### ADR 010 — Resiliência de Áudios Grandes, Fallback Gracioso e Pós-Processamento Executivo
+- **Data**: 2026-08-20
+- **Status**: Aprovado
+- **Contexto**: Áudios extensos geravam a percepção de falta de transcrição no WhatsApp. A investigação nos logs e no SQLite do n8n revelou que o Whisper transcrevia perfeitamente, mas o endpoint `/ai/revise` estourava HTTP `502 Bad Gateway` em oscilações/timeouts de 30s da API externa, cancelando a entrega do n8n. Além disso, áudios longos enviados como documentos não eram reconhecidos no fluxo.
+- **Decisão**:
+  1. Implementar **Fallback Gracioso no `POST /ai/revise`**: em caso de qualquer exceção ou timeout da LLM, retornar `200 OK` com o texto bruto transcrito (`is_fallback=True`), garantindo que o WhatsApp sempre receba a transcrição.
+  2. Implementar **Pós-Processamento Inteligente de Conversas Extensas**: mensagens com mais de 350 caracteres recebem formatação estruturada com seção de *Destaques do Áudio* (*Key Points*) e *Ações*.
+  3. Expandir o nó `É Mensagem de Áudio?` no n8n para reconhecer áudios encapsulados em `documentMessage`.
+  4. Configurar tolerância a falhas (`continueOnFail: true`) e timeout de 300s nos nós de integração do n8n.
+  5. Aumentar o timeout do cliente HTTP do Gemini para 60s e normalizar o campo `decisions` no Extractor Semântico.
 
+---
 
+## 📅 Log de Sessão — 20 de Agosto de 2026 (Sessão Diurna)
 
-
+- **Objetivo**: Diagnóstico aprofundado e resolução definitiva de falhas na entrega de transcrições de áudios grandes no WhatsApp, implementação de fallback de IA, suporte a áudios recebidos como documentos no n8n e pós-processamento executivo com destaques de áudios longos.
+- **Ações Realizadas**:
+  1. **Auditoria Forense de Execuções**:
+     - Conexão e inspeção no banco SQLite do n8n no servidor `ssh peixe` (1.884 execuções analisadas).
+     - Identificação de falhas no nó `AI Gateway (POST /ai/revise)` causadas por erro 502 em áudios longos, bloqueando o envio no WhatsApp.
+  2. **Implementação de Resiliência no Backend FastAPI**:
+     - Atualização de `src/ai_gateway/router.py` para capturar exceções da LLM e retornar `200 OK` com `text_revised` bruto e flag `is_fallback = True`.
+     - Atualização de `src/ai_gateway/prompts.py` para gerar destaques executivos em tópicos para mensagens extensas.
+     - Atualização de `src/ai_gateway/schemas.py` com campos `is_fallback` e `enable_highlights`.
+     - Normalização de `decisions`, `ideas` e `topics` em `src/ai_gateway/extractor.py`.
+     - Elevação de timeout para 60s em `src/ai_gateway/providers/gemini.py`.
+  3. **Atualização dos Workflows no n8n**:
+     - Ajuste do nó de detecção de áudio para suportar `documentMessage` com mimetype `audio/*`.
+     - Inclusão de `continueOnFail: true` no nó `/ai/revise` e timeout de 300s.
+     - Sincronização direta no SQLite do n8n no host `peixe` e reinicialização dos containers.
+  4. **Bateria de Testes Automatizados**:
+     - Criação do arquivo de teste `tests/test_long_audio_resilience.py`.
+     - Instalação e validação do modelo spaCy `pt_core_news_sm-3.8.0`.
+     - Execução da suíte de testes com 100% de aprovação.
+  5. **Deploy e Sincronização**:
+     - Push no repositório remoto Git.
+     - `git pull` e restart do container `hermes-api` na VPS Hostinger (`ssh hostinger`).
+     - Sincronização do workflow e restart dos containers `hermes-evolution-api` e `hermes-n8n` no servidor `peixe`.
+     - Atualização do Grafo de Conhecimento com Graphify (`graphify update .`).
+- **Resultado**: Resiliência máxima em áudios de qualquer tamanho, pós-processamento executivo ativo e n8n 100% online e operacional.
 
 
 

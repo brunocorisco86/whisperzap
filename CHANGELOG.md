@@ -4,6 +4,24 @@ Todas as mudanças notáveis, refatorações arquiteturais, motores de IA e otim
 
 ---
 
+## [v2.6.0] — 2026-08-20 — Release: Long Audio Resilience & Executive Post-Processing
+
+### 🎙️ 1. Resiliência de Áudios Longos & Fallback Gracioso (Zero 502)
+- **Fallback Gracioso no AI Gateway (`POST /ai/revise`)**: Qualquer falha, oscilação ou timeout na API externa de LLM agora retorna status `200 OK` com o texto bruto transcrito pelo Whisper e `is_fallback = True`, garantindo que o WhatsApp **nunca** fique sem resposta.
+- **Detecção de Áudio em Documentos no n8n**: O nó `É Mensagem de Áudio?` foi aprimorado para reconhecer áudios encaminhados ou gravados por aplicativos externos transmitidos como `documentMessage` com mimetype de áudio.
+- **Tolerância a Falhas nos Workflows**: Configuração de `continueOnFail: true` e timeout estendido de 300s nos nós de transcrição e IA do n8n.
+
+### 📋 2. Pós-Processamento Inteligente de Conversas Extensas
+- **Destaques Executivos (*Key Points* e Ações)**: Mensagens extensas (> 350 caracteres ou > 45s) recebem automaticamente, além da transcrição revisada limpa, uma seção de **Destaques do Áudio** e **Ações Identificadas** para leitura dinâmica no WhatsApp.
+- **Prompt Especializado**: Inclusão de regras de estruturação em tópicos preservando termos técnicos zootécnicos e nomes operacionais.
+
+### ⚙️ 3. Otimização de Infraestrutura e Schemas
+- **Aumento de Timeout HTTP**: Cliente assíncrono do Gemini configurado com timeout de 60s.
+- **Normalização de Decisões no Extractor Semântico**: Conversão automática de objetos heterogêneos (`dict`) retornados pela LLM em `list[str]`, eliminando erros de validação Pydantic.
+- **Ajuste de Heap Node.js na Evolution API**: Memória alocada ajustada para 380MB no ambiente Alpine (`peixe`).
+
+---
+
 ## [v2.5.0] — 2026-08-19 / 2026-08-20 — Release: Mnemosine Auth, Calíope Filters & Ultra-Minimalist Latency
 
 ### 🔒 1. Autenticação & Proteção do Dashboard

@@ -54,7 +54,7 @@ services:
       CACHE_REDIS_URI: redis://evolution-redis:6379
       LOG_LEVEL: ERROR,WARN,INFO
       CONFIG_SESSION_PHONE_CLIENT: "Hermes Voice Memory"
-      NODE_OPTIONS: "--max-old-space-size=256"
+      NODE_OPTIONS: "--max-old-space-size=380"
     depends_on:
       - evolution-postgres
       - evolution-redis

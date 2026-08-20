@@ -66,6 +66,8 @@ O Hermes é a solução corporativa definitiva:
 - ⭐ **Sistema de Favoritos Ponderados**: Contatos marcados como favoritos ganham **+10% de peso de prioridade** imediata no motor de relevância.
 - 🕸️ **Knowledge Graph em Tempo Real (NetworkX + Graphify)**: Modela quem fala com quem, projetos cruzados e conexões ocultas entre fazendas, cooperativas e departamentos.
 - 🧹 **Agente Zeladora (`GraphJanitor`)**: Faxina autônoma semanal que remove ruídos temporais e funde aliases automaticamente.
+- 🎙️ **Resiliência Extrema em Áudios Longos & Zero 502**: Fallback gracioso automático no AI Gateway (`POST /ai/revise`). Se o provedor de IA oscilar ou demorar, o WhatsApp recebe instantaneamente a transcrição pura do Whisper sem travar a pipeline.
+- 📌 **Pós-Processamento Executivo de Áudios Extensos**: Áudios com mais de 350 caracteres recebem automaticamente formatação em tópicos acompanhada de uma síntese de **Destaques do Áudio** e **Ações Identificadas**, acelerando a tomada de decisão no WhatsApp.
 - 🔒 **Privacidade & Soberania de Dados**: Deploy em infraestrutura híbrida privada (Homelab no Raspberry Pi + VPS dedicada).
 
 ---
