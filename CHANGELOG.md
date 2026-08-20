@@ -4,6 +4,25 @@ Todas as mudanças notáveis, refatorações arquiteturais, motores de IA e otim
 
 ---
 
+## [v2.5.0] — 2026-08-19 / 2026-08-20 — Release: Mnemosine Auth, Calíope Filters & Ultra-Minimalist Latency
+
+### 🔒 1. Autenticação & Proteção do Dashboard
+- **Sessão Persistente (30 dias)**: Token HMAC e cookie `HttpOnly` com persistência no `localStorage`, imune a recarregamentos de página (F5).
+- **Interface Mnemosine "Never Forget"**: Modal temático com a imagem clássica de Mnemosine, tipografia *Cinzel* e botão de encerramento rápido de sessão.
+- **Configuração Simples**: Senha gerenciável via `.env` (`DASHBOARD_PASSWORD=blurbang`).
+
+### 🎙️ 2. Filtros de Mídia e Prosódia em Calíope
+- **Filtro de Origem**: Segmentação instantânea entre notas de voz (`🎙️ Áudios`) e mensagens de texto diretas (`💬 Textos`).
+- **Filtro de Prosódia Acústica**: Seletores de tom de voz (⚡ *Acelerado & Tenso*, 🚀 *Enérgico*, 🌿 *Calmo*, 🤔 *Hesitante*, 💬 *Neutro*).
+- **Badges de Identificação**: Cards de mensagens enriquecidos com badges de mídia e métricas de fala ativa.
+
+### ⚡ 3. Resposta Ultra-Minimalista & Latência Otimizada
+- **Remoção de Personas de Bots**: WhatsApp devolve exclusivamente o texto revisado limpo e pontuado, eliminando títulos lúdicos (*James/Calíope*).
+- **Greedy Decoding no Gemini (`temperature=0.0`)**: Maior velocidade de resposta, zero alucinações e zero custo adicional de tokens.
+- **Comunicação Direta Docker**: Tráfego de áudio otimizado na rede interna do homelab (`hermes_homelab_network`).
+
+---
+
 ## [v2.4.0] — 2026-08-17 / 2026-08-18 — Release: Neural Intelligence, GraphRAG & Token Economy
 
 ### 🎙️ 1. Speech-to-Text & Whisper Priming

@@ -264,36 +264,51 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
   2. Calibrar a fórmula de sentimento dominante: mensagens neutras formam o volume base operacional, enquanto mensagens positivas e de atrito definem a polaridade real ($pos > neg$ e score $\ge +0.08$ ➔ `POSITIVE`).
   3. Implementar filtro dinâmico por sentimento no frontend de Erato.
 
+### ADR 019 — Autenticação com Sessão Persistente e Proteção do Dashboard Web
+- **Data**: 2026-08-19
+- **Status**: Aprovado
+- **Contexto**: A interface web corporativa do WhisperZap/Mnemosine precisava de proteção de acesso por senha simples configurada via `.env`, sem exigir que o usuário digite a senha a cada F5 ou recarregamento de página.
+- **Decisão**:
+  1. Implementar endpoints dedicados `/api/auth/login`, `/api/auth/check` e `/api/auth/logout` em `src/web/router.py`.
+  2. Emitir tokens HMAC-SHA256 seguros e armazenar simultaneamente no `localStorage` e em cookie `HttpOnly` com validade de 30 dias.
+  3. Criar modal de login moderno com a imagem clássica de Mnemosine, tipografia greco-romana *Cinzel* e o lema *"Never Forget"*.
+  4. Manter as rotas de automação do n8n, webhooks e Speech-to-Text desimpedidas para garantir funcionamento ininterrupto do WhatsApp.
+
+### ADR 020 — Resposta Ultra-Minimalista no WhatsApp e Latência Otimizada com Greedy Decoding
+- **Data**: 2026-08-19
+- **Status**: Aprovado
+- **Contexto**: Eliminar ruídos lúdicos/personas de bots (*James*, *Calíope*, *Melpômene*) nas mensagens devolvidas pelo WhatsApp e reduzir a latência de round-trip mantendo a qualidade da revisão gramatical.
+- **Decisão**:
+  1. Padronizar os fluxos n8n (`n8n_whatsapp_master_orchestrator.json` e `n8n_whatsapp_voice_transcription.json`) para responder exclusivamente o texto limpo revisado sem cabeçalhos.
+  2. Ajustar `temperature = 0.0` (greedy decoding determinístico) no provedor do Gemini (`src/ai_gateway/providers/gemini.py`), eliminando tempo de amostragem probabilística da IA com zero custo adicional de tokens e zero alucinações.
+  3. Aproveitar a rede interna Docker (`hermes_homelab_network`) no Raspberry Pi para transferência local de mídia entre Evolution API e n8n.
+
 ---
 
-## 📅 Log de Sessão — 19/20 de Agosto de 2026
+## 📅 Log de Sessão — 19/20 de Agosto de 2026 (Sessão Noturna)
 
-- **Objetivo**: Rebranding Mnemosine & 9 Musas, Otimização de Performance e Paginação, Upgrade Semântico do WordMap com spaCy, Ativação do Subsistema de Sentimentos (Zero-Cost), Motor de Prosódia Acústica Ultra-Leve, Isolamento e Calibração de Erato, e Sincronização em Produção.
+- **Objetivo**: Implementação de Filtros de Prosódia & Origem em Calíope, Remoção de Personas Lúdicas por Resposta Ultra-Minimalista no WhatsApp, Otimização de Latência com `temperature=0.0`, Autenticação com Sessão Persistente (30 dias) e Deploy em Produção na VPS Hostinger.
 - **Ações Realizadas**:
-  1. **Rebranding Mitológico Mnemosine & 9 Musas**:
-     - Atualização de toda a interface web, abas, lore mitológico (`#tab-lore`), cards de lore e terminologia visual no Control Hub.
-  2. **Performance & Paginação Inteligente**:
-     - Limite padrão e paginação de cards em Clio (20 contatos), Terpsícore (10 tarefas com filtro PENDING padrão), Calíope (10 mensagens com botões Avançar/Voltar) e Polímnia (50 termos com paginação e botão de edição rápida).
-  3. **WordMap Semântico & spaCy NLP (Tália)**:
-     - Integração do modelo spaCy (`pt_core_news_sm`) para extração de sintagmas nominais compostos (*sensor de temperatura*, *fila de espera*, *entrega de ração*).
-     - Filtro inteligente de stopwords técnicas e lixo de XML/DrawIO.
-     - 9 pilares estratégicos de filtragem e modal de ação para consultas rápidas em Melpômene (RAG).
-  4. **Ativação do Subsistema de Sentimentos (Zero-Cost)**:
-     - Persistência garantida do sentimento entregue pela chamada única do Gemini.
-     - Script offline de cura e backfill histórico para todas as 644 mensagens no PostgreSQL.
-  5. **Motor de Prosódia Acústica Ultra-Leve (Pure NumPy & VAD)**:
-     - Criação de `src/transcriber/prosody_analyzer.py` rodando em $< 1.5\text{ms}$ no Alpine Linux.
-     - Extração de palavras por segundo ativo, taxa de pausas e selos de tom de voz (`🌿 Calmo & Equilibrado`, `⚡ Acelerado & Tenso`) integrados nos cards de Calíope.
-  6. **Isolamento de Contatos & Calibração de Erato**:
-     - Correção do bug de substring no card do Ari Patel.
-     - Visualização agregada dos últimos 30 dias por padrão.
-     - Ordenação rigorosa dos cards por volume de interações decrescente.
-     - Calibração matemática da matriz emocional e filtro dinâmico por sentimento.
-  7. **Auditoria & Deploy em Produção**:
-     - **13 Testes Automatizados Aprovados com 100% de Sucesso** (`pytest`).
-     - Atualização do Grafo de Conhecimento com **1300 nós**, **2422 arestas** e **106 comunidades**.
-     - Deploy final validado na VPS Hostinger (`179.197.73.80:8005`).
-- **Resultado**: Todas as metas concluídas com excelência e total estabilidade.
+  1. **Filtros de Origem e Prosódia em Calíope**:
+     - Criação dos seletores `msg-filter-origin` (🎙️ Áudio vs 💬 Texto) e `msg-filter-prosody` (⚡ Tenso, 🚀 Enérgico, 🌿 Calmo, 🤔 Hesitante, 💬 Neutro) em `index.html`.
+     - Lógica reativa com badges de mídia e prosódia em `app.js`.
+  2. **Formato Ultra-Minimalista no WhatsApp (n8n)**:
+     - Atualização dos arquivos `.json` de workflow eliminando mensagens de bots/mordomos (*James/Calíope*) e entregando apenas o texto puro pontuado.
+  3. **Otimização de Latência no Gemini**:
+     - Configuração de `temperature=0.0` no `src/ai_gateway/providers/gemini.py` e `/ai/revise`.
+     - Análise e confirmação de custo zero adicional de tokens.
+  4. **Autenticação do Dashboard & Tela Mnemosine "Never Forget"**:
+     - Configuração de `DASHBOARD_PASSWORD=blurbang` e `DASHBOARD_AUTH_ENABLED=true` com persistência em `.env` (ignorado no git).
+     - Implementação de sessão persistente (30 dias) no `localStorage` e cookies `HttpOnly`, imune a F5.
+     - Overlay de autenticação temático com a imagem de Mnemosine (`/static/images/mnemosine.jpg`), tipografia clássica *Cinzel* e tagline *"Never Forget"*.
+     - Botão de logout rápido na navbar.
+  5. **Bateria de Testes Automatizados**:
+     - Criação de `tests/test_dashboard_auth.py`.
+     - **127 testes automatizados executados e aprovados com 100% de sucesso**.
+  6. **Deploy em Produção na VPS Hostinger**:
+     - Sincronização via Git na VPS (`/root/projetos/whisperzap`), injeção de segredos no `.env` e reinicialização com health check aprovado.
+     - Sincronização do Grafo de Conhecimento com Graphify (1650 nós, 2817 arestas, 124 comunidades).
+- **Resultado**: Sistema 100% operacional, seguro, veloz e pronto para uso em produção.
 
 
 
