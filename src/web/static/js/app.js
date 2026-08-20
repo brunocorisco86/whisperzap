@@ -65,7 +65,9 @@ function showToast(message, isError = false) {
   setTimeout(() => toast.classList.remove('show'), 3500);
 }
 
-// Tabs
+// Tabs & State Persistence
+const ACTIVE_MUSA_STORAGE_KEY = 'hermes_active_musa';
+
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -75,6 +77,13 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     const targetId = btn.dataset.tab;
     const targetContent = document.getElementById(targetId);
     if (targetContent) targetContent.classList.add('active');
+
+    try {
+      localStorage.setItem(ACTIVE_MUSA_STORAGE_KEY, targetId);
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', '#' + targetId);
+      }
+    } catch (e) {}
 
     if (targetId === 'tab-graph') {
       setTimeout(renderInteractiveGraph, 100);
@@ -87,15 +96,24 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     } else if (targetId === 'tab-sentiment') {
       loadDailySentiments();
       populateSentimentSpeakers();
+    } else if (targetId === 'tab-contacts') {
+      loadContacts();
     }
   });
 });
 
 function activateTab(tabId) {
-  const btn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+  if (!tabId) return;
+  const cleanId = tabId.replace('#', '');
+  const btn = document.querySelector(`.tab-btn[data-tab="${cleanId}"]`);
   if (btn) btn.click();
 }
 window.activateTab = activateTab;
+
+window.addEventListener('hashchange', () => {
+  const targetId = window.location.hash.replace('#', '');
+  if (targetId) activateTab(targetId);
+});
 
 // --- Authentication Management (WhisperZap Session & Token) ---
 const AUTH_TOKEN_KEY = 'whisperzap_auth_token';
@@ -217,6 +235,11 @@ window.checkAuthStatus = checkAuthStatus;
 document.addEventListener('DOMContentLoaded', async () => {
   const isAuthenticated = await checkAuthStatus();
   if (isAuthenticated) {
+    // Restaura imediatamente a musa ativa anterior (via URL hash ou localStorage)
+    const savedMusa = window.location.hash.replace('#', '') || localStorage.getItem(ACTIVE_MUSA_STORAGE_KEY) || 'tab-contacts';
+    if (savedMusa && savedMusa !== 'tab-contacts') {
+      activateTab(savedMusa);
+    }
     loadStats();
     loadContacts();
     loadDictionary();
@@ -598,15 +621,29 @@ async function loadStats() {
   }
 }
 
-async function loadContacts() {
+async function loadContacts(forceReload = false) {
   try {
+    // 1. Render instantâneo do cache de sessão (0ms de latência percebida)
+    const cached = sessionStorage.getItem('hermes_cached_contacts');
+    if (cached && (!allContacts || allContacts.length === 0 || !forceReload)) {
+      try {
+        allContacts = JSON.parse(cached);
+        if (countContactsEl) countContactsEl.textContent = allContacts.length;
+        renderContacts();
+      } catch (e) {}
+    }
+
+    // 2. Busca dados atualizados da API em background
     const res = await fetch('/api/v1/contacts');
     if (res.ok) {
       allContacts = await res.json();
+      try {
+        sessionStorage.setItem('hermes_cached_contacts', JSON.stringify(allContacts));
+      } catch (e) {}
     }
     
     // Fallback se SQL vazio
-    if (allContacts.length === 0) {
+    if (!allContacts || allContacts.length === 0) {
       const graphRes = await fetch('/api/v1/memory/graph/nodes?category=PERSON');
       if (graphRes.ok) {
         const graphNodes = await graphRes.json();
@@ -623,7 +660,7 @@ async function loadContacts() {
       }
     }
 
-    countContactsEl.textContent = allContacts.length;
+    if (countContactsEl) countContactsEl.textContent = allContacts.length;
     renderContacts();
   } catch (err) {
     console.error('Erro ao carregar contatos:', err);

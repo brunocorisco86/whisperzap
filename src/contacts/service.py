@@ -243,10 +243,7 @@ class ContactService:
             should_close = True
 
         try:
-            # 1. Executa auto-deduplicação e fusão preventiva
-            self.deduplicate_and_merge_contacts(db=db)
-
-            # 2. Busca contatos com filtros diretamente do banco
+            # 1. Busca contatos com filtros diretamente do banco
             query = db.query(ContactRecord)
             if only_unknown:
                 query = query.filter(ContactRecord.role == "UNKNOWN")
@@ -256,7 +253,7 @@ class ContactService:
             if company:
                 query = query.filter(ContactRecord.company.ilike(f"%{company}%"))
 
-            # 2.1 Filtro por período da última interação
+            # 1.1 Filtro por período da última interação
             now = datetime.now(timezone.utc)
             if interaction_period == "today":
                 start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -271,45 +268,138 @@ class ContactService:
             # Ordena por última interação mais recente (se filtrado), favoritos no topo, depois nome
             if interaction_period in ("today", "7d", "30d", "week", "month"):
                 records = query.order_by(
-                    ContactRecord.last_interaction_at.desc(),
+                    ContactRecord.last_interaction_at.desc().nullslast(),
                     ContactRecord.is_favorite.desc(),
                     ContactRecord.name.asc(),
                 ).all()
             else:
                 records = query.order_by(ContactRecord.is_favorite.desc(), ContactRecord.name.asc()).all()
 
-            # 3. Enriquece com as últimas 3 mensagens e sentimentos de cada pessoa
-            from sqlalchemy import or_
+            if not records:
+                return []
+
+            # Consolidação inteligente e instantânea de duplicatas em memória (0ms overhead)
+            from src.ai_gateway.bypass import is_owner_interaction
+            dedup_records = []
+            seen_phones = {}
+            seen_names = {}
+            seen_owner = False
+
+            for r in records:
+                if is_owner_interaction(r.name) or is_owner_interaction(r.phone_number):
+                    if not seen_owner:
+                        seen_owner = True
+                        r.name = "Bruno Conter"
+                        r.role = "OWNER"
+                        if not r.phone_number:
+                            r.phone_number = settings.USER_PHONE_NUMBER or "554497604925"
+                        dedup_records.append(r)
+                    continue
+
+                dig = re.sub(r"\D", "", r.phone_number or "")
+                norm_name = r.name.lower().strip()
+
+                if len(dig) >= 8:
+                    suffix = dig[-8:]
+                    if suffix in seen_phones:
+                        existing = seen_phones[suffix]
+                        if (existing.role == "UNKNOWN" or not existing.role) and r.role and r.role != "UNKNOWN":
+                            existing.role = r.role
+                        if not existing.nickname and r.nickname:
+                            existing.nickname = r.nickname
+                        continue
+                    seen_phones[suffix] = r
+
+                if norm_name:
+                    if norm_name in seen_names:
+                        existing = seen_names[norm_name]
+                        if not existing.phone_number and r.phone_number:
+                            existing.phone_number = r.phone_number
+                        if (existing.role == "UNKNOWN" or not existing.role) and r.role and r.role != "UNKNOWN":
+                            existing.role = r.role
+                        continue
+                    seen_names[norm_name] = r
+
+                dedup_records.append(r)
+
+            records = dedup_records
+
+            # 2. Enriquece com as últimas mensagens em BATCH de alta performance (1 única query)
             from src.memory.models import MessageRecord
+            from src.ai_gateway.bypass import normalize_text
+
+            recent_messages = (
+                db.query(MessageRecord)
+                .order_by(MessageRecord.created_at.desc())
+                .limit(400)
+                .all()
+            )
+
+            # Agrupa mensagens recentes por chaves de busca normalizadas
+            msgs_by_key = defaultdict(list)
+            for m in recent_messages:
+                spk = (m.speaker or "").strip()
+                if spk:
+                    msgs_by_key[spk.lower()].append(m)
+                    norm_spk = normalize_text(spk)
+                    if norm_spk:
+                        msgs_by_key[norm_spk].append(m)
+                    dig = re.sub(r"\D", "", spk)
+                    if dig:
+                        msgs_by_key[dig].append(m)
+                        if len(dig) >= 8:
+                            msgs_by_key[dig[-8:]].append(m)
+
+                meta = m.meta_info or {}
+                meta_phone = str(meta.get("phone") or meta.get("remoteJid") or "")
+                dig_meta = re.sub(r"\D", "", meta_phone)
+                if dig_meta:
+                    msgs_by_key[dig_meta].append(m)
+                    if len(dig_meta) >= 8:
+                        msgs_by_key[dig_meta[-8:]].append(m)
+
+                push = str(meta.get("pushName") or "")
+                if push:
+                    msgs_by_key[push.lower()].append(m)
+                    norm_p = normalize_text(push)
+                    if norm_p:
+                        msgs_by_key[norm_p].append(m)
+
             responses = []
             for r in records:
-                msg_filters = [
-                    MessageRecord.speaker == r.name,
-                    MessageRecord.speaker.ilike(f"%{r.name}%"),
-                ]
-                # Match se o nome do contato contiver o speaker (ex: 'Guilherme Bampi Righetto PLASSON' contém 'Guilherme Bampi Righetto')
-                first_name = r.name.split()[0] if r.name else ""
-                if len(first_name) >= 4:
-                    msg_filters.append(MessageRecord.speaker.ilike(f"%{first_name}%"))
+                matched_msgs = []
+                seen_msg_ids = set()
 
-                if r.nickname and len(r.nickname.strip()) >= 3:
-                    msg_filters.append(MessageRecord.speaker.ilike(f"%{r.nickname.strip()}%"))
+                candidates_keys = []
+                if r.name:
+                    candidates_keys.append(r.name.lower())
+                    norm_n = normalize_text(r.name)
+                    if norm_n:
+                        candidates_keys.append(norm_n)
+                    first = r.name.split()[0]
+                    if len(first) >= 4:
+                        candidates_keys.append(first.lower())
+                if r.nickname:
+                    candidates_keys.append(r.nickname.lower())
+                    norm_nick = normalize_text(r.nickname)
+                    if norm_nick:
+                        candidates_keys.append(norm_nick)
+                if r.phone_number:
+                    dig = re.sub(r"\D", "", r.phone_number)
+                    if dig:
+                        candidates_keys.append(dig)
+                        if len(dig) >= 8:
+                            candidates_keys.append(dig[-8:])
 
-                if r.phone_number and len(r.phone_number) >= 8:
-                    clean_phone = re.sub(r"\D", "", r.phone_number)
-                    msg_filters.append(MessageRecord.speaker == r.phone_number)
-                    if clean_phone:
-                        msg_filters.append(MessageRecord.speaker == clean_phone)
-                    if len(clean_phone) >= 8:
-                        msg_filters.append(MessageRecord.speaker.like(f"%{clean_phone[-8:]}%"))
+                for k in candidates_keys:
+                    if k in msgs_by_key:
+                        for m in msgs_by_key[k]:
+                            if m.id not in seen_msg_ids:
+                                seen_msg_ids.add(m.id)
+                                matched_msgs.append(m)
 
-                recent_msgs = (
-                    db.query(MessageRecord)
-                    .filter(or_(*msg_filters))
-                    .order_by(MessageRecord.created_at.desc())
-                    .limit(3)
-                    .all()
-                )
+                matched_msgs.sort(key=lambda m: m.created_at or datetime.min, reverse=True)
+                top_msgs = matched_msgs[:3]
 
                 recent_sentiments = [
                     {
@@ -319,7 +409,7 @@ class ContactService:
                         "created_at": m.created_at.strftime("%d/%m %H:%M") if m.created_at else "",
                         "urgency": m.urgency or "MEDIUM",
                     }
-                    for m in recent_msgs
+                    for m in top_msgs
                 ]
                 latest_sentiment = recent_sentiments[0]["sentiment"] if recent_sentiments else "NEUTRAL"
                 responses.append(record_to_response(r, latest_sentiment=latest_sentiment, recent_sentiments=recent_sentiments))

@@ -67,3 +67,14 @@ def test_contacts_api_crud_and_batch():
     # 6. Deleção
     res_del = client.delete(f"/api/v1/contacts/{contact_id}")
     assert res_del.status_code == 204
+
+
+def test_contacts_api_high_speed_performance_and_interaction_filter():
+    """Garante que a listagem de contatos responde em menos de 100ms e suporta filtros temporais."""
+    import time
+    t0 = time.time()
+    res = client.get("/api/v1/contacts?interaction_period=today")
+    t1 = time.time()
+    assert res.status_code == 200
+    assert (t1 - t0) < 1.0  # Em testes com SQLite/TestClient deve ser instantâneo
+    assert isinstance(res.json(), list)

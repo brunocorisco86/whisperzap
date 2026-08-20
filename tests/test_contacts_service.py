@@ -149,6 +149,7 @@ def test_deduplicate_and_merge_contacts(contact_db):
     contact_db.commit()
 
     # Executa deduplicação
+    service.deduplicate_and_merge_contacts(db=contact_db)
     contacts = service.get_contacts(db=contact_db)
 
     # Valida que o Bruno existe apenas 1 vez, consolidado como OWNER com prioridade suprema
