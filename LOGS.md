@@ -353,6 +353,21 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
      - Atualização do Grafo de Conhecimento com Graphify (`graphify update .`).
 - **Resultado**: Resiliência máxima em áudios de qualquer tamanho, pós-processamento executivo ativo e n8n 100% online e operacional.
 
+---
+
+### ADR 011 — Pacote Standard (Calíope + Clio), Monetização Modular e Ingestão de Contatos Apple/Google em 3 Camadas
+- **Data**: 2026-08-20
+- **Status**: Aprovado
+- **Contexto**: A venda do ecossistema Mnemosine como SaaS B2B exige uma estratégia de entrada de baixa fricção (*Product-Led Growth*). A inclusão de Clio (Contatos) no plano Standard junto com Calíope (Voz) é indispensável para viabilizar o Priming Dinâmico de vocabulário no Whisper. O desafio era resolver o gargalo de sincronização de agendas Apple (iCloud/iOS) e Google (Android/Gmail) sem gerar atrito no onboarding.
+- **Decisão**:
+  1. Definir o **Plano Standard (R$ 97/mês)** composto por **Calíope (Voz & Prosódia)** + **Clio (Contatos & Priming Dinâmico)**.
+  2. Implementar a **Ingestão de Contatos em 3 Camadas**:
+     - *Camada 1 (Zero Fricção)*: Extração automática de contatos e conversas salvas no WhatsApp via Evolution API (`/chat/findContacts`) no primeiro escaneamento de QR Code.
+     - *Camada 2 (Self-Service 1-Clique)*: Upload ou envio no WhatsApp de arquivos vCard (`.vcf`) exportados do iPhone ou Google Contacts via parser polimórfico existente.
+     - *Camada 3 (Cloud Pro)*: Conectores contínuos via protocolo CardDAV (Apple iCloud) e Google People API (OAuth2 com syncToken).
+  3. Adotar modelo modular de Musas adicionais via *Feature Flags* no banco de dados (`active_muses`), permitindo upsell progressivo de *Terpsícore*, *Polímnia*, *Erato*, *Tália*, *Urânia* e *Melpômene*.
+
+
 
 
 
