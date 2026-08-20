@@ -1585,6 +1585,68 @@ select:focus {
   border-radius: 12px;
 }
 
+/* Botões e Badges de Cadastro em Clio (Calíope -> Clio) */
+.btn-clio-register {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(217, 119, 6, 0.28));
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  padding: 0.2rem 0.55rem;
+  font-size: 0.73rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: all 0.18s ease;
+  text-decoration: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.btn-clio-register:hover {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(217, 119, 6, 0.5));
+  color: #fef08a;
+  border-color: rgba(245, 158, 11, 0.8);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(245, 158, 11, 0.25);
+}
+
+.btn-clio-register-bar {
+  background: rgba(245, 158, 11, 0.12) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(245, 158, 11, 0.35) !important;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: all 0.18s ease;
+}
+
+.btn-clio-register-bar:hover {
+  background: rgba(245, 158, 11, 0.25) !important;
+  color: #fef08a !important;
+  border-color: rgba(245, 158, 11, 0.65) !important;
+}
+
+.badge-unrecognized {
+  font-size: 0.72rem;
+  background: rgba(245, 158, 11, 0.15) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.message-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+
 /* ==========================================================================
    Analytics & Dashboard Executivo
    ========================================================================== */

@@ -608,6 +608,9 @@ async function loadTasks() {
 
 async function loadMessages() {
   try {
+    if (!allContacts || allContacts.length === 0) {
+      await loadContacts();
+    }
     const res = await fetch('/api/v1/memory/messages');
     if (res.ok) {
       allMessages = await res.json();
@@ -1327,6 +1330,76 @@ function copyTaskOriginalText(taskId) {
 }
 window.copyTaskOriginalText = copyTaskOriginalText;
 
+// Localiza se o remetente da mensagem é o Dono ou um Contato cadastrado em Clio
+function findContactForMessage(m) {
+  if (!m) return { isRecognized: false, isOwner: false, contact: null, phone: '', name: '' };
+
+  const ownerNames = ['bruno conter', 'bruno', 'user', 'admin', 'owner', 'proprietario', 'proprietário', 'mestre', 'deus'];
+  const ownerPhones = ['554499214934', '4499214934', '99214934', '5544999214934', '44999214934', '999214934'];
+
+  const meta = (m.meta_info && typeof m.meta_info === 'object') ? m.meta_info : {};
+  const isFromMe = meta.fromMe === true || meta.fromMe === 1 || meta.from_me === true;
+
+  // Extrai dígitos de telefone disponíveis
+  let rawPhone = meta.phone || meta.sender_phone || meta.remoteJid || meta.remote_jid || '';
+  if (!rawPhone && m.speaker && /^\+?[\d\s\-\(\)\.]+$/.test(m.speaker.trim())) {
+    rawPhone = m.speaker.trim();
+  }
+  const cleanPhone = String(rawPhone).replace(/\D/g, '');
+
+  const speakerRaw = String(m.speaker || '').trim();
+  const speakerLower = speakerRaw.toLowerCase();
+  const speakerNorm = speakerLower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // 1. Verificação se é o Dono
+  if (isFromMe) {
+    return { isRecognized: true, isOwner: true, contact: null, phone: cleanPhone, name: 'Bruno Conter' };
+  }
+  if (ownerNames.includes(speakerLower) || ownerNames.includes(speakerNorm) || speakerNorm.includes('bruno conter')) {
+    return { isRecognized: true, isOwner: true, contact: null, phone: cleanPhone, name: 'Bruno Conter' };
+  }
+  if (cleanPhone && ownerPhones.some(op => cleanPhone === op || (cleanPhone.length >= 8 && (cleanPhone.endsWith(op.slice(-8)) || op.endsWith(cleanPhone.slice(-8)))))) {
+    return { isRecognized: true, isOwner: true, contact: null, phone: cleanPhone, name: 'Bruno Conter' };
+  }
+
+  // 2. Busca nos contatos cadastrados de Clio (allContacts)
+  if (Array.isArray(allContacts) && allContacts.length > 0) {
+    for (const c of allContacts) {
+      const cPhone = String(c.phone_number || '').replace(/\D/g, '');
+      const cName = String(c.name || '').trim();
+      const cNick = String(c.nickname || '').trim();
+      const cNameNorm = cName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const cNickNorm = cNick.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+      // Match por telefone (exato ou 8 últimos dígitos)
+      if (cleanPhone && cPhone) {
+        if (cleanPhone === cPhone || (cleanPhone.length >= 8 && cPhone.length >= 8 && (cleanPhone.endsWith(cPhone.slice(-8)) || cPhone.endsWith(cleanPhone.slice(-8))))) {
+          return { isRecognized: true, isOwner: false, contact: c, phone: cleanPhone || cPhone, name: c.name };
+        }
+      }
+
+      // Match por nome ou apelido
+      if (speakerNorm && (speakerNorm === cNameNorm || (cNickNorm && speakerNorm === cNickNorm))) {
+        return { isRecognized: true, isOwner: false, contact: c, phone: cleanPhone || cPhone, name: c.name };
+      }
+    }
+  }
+
+  // 3. Contato Não Reconhecido
+  const pushName = String(meta.pushName || meta.push_name || '').trim();
+  const isSpeakerOnlyDigits = /^\+?[\d\s\-\(\)\.@]+$/.test(speakerRaw);
+  const suggestedName = pushName || (!isSpeakerOnlyDigits && !['user', 'desconhecido'].includes(speakerLower) ? speakerRaw : '');
+
+  return {
+    isRecognized: false,
+    isOwner: false,
+    contact: null,
+    phone: cleanPhone,
+    suggestedName: suggestedName
+  };
+}
+window.findContactForMessage = findContactForMessage;
+
 function renderMessages() {
   if (!messagesContainer) return;
 
@@ -1390,8 +1463,33 @@ function renderMessages() {
   if (btnNext) btnNext.disabled = (messagesCurrentPage >= totalPages);
 
   messagesContainer.innerHTML = pageItems.map(m => {
-    const initials = (m.speaker || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    const contactInfo = findContactForMessage(m);
     const urgencyColor = m.urgency === 'URGENT' ? '#ef4444' : m.urgency === 'HIGH' ? '#f59e0b' : '#10b981';
+
+    // Determina nome, avatar e badge de papel
+    let displayName = m.speaker || 'Desconhecido';
+    let avatarHtml = '';
+    let roleBadgeHtml = '';
+
+    if (contactInfo.isOwner) {
+      displayName = 'Bruno Conter 👑';
+      avatarHtml = '<span title="Proprietário & Arquiteto">👑</span>';
+    } else if (contactInfo.isRecognized && contactInfo.contact) {
+      const c = contactInfo.contact;
+      displayName = c.name + (c.nickname ? ` <small style="color: var(--text-muted); font-weight: normal;">(${c.nickname})</small>` : '');
+      if (c.role && c.role !== 'UNKNOWN') {
+        roleBadgeHtml = `<span class="badge" style="font-size: 0.68rem; background: rgba(59, 130, 246, 0.15); color: #60a5fa;" title="Papel: ${c.role}">${c.role}</span>`;
+      }
+      if (c.avatar_url) {
+        avatarHtml = `<img src="${c.avatar_url}" alt="${c.name}" class="message-avatar-img">`;
+      } else {
+        const initials = c.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        avatarHtml = initials || 'C';
+      }
+    } else {
+      const initials = (m.speaker || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+      avatarHtml = initials || '❓';
+    }
 
     // Mapeamento de Sentimento
     const sentimentConfig = {
@@ -1425,13 +1523,34 @@ function renderMessages() {
     ` : '';
 
     // Telefone / WhatsApp
-    let phoneClean = '';
-    if (m.meta_info && m.meta_info.remoteJid) {
-      phoneClean = m.meta_info.remoteJid.replace(/[^0-9]/g, '');
-    } else if (m.speaker && /^\d+$/.test(m.speaker.replace(/[^0-9]/g, ''))) {
-      phoneClean = m.speaker.replace(/[^0-9]/g, '');
+    let phoneClean = contactInfo.phone || '';
+    if (!phoneClean) {
+      if (m.meta_info && m.meta_info.remoteJid) {
+        phoneClean = m.meta_info.remoteJid.replace(/[^0-9]/g, '');
+      } else if (m.speaker && /^\d+$/.test(m.speaker.replace(/[^0-9]/g, ''))) {
+        phoneClean = m.speaker.replace(/[^0-9]/g, '');
+      }
     }
     const waLink = phoneClean.length >= 10 ? `https://wa.me/${phoneClean}` : null;
+
+    // Badges e Botões de cadastro em Clio para contato não reconhecido
+    const unrecognizedBadgeHtml = !contactInfo.isRecognized ? `
+      <span class="badge badge-unrecognized" title="Contato não cadastrado no banco de dados de Clio">
+        ⚠️ Não Cadastrado
+      </span>
+    ` : '';
+
+    const registerButtonHeaderHtml = !contactInfo.isRecognized ? `
+      <button type="button" class="btn-clio-register" onclick="openRegisterContactModal('${m.id}')" title="Cadastrar este contato em Clio">
+        📜 + Cadastrar em Clio
+      </button>
+    ` : '';
+
+    const registerButtonBarHtml = !contactInfo.isRecognized ? `
+      <button type="button" class="btn btn-secondary btn-sm btn-clio-register-bar" onclick="openRegisterContactModal('${m.id}')" title="Cadastrar este contato em Clio">
+        📜 Cadastrar em Clio
+      </button>
+    ` : '';
 
     // Tarefas
     const tasksHtml = (m.tasks && m.tasks.length > 0) ? `
@@ -1466,11 +1585,13 @@ function renderMessages() {
         <!-- Header -->
         <div class="message-header">
           <div class="message-speaker-info">
-            <div class="message-avatar">${initials}</div>
+            <div class="message-avatar">${avatarHtml}</div>
             <div>
               <div class="message-speaker-name">
-                <span>${m.speaker || 'Desconhecido'}</span>
+                <span>${displayName}</span>
+                ${roleBadgeHtml}
                 ${waLink ? `<a href="${waLink}" target="_blank" title="Abrir conversa no WhatsApp">💬 WhatsApp</a>` : ''}
+                ${registerButtonHeaderHtml}
               </div>
               <small style="color: var(--text-muted); font-size: 0.78rem;">${m.created_at || 'Data desconhecida'}</small>
             </div>
@@ -1478,6 +1599,7 @@ function renderMessages() {
 
           <div class="message-badges">
             ${originBadgeHtml}
+            ${unrecognizedBadgeHtml}
             <span class="badge badge-executive" style="font-size: 0.72rem;">${m.intent}</span>
             <span class="badge" style="font-size: 0.72rem; background: rgba(255,255,255,0.06); color: ${urgencyColor};">${m.urgency}</span>
             <span class="badge" style="font-size: 0.72rem; background: rgba(255,255,255,0.06); color: ${sent.color};" title="Score emocional: ${m.sentiment_score || 0.0}">
@@ -1519,6 +1641,7 @@ function renderMessages() {
           </div>
 
           <div style="display: flex; gap: 0.5rem; align-items: center;">
+            ${registerButtonBarHtml}
             <button class="btn btn-secondary btn-sm" onclick="copyMessageText('${encodeURIComponent(m.revised_text || m.raw_text || '')}')" title="Copiar texto revisado">
               📋 Copiar
             </button>
@@ -1883,9 +2006,10 @@ async function handleSaveContact(e) {
       showToast(`Contato ${name} ${isEditing ? 'atualizado' : 'cadastrado'} e sincronizado na VPS!`);
       modalContact.classList.remove('active');
       document.getElementById('contact-id').value = '';
-      loadContacts();
+      await loadContacts();
       loadStats();
       loadGraphData();
+      renderMessages();
     } else {
       const errData = await res.json().catch(() => ({}));
       showToast(`Erro ao salvar contato: ${errData.detail || res.statusText}`, true);
@@ -1895,6 +2019,60 @@ async function handleSaveContact(e) {
     showToast('Erro de conexão ao salvar', true);
   }
 }
+
+// Abre o modal de Clio pré-preenchido com os dados da mensagem não reconhecida de Calíope
+function openRegisterContactModal(msgId) {
+  const msg = allMessages.find(m => String(m.id) === String(msgId));
+  if (!msg) return;
+
+  const contactInfo = findContactForMessage(msg);
+
+  document.getElementById('modal-contact-title').textContent = '📜 Cadastrar Contato em Clio';
+  formContact.reset();
+  document.getElementById('contact-id').value = '';
+
+  // Nome sugerido
+  let nameVal = contactInfo.suggestedName || '';
+  if (!nameVal && msg.speaker && !/^\+?[\d\s\-\(\)\.@]+$/.test(msg.speaker.trim())) {
+    nameVal = msg.speaker.trim();
+  }
+  document.getElementById('contact-name').value = nameVal;
+
+  // Telefone / WhatsApp formatado
+  let phoneVal = contactInfo.phone || '';
+  if (phoneVal) {
+    if (phoneVal.startsWith('55') && phoneVal.length >= 12) {
+      const ddd = phoneVal.substring(2, 4);
+      const rest = phoneVal.substring(4);
+      if (rest.length === 9) {
+        phoneVal = `(${ddd}) ${rest.substring(0, 5)}-${rest.substring(5)}`;
+      } else if (rest.length === 8) {
+        phoneVal = `(${ddd}) ${rest.substring(0, 4)}-${rest.substring(4)}`;
+      }
+    }
+  }
+  document.getElementById('contact-phone').value = phoneVal;
+
+  // Papel padrão para novos contatos
+  document.getElementById('contact-role').value = 'PRODUCER_COOPERATED';
+
+  // Observações contextuais de Calíope
+  const snippet = (msg.revised_text || msg.raw_text || '').substring(0, 120).trim();
+  document.getElementById('contact-notes').value = `Cadastrado via Calíope a partir da mensagem (${msg.created_at || 'recente'}): "${snippet}..."`;
+
+  modalContact.classList.add('active');
+
+  setTimeout(() => {
+    if (!nameVal) {
+      document.getElementById('contact-name').focus();
+    } else if (!phoneVal) {
+      document.getElementById('contact-phone').focus();
+    } else {
+      document.getElementById('contact-role').focus();
+    }
+  }, 100);
+}
+window.openRegisterContactModal = openRegisterContactModal;
 
 function editContact(idOrName) {
   const contact = allContacts.find(c => c.id === idOrName || c.name === idOrName);

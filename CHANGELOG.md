@@ -20,6 +20,13 @@ Todas as mudanças notáveis, refatorações arquiteturais, motores de IA e otim
 - **Normalização de Decisões no Extractor Semântico**: Conversão automática de objetos heterogêneos (`dict`) retornados pela LLM em `list[str]`, eliminando erros de validação Pydantic.
 - **Ajuste de Heap Node.js na Evolution API**: Memória alocada ajustada para 380MB no ambiente Alpine (`peixe`).
 
+### 📜 4. Integração Calíope ➔ Clio: Cadastro Instantâneo de Contatos Não Reconhecidos
+- **Botão de Cadastro Direto**: Mensagens recebidas de números ou remetentes não cadastrados no banco de dados de Clio agora exibem a badge `⚠️ Não Cadastrado` e os botões `📜 + Cadastrar em Clio` no cabeçalho e rodapé do card.
+- **Pré-Preenchimento Automático**: Ao clicar no botão, o modal de contato de Clio é aberto com o número de WhatsApp formatado, o nome do remetente (ou *pushName* do WhatsApp) e nota contextual da mensagem preenchidos automaticamente.
+- **Sincronização Reativa em Tempo Real**: Ao salvar o contato, a memória e o feed de Calíope são atualizados imediatamente na interface sem necessidade de recarregar a página.
+
+
+
 ---
 
 ## [v2.5.0] — 2026-08-19 / 2026-08-20 — Release: Mnemosine Auth, Calíope Filters & Ultra-Minimalist Latency
