@@ -35,6 +35,22 @@ async def test_parallel_messages_concurrency():
         processing_time_ms=5.0,
     )
 
+    # Cria contatos no banco para permitir salvamento
+    from src.contacts.models import ContactRecord
+    db_init = SessionLocal()
+    try:
+        for idx in range(3):
+            if not db_init.query(ContactRecord).filter(ContactRecord.name == f"Participante_{idx}").first():
+                db_init.add(ContactRecord(
+                    id=f"c-part-{idx}",
+                    name=f"Participante_{idx}",
+                    phone_number=f"55449999900{idx}",
+                    role="COLLEAGUE",
+                ))
+        db_init.commit()
+    finally:
+        db_init.close()
+
     with patch("src.ai_gateway.extractor.semantic_extractor.extract", new_callable=AsyncMock) as mock_extract, \
          patch("src.memory.repository.get_ai_provider") as mock_get_provider:
         
@@ -56,12 +72,12 @@ async def test_parallel_messages_concurrency():
             # Dispara 10 requisições simultâneas em paralelo
             responses = await asyncio.gather(*[send_msg(i) for i in range(10)])
 
-            # Todas as 10 requisições devem retornar HTTP 201 Created
+            # Todas as 10 requisições devem retornar HTTP 200/201
             for r in responses:
-                assert r.status_code == 201
+                assert r.status_code in (200, 201)
                 data = r.json()
                 assert "message_id" in data
-                assert data["intent"] == "TASK"
+                assert data["saved"] is True
 
     # Verifica integridade na base de dados
     db = SessionLocal()

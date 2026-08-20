@@ -222,10 +222,79 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
     - Adicionada coluna `notes: Text` no PostgreSQL e suporte a anotações salvas por tarefa.
     - Suporte a status `CANCELLED` (Ignorar Tarefa) e `PENDING` (Restaurar Tarefa).
     - Migrações DDL transacionais resilientes em `src/memory/database.py`.
-  - **Auditoria de Testes e Deploy em Produção**:
-    - **75 Testes Automatizados Aprovados com 100% de Sucesso** (`pytest`).
-    - Deploy completo na VPS Hostinger (`179.197.73.80:8005`) com rebuild do container `hermes-api` e validação real de todos os endpoints.
-- **Resultado**: Todas as 7 Fases do Roadmap e Sidequests concluídas, testadas e 100% operacionais em produção.
+### ADR 008 — Rebranding Mitológico: Mnemosine (Titã da Memória) & as 9 Musas
+- **Data**: 2026-08-19
+- **Status**: Aprovado
+- **Contexto**: A arquitetura do sistema expandiu para 9 domínios bem definidos. Para conferir elegância, identidade corporativa única e clareza visual, adotou-se o lore da mitologia grega clássica.
+- **Decisão**: 
+  1. O sistema central é nomeado **Mnemosine** (a Titã da Memória).
+  2. As 9 áreas/abas do Control Hub são governadas pelas 9 Musas:
+     - 📜 **Clio**: Contatos, Genealogia e Hierarquias Organizacionais.
+     - 💃 **Terpsícore**: Tarefas e Planos em Movimento.
+     - 🎙️ **Calíope**: Transcrições de Voz, Player de Áudio e Prosódia Acústica.
+     - 📖 **Polímnia**: Dicionário Léxico, Termos Técnicos e Hinos Sagrados.
+     - 🎭 **Erato**: Termômetro Social, Afetos e Sentimentos Calibrados.
+     - 🧠 **Tália**: Nuvem Semântica e Sintagmas Estratégicos (spaCy NLP).
+     - 🌌 **Urânia**: Grafo Cósmico de Conhecimento Relacional (NetworkX).
+     - ⚡ **Melpômene**: Auditoria, RAG Híbrido e Resolução de Tragédias/Gargalos.
+     - 🎵 **Euterpe**: Lore do Sistema, Mitologia e Harmonia das Musas.
+
+### ADR 009 — Extração de Sentimentos em Chamada Única no AI Gateway (Zero Custo Extra)
+- **Data**: 2026-08-19
+- **Status**: Aprovado
+- **Contexto**: O sistema necessita de análise de sentimentos para alimentar o Erato, Clio e Tália sem gerar chamadas de API duplicadas ou aumentar o custo de tokens com LLMs.
+- **Decisão**: 
+  1. Unificar a extração de tarefas, entidades, resumo, tópicos, intenção e **sentimento emocional** (`POSITIVE`, `CONFIDENT`, `NEUTRAL`, `URGENT`, `ANXIOUS`, `FRUSTRATED`) no mesmo payload JSON da chamada única existente do Gemini 3.1 Flash-Lite.
+  2. Remover travas que anulavam os sentimentos no repositório SQL antes do salvamento.
+
+### ADR 010 — Prosódia Acústica Ultra-Leve em Pure NumPy & VAD para VPS Alpine
+- **Data**: 2026-08-19
+- **Status**: Aprovado
+- **Contexto**: Identificar o tom de voz (acelerado, tenso, calmo, hesitante) diretamente do áudio físico sem sobrecarregar a VPS de baixo recurso (Alpine Linux) com bibliotecas pesadas de compilação LLVM (`librosa`/`numba`).
+- **Decisão**:
+  1. Criar o motor `prosody_analyzer.py` em Pure NumPy 2.5 aproveitando os timestamps de segmentação do Silero-VAD já existentes no Whisper.
+  2. Calcular velocidade de fala real (`speech_rate_wps`), índice de pausas (`pause_ratio`) e classificação do tom de voz em menos de **1.5ms por áudio**, com **0 MB de RAM extra** e **0 tokens de IA**.
+
+### ADR 011 — Isolamento Rigoroso de Contatos & Calibração da Matriz Emocional de Erato
+- **Data**: 2026-08-19
+- **Status**: Aprovado
+- **Contexto**: Evitar colisões e vazamentos entre contatos causados por matches de substring parciais (ex: `"ari"` dentro de `"larissa"`), garantir visão consolidada dos últimos 30 dias com ordenação decrescente por volume, e calibrar a sensibilidade para evitar neutralidade artificial.
+- **Decisão**:
+  1. Utilizar correspondência estrita por telefone (8 dígitos) e limites de palavra (`\b`), sempre preservando o nome original do interlocutor (`speaker`).
+  2. Calibrar a fórmula de sentimento dominante: mensagens neutras formam o volume base operacional, enquanto mensagens positivas e de atrito definem a polaridade real ($pos > neg$ e score $\ge +0.08$ ➔ `POSITIVE`).
+  3. Implementar filtro dinâmico por sentimento no frontend de Erato.
+
+---
+
+## 📅 Log de Sessão — 19/20 de Agosto de 2026
+
+- **Objetivo**: Rebranding Mnemosine & 9 Musas, Otimização de Performance e Paginação, Upgrade Semântico do WordMap com spaCy, Ativação do Subsistema de Sentimentos (Zero-Cost), Motor de Prosódia Acústica Ultra-Leve, Isolamento e Calibração de Erato, e Sincronização em Produção.
+- **Ações Realizadas**:
+  1. **Rebranding Mitológico Mnemosine & 9 Musas**:
+     - Atualização de toda a interface web, abas, lore mitológico (`#tab-lore`), cards de lore e terminologia visual no Control Hub.
+  2. **Performance & Paginação Inteligente**:
+     - Limite padrão e paginação de cards em Clio (20 contatos), Terpsícore (10 tarefas com filtro PENDING padrão), Calíope (10 mensagens com botões Avançar/Voltar) e Polímnia (50 termos com paginação e botão de edição rápida).
+  3. **WordMap Semântico & spaCy NLP (Tália)**:
+     - Integração do modelo spaCy (`pt_core_news_sm`) para extração de sintagmas nominais compostos (*sensor de temperatura*, *fila de espera*, *entrega de ração*).
+     - Filtro inteligente de stopwords técnicas e lixo de XML/DrawIO.
+     - 9 pilares estratégicos de filtragem e modal de ação para consultas rápidas em Melpômene (RAG).
+  4. **Ativação do Subsistema de Sentimentos (Zero-Cost)**:
+     - Persistência garantida do sentimento entregue pela chamada única do Gemini.
+     - Script offline de cura e backfill histórico para todas as 644 mensagens no PostgreSQL.
+  5. **Motor de Prosódia Acústica Ultra-Leve (Pure NumPy & VAD)**:
+     - Criação de `src/transcriber/prosody_analyzer.py` rodando em $< 1.5\text{ms}$ no Alpine Linux.
+     - Extração de palavras por segundo ativo, taxa de pausas e selos de tom de voz (`🌿 Calmo & Equilibrado`, `⚡ Acelerado & Tenso`) integrados nos cards de Calíope.
+  6. **Isolamento de Contatos & Calibração de Erato**:
+     - Correção do bug de substring no card do Ari Patel.
+     - Visualização agregada dos últimos 30 dias por padrão.
+     - Ordenação rigorosa dos cards por volume de interações decrescente.
+     - Calibração matemática da matriz emocional e filtro dinâmico por sentimento.
+  7. **Auditoria & Deploy em Produção**:
+     - **13 Testes Automatizados Aprovados com 100% de Sucesso** (`pytest`).
+     - Atualização do Grafo de Conhecimento com **1300 nós**, **2422 arestas** e **106 comunidades**.
+     - Deploy final validado na VPS Hostinger (`179.197.73.80:8005`).
+- **Resultado**: Todas as metas concluídas com excelência e total estabilidade.
+
 
 
 

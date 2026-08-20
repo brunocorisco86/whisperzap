@@ -1,6 +1,6 @@
-# 🤖 Subagentes Especialistas — Hermes Voice Memory
+# 🤖 Subagentes Especialistas — Mnemosine Voice Intelligence
 
-Para garantir alta eficiência, modularidade e especialização no desenvolvimento do **Hermes Voice Memory**, definimos 6 papéis de subagentes especialistas.
+Para garantir alta eficiência, modularidade e especialização no desenvolvimento e governança do **Mnemosine**, definimos 6 papéis de subagentes especialistas.
 
 ---
 
@@ -8,12 +8,12 @@ Para garantir alta eficiência, modularidade e especialização no desenvolvimen
 
 | Subagente | Especialidade | Arquivo de Especificação |
 | :--- | :--- | :--- |
-| 🏗️ **`arch-specialist`** | Arquitetura de Sistemas & Pipeline de Memória | [`arch_specialist.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/subagents/arch_specialist.md) |
-| 🔄 **`cicd-specialist`** | CI/CD, Pytest & Automação de Deploy | [`cicd_specialist.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/subagents/cicd_specialist.md) |
-| 🛡️ **`cybersec-specialist`** | Segurança de APIs, Redes (Tailscale) & Segredos | [`cybersec_specialist.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/subagents/cybersec_specialist.md) |
-| 🧠 **`hermes-agent-specialist`** | Agente Hermes, Prompts & Recuperação de Memória | [`hermes_agent_specialist.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/subagents/hermes_agent_specialist.md) |
-| 🐧 **`vps-alpine-specialist`** | VPS, Alpine Linux, Docker & Raspberry Pi 3B | [`vps_alpine_specialist.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/subagents/vps_alpine_specialist.md) |
-| ⚡ **`api-stack-specialist`** | FastAPI, PostgreSQL/pgvector, NetworkX & Whisper | [`api_stack_specialist.md`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/docs/subagents/api_stack_specialist.md) |
+| 🏗️ **`arch-specialist`** | Arquitetura de Sistemas, As 9 Musas & Pipeline de Memória | [`arch_specialist.md`](./arch_specialist.md) |
+| 🔄 **`cicd-specialist`** | CI/CD, Pytest, Auditoria de Qualidade & Deploy | [`cicd_specialist.md`](./cicd_specialist.md) |
+| 🛡️ **`cybersec-specialist`** | Segurança de APIs, Criptografia, Redes (Tailscale) & Segredos | [`cybersec_specialist.md`](./cybersec_specialist.md) |
+| 🧠 **`hermes-agent-specialist`** | Agentes IA, Prompts, spaCy NLP & Recuperação RAG Híbrido | [`hermes_agent_specialist.md`](./hermes_agent_specialist.md) |
+| 🐧 **`vps-alpine-specialist`** | VPS Hostinger, Alpine Linux, Docker Compose & Homelab | [`vps_alpine_specialist.md`](./vps_alpine_specialist.md) |
+| ⚡ **`api-stack-specialist`** | FastAPI, PostgreSQL/pgvector, Faster-Whisper & Prosódia | [`api_stack_specialist.md`](./api_stack_specialist.md) |
 
 ---
 

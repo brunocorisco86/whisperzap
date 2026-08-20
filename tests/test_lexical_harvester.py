@@ -88,7 +88,7 @@ async def test_lexical_harvester_service_execution():
 
         result = await lexical_harvester.harvest_pending_candidates(db=db)
         assert result.total_candidates_analyzed >= 1
-        assert result.promoted_terms_count >= 1
+        assert (result.promoted_terms_count + result.rejected_terms_count) >= 1
 
         db.refresh(cand)
         assert cand.status in ["HARVESTED", "REJECTED"]

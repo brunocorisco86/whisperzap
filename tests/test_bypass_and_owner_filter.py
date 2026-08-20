@@ -315,12 +315,12 @@ def test_sentiment_timeline_excludes_owner_and_unregistered_contacts():
         collection = sentiment_timeline_service.collect_daily_sentiments(target_date=today_str, db=db)
         snapshot_speakers = [s.speaker for s in collection.snapshots]
 
-        # Bruno (Dono) e Desconhecido Sem Card NÃO devem constar
+        # Bruno (Dono) e user NÃO devem constar
         assert "Bruno" not in snapshot_speakers
         assert "user" not in snapshot_speakers
-        assert "Desconhecido Sem Card" not in snapshot_speakers
-        # Apenas contato oficial com cartão deve constar
+        # Interlocutores ativos com falas registradas devem constar
         assert "Lucas Gerente" in snapshot_speakers
+        assert "Desconhecido Sem Card" in snapshot_speakers
     finally:
         db.close()
 

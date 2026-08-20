@@ -1,15 +1,32 @@
-# 🏛️ Hermes Voice Memory — Enterprise Voice Intelligence & Neural Knowledge Graph
+# 🏛️ Mnemosine — Titã da Memória & As 9 Musas da Inteligência Vocal
 
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL_16-pgvector-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-Production_Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![NetworkX](https://img.shields.io/badge/NetworkX-Knowledge_Graph-FF6F00?style=for-the-badge)](https://networkx.org/)
+[![spaCy](https://img.shields.io/badge/spaCy-NLP_Strategic-09A3D5?style=for-the-badge)](https://spacy.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-F59E0B?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
 > *"Sua voz não é apenas som: é o centro de comando e inteligência operacional do seu negócio."*
 
-O **Hermes Voice Memory** é um ecossistema de inteligência conversacional, memória de longo prazo e copiloto executivo autônomo. Ele transforma mensagens e áudios do WhatsApp em **grafos relacionais de conhecimento, gestão acionável de tarefas, séries temporais de sentimentos e síntese estratégica** com precisão cirúrgica e **zero desperdício de tokens de IA**.
+O **Mnemosine** é um ecossistema corporativo de inteligência conversacional, memória perpétua de longo prazo e copiloto executivo autônomo. Ele transforma mensagens e áudios do WhatsApp em **grafos relacionais de conhecimento, gestão acionável de tarefas, séries temporais de sentimentos, prosódia acústica e síntese estratégica** com precisão cirúrgica e **zero desperdício de tokens de IA**.
+
+---
+
+## 🎭 As 9 Musas do Mnemosine
+
+O sistema organiza suas capacidades sob o governo das 9 Musas da mitologia clássica:
+
+1. 📜 **Clio (História)**: Gestão de Contatos, Genealogia Organizacional e Ponderação Hierárquica.
+2. 💃 **Terpsícore (Dança)**: Gestão de Tarefas, Planos de Ação e Movimento Operacional.
+3. 🎙️ **Calíope (Eloquência)**: Transcrição Whisper, Player de Áudio e **Prosódia Acústica Ultra-Leve** (< 1.5ms).
+4. 📖 **Polímnia (Hinos Sagrados)**: Dicionário Léxico Oficial, Vocabulário Técnico (C.Vale, Mtech) e Priming Dinâmico.
+5. 🎭 **Erato (Poesia Amorosa & Afetos)**: Termômetro Social, Série Temporal e Sentimentos Calibrados.
+6. 🧠 **Tália (Comédia & Festividades)**: Nuvem Semântica e Sintagmas Estratégicos com spaCy NLP.
+7. 🌌 **Urânia (Astronomia)**: Grafo Cósmico de Conhecimento Relacional em NetworkX.
+8. ⚡ **Melpômene (Tragédia)**: Auditoria Executiva, RAG Híbrido e Resolução de Gargalos Críticos.
+9. 🎵 **Euterpe (Música & Poesia Lírica)**: Lore do Sistema, Harmonia das Musas e Mitologia do Mnemosine.
 
 ---
 

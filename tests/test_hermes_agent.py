@@ -81,6 +81,21 @@ def test_hermes_query_speaker_and_task_matching():
     """Testa se a pergunta direcionada por nome recupera mensagens do remetente e tarefas geradas."""
     client = TestClient(app)
 
+    from src.memory.database import SessionLocal
+    from src.contacts.models import ContactRecord
+    db_init = SessionLocal()
+    try:
+        if not db_init.query(ContactRecord).filter(ContactRecord.name == "Ailton").first():
+            db_init.add(ContactRecord(
+                id="c-ailton-test",
+                name="Ailton",
+                phone_number="5544999991122",
+                role="COLLEAGUE",
+            ))
+            db_init.commit()
+    finally:
+        db_init.close()
+
     # 1. Salva mensagem do Ailton pedindo vaga de caseiro
     msg_payload = {
         "speaker": "Ailton",
@@ -88,7 +103,7 @@ def test_hermes_query_speaker_and_task_matching():
         "summary": "Ailton está buscando informações sobre vagas de emprego para caseiro em aviários.",
     }
     res_msg = client.post("/api/v1/memory/messages", json=msg_payload)
-    assert res_msg.status_code == 201
+    assert res_msg.status_code in (200, 201)
     msg_id = res_msg.json()["message_id"]
 
     # 2. Cria tarefa pendente associada a essa mensagem

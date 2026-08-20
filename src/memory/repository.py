@@ -282,6 +282,7 @@ class MemoryRepository:
                 embedding_json=embedding_vector,
                 created_at=datetime.now(timezone.utc),
             )
+            db.add(emb_rec)
             db.commit()
             db.refresh(message)
 

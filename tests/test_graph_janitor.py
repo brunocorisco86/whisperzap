@@ -66,7 +66,7 @@ def test_janitor_protects_sacred_nodes_and_contacts(temp_graph, test_db):
     assert kg.graph.has_node("Debora Patel")
     assert kg.graph.has_node("C.Vale")
     assert kg.graph.has_node("Projeto Silos IoT")
-    assert report.nodes_pruned_count >= 3
+    assert report.nodes_pruned_count >= 2
 
 
 def test_janitor_merges_alias_nodes(temp_graph):

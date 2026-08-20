@@ -58,7 +58,7 @@ async def test_transcribe_endpoint():
         TranscriptionSegment(id=0, start=0.0, end=1.0, text="Mensagem de teste")
     ]
     with patch("src.transcriber.router.whisper_service.transcribe_audio", new_callable=AsyncMock) as mock_transcribe:
-        mock_transcribe.return_value = ("Mensagem de teste", "pt", 0.99, 1.0, mock_segments)
+        mock_transcribe.return_value = ("Mensagem de teste", "pt", 0.99, 1.0, mock_segments, None)
 
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
@@ -82,7 +82,7 @@ async def test_transcribe_base64_endpoint():
         TranscriptionSegment(id=0, start=0.0, end=1.0, text="Mensagem base64")
     ]
     with patch("src.transcriber.router.whisper_service.transcribe_audio", new_callable=AsyncMock) as mock_transcribe:
-        mock_transcribe.return_value = ("Mensagem base64", "pt", 0.99, 1.0, mock_segments)
+        mock_transcribe.return_value = ("Mensagem base64", "pt", 0.99, 1.0, mock_segments, None)
 
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:

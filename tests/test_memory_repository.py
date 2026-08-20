@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker
 from src.ai_gateway.extractor import semantic_extractor
 from src.ai_gateway.providers.mock import MockProvider
 from src.memory.models import Base, MessageCreate, TaskUpdate
+from src.contacts.models import ContactRecord
 from src.memory.repository import MemoryRepository, cosine_similarity
 
 
