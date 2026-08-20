@@ -23,19 +23,19 @@ logger = logging.getLogger(__name__)
 
 
 def compute_dominant_sentiment(pos: int, neu: int, neg: int) -> tuple[str, float]:
-    """Calcula o sentimento dominante e o score médio ponderado de -1.0 a +1.0."""
+    """Calcula o sentimento dominante calibrado e o score médio ponderado de -1.0 a +1.0."""
     total = pos + neu + neg
     if total == 0:
         return "NEUTRAL", 0.0
 
     score = round((pos * 1.0 + neu * 0.0 + neg * (-1.0)) / total, 3)
 
-    if pos > neu and pos > neg:
-        dominant = "POSITIVE"
-    elif neg > neu and neg > pos:
-        dominant = "NEGATIVE"
-    elif pos > 0 and neg > 0 and abs(pos - neg) <= 1:
+    if pos > 0 and neg > 0 and abs(pos - neg) <= 1 and (pos + neg) >= 2:
         dominant = "MIXED"
+    elif pos > neg and (pos / (pos + neg + 0.0001)) >= 0.55 and score >= 0.08:
+        dominant = "POSITIVE"
+    elif neg > pos and (neg / (pos + neg + 0.0001)) >= 0.55 and score <= -0.08:
+        dominant = "NEGATIVE"
     else:
         dominant = "NEUTRAL"
 

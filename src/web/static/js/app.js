@@ -361,6 +361,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const sentimentFilterDominant = document.getElementById('sentiment-filter-dominant');
+  if (sentimentFilterDominant) {
+    sentimentFilterDominant.addEventListener('change', applyEratoSentimentFilter);
+  }
+
   const speakerSelect = document.getElementById('sentiment-speaker-select');
   if (speakerSelect) {
     speakerSelect.addEventListener('change', (e) => {
@@ -1978,11 +1983,15 @@ window.runHermesQuery = runHermesQuery;
 
 // --- Subsistema de Sentimentos & Série Temporal (Erato) ---
 
+let cachedDailySnapshots = [];
+let currentEratoTargetDate = 'all';
+
 async function loadDailySentiments(targetDate = 'all') {
   const container = document.getElementById('sentiment-daily-container');
   const badge = document.getElementById('sentiment-day-badge');
   if (!container) return;
 
+  currentEratoTargetDate = targetDate;
   const isAll = !targetDate || targetDate === 'all' || targetDate === 'todos';
   const url = isAll ? '/api/v1/memory/sentiment/daily?date=all&days=30' : `/api/v1/memory/sentiment/daily?date=${targetDate}`;
   
@@ -1999,8 +2008,8 @@ async function loadDailySentiments(targetDate = 'all') {
   try {
     const res = await fetch(url);
     if (res.ok) {
-      const snapshots = await res.json();
-      renderDailySentiments(snapshots, isAll ? 'all' : targetDate);
+      cachedDailySnapshots = await res.json();
+      applyEratoSentimentFilter();
     } else {
       container.innerHTML = `
         <div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 2.5rem; color: var(--text-muted);">
@@ -2016,6 +2025,24 @@ async function loadDailySentiments(targetDate = 'all') {
       </div>
     `;
   }
+}
+
+function applyEratoSentimentFilter() {
+  const filterSelect = document.getElementById('sentiment-filter-dominant');
+  const selected = filterSelect ? filterSelect.value : '';
+
+  let list = cachedDailySnapshots || [];
+  if (selected) {
+    list = list.filter(s => {
+      const dom = (s.dominant_sentiment || '').toUpperCase();
+      if (selected === 'NEGATIVE') {
+        return dom === 'NEGATIVE' || dom === 'FRUSTRATED' || dom === 'URGENT';
+      }
+      return dom === selected;
+    });
+  }
+
+  renderDailySentiments(list, currentEratoTargetDate);
 }
 
 async function collectSentiments(targetDate = '') {
