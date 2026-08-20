@@ -136,7 +136,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ number: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API)').item.json.body?.sender?.phone || '', text: '🎙️ Calíope (Voz & Memória)\\n\\n_Transcrição_:\\n' + ($json.text_revised || $json.text || '') }) }}",
+        "jsonBody": "={{ JSON.stringify({ number: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API)').item.json.body?.sender?.phone || '', text: '🎙️ *Calíope (Voz & Eloquência)*\\n\\n_Transcrição_:\\n' + ($json.text_revised || $json.text || '') }) }}",
         "options": {}
       },
       "name": "Envia Transcrição Calíope (WhatsApp)",
@@ -194,7 +194,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [1140, 400],
-      "id": "4e112d7c-a7a2-4bb0-80a1-000000000002"
+      "id": "4e112d7c-a7a2-4bb0-80a1-000000000001"
     },
     {
       "parameters": {
@@ -209,7 +209,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [1360, 360],
-      "id": "4e112d7c-a7a2-4bb0-80a1-000000000003"
+      "id": "4e112d7c-a7a2-4bb0-80a1-000000000002"
     },
     {
       "parameters": {
@@ -226,10 +226,10 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ number: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API)').item.json.body?.sender?.phone || '', text: '🧠 *Hermes Agent*:\\n\\n' + ($json.answer || '') }) }}",
+        "jsonBody": "={{ JSON.stringify({ number: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API)').item.json.body?.sender?.phone || '', text: '⚡ *Melpômene (Inteligência & Memória)*:\\n\\n' + ($json.answer || '') }) }}",
         "options": {}
       },
-      "name": "Envia Resposta Hermes (WhatsApp)",
+      "name": "Envia Resposta Melpômene (WhatsApp)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [1580, 360],
