@@ -78,5 +78,10 @@ class Settings(BaseSettings):
     # Threshold de Peso / Influência para Análise de Sentimento (Default 0.70: Executivos, Família, Cooperados, Favoritos)
     SENTIMENT_WEIGHT_THRESHOLD: float = 0.70
 
+    # Autenticação do Dashboard Web
+    DASHBOARD_PASSWORD: str = "blurbang"
+    DASHBOARD_AUTH_ENABLED: bool = True
+    DASHBOARD_SESSION_SECRET: str = "whisperzap_secret_session_key_2026"
+
 
 settings = Settings()

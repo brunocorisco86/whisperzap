@@ -43,8 +43,10 @@ const tasksSearchInput = document.getElementById('tasks-search');
 const tasksFilterStatus = document.getElementById('tasks-filter-status');
 const tasksFilterPriority = document.getElementById('tasks-filter-priority');
 const msgSearchInput = document.getElementById('msg-search');
+const msgFilterOrigin = document.getElementById('msg-filter-origin');
 const msgFilterIntent = document.getElementById('msg-filter-intent');
 const msgFilterSentiment = document.getElementById('msg-filter-sentiment');
+const msgFilterProsody = document.getElementById('msg-filter-prosody');
 const btnRefreshMessages = document.getElementById('btn-refresh-messages');
 
 // Modals
@@ -95,11 +97,131 @@ function activateTab(tabId) {
 }
 window.activateTab = activateTab;
 
+// --- Authentication Management (WhisperZap Session & Token) ---
+const AUTH_TOKEN_KEY = 'whisperzap_auth_token';
+
+async function checkAuthStatus() {
+  const overlay = document.getElementById('auth-overlay');
+  const token = localStorage.getItem(AUTH_TOKEN_KEY) || '';
+
+  try {
+    const res = await fetch('/api/auth/check', {
+      headers: { 'X-Dashboard-Token': token }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.authenticated) {
+        if (overlay) overlay.style.display = 'none';
+        return true;
+      }
+    }
+  } catch (err) {
+    console.warn('Verificação de autenticação falhou:', err);
+  }
+
+  // Se não autenticado, exibe tela de login
+  if (overlay) {
+    overlay.style.display = 'flex';
+    const input = document.getElementById('auth-password-input');
+    if (input) setTimeout(() => input.focus(), 100);
+  }
+  return false;
+}
+
+async function handleAuthLogin() {
+  const input = document.getElementById('auth-password-input');
+  const errorMsg = document.getElementById('auth-error-msg');
+  const overlay = document.getElementById('auth-overlay');
+  const btn = document.getElementById('btn-auth-submit');
+
+  const password = input ? input.value.trim() : '';
+  if (!password) {
+    if (errorMsg) {
+      errorMsg.textContent = '❌ Por favor, digite a senha.';
+      errorMsg.style.display = 'block';
+    }
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Verificando...';
+  }
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      localStorage.setItem(AUTH_TOKEN_KEY, data.token || '');
+      if (overlay) overlay.style.display = 'none';
+      if (errorMsg) errorMsg.style.display = 'none';
+      showToast('✅ Acesso autorizado!');
+
+      // Carrega os dados após login bem-sucedido
+      loadStats();
+      loadContacts();
+      loadDictionary();
+      loadGraphData();
+    } else {
+      if (errorMsg) {
+        errorMsg.textContent = '❌ Senha incorreta. Tente novamente.';
+        errorMsg.style.display = 'block';
+      }
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
+    }
+  } catch (err) {
+    if (errorMsg) {
+      errorMsg.textContent = '❌ Erro ao conectar ao servidor: ' + err.message;
+      errorMsg.style.display = 'block';
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Entrar ➔';
+    }
+  }
+}
+
+async function handleAuthLogout() {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  try {
+    await fetch('/api/auth/logout', { method: 'POST' });
+  } catch (e) {
+    // ignore
+  }
+  const overlay = document.getElementById('auth-overlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    const input = document.getElementById('auth-password-input');
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
+  }
+  showToast('Sessão encerrada.');
+}
+
+window.handleAuthLogin = handleAuthLogin;
+window.handleAuthLogout = handleAuthLogout;
+window.checkAuthStatus = checkAuthStatus;
+
 // Init
-document.addEventListener('DOMContentLoaded', () => {
-  loadStats();
-  loadContacts();
-  loadDictionary();
+document.addEventListener('DOMContentLoaded', async () => {
+  const isAuthenticated = await checkAuthStatus();
+  if (isAuthenticated) {
+    loadStats();
+    loadContacts();
+    loadDictionary();
+    loadGraphData();
+  }
 
   // Search & Filter Listeners
   contactSearchInput.addEventListener('input', renderContacts);
@@ -149,8 +271,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (msgSearchInput) msgSearchInput.addEventListener('input', () => { messagesCurrentPage = 1; renderMessages(); });
+  if (msgFilterOrigin) msgFilterOrigin.addEventListener('change', () => { messagesCurrentPage = 1; renderMessages(); });
   if (msgFilterIntent) msgFilterIntent.addEventListener('change', () => { messagesCurrentPage = 1; renderMessages(); });
   if (msgFilterSentiment) msgFilterSentiment.addEventListener('change', () => { messagesCurrentPage = 1; renderMessages(); });
+  if (msgFilterProsody) msgFilterProsody.addEventListener('change', () => { messagesCurrentPage = 1; renderMessages(); });
 
   const btnMsgPrev = document.getElementById('btn-msg-prev');
   const btnMsgNext = document.getElementById('btn-msg-next');
@@ -389,11 +513,17 @@ document.addEventListener('DOMContentLoaded', () => {
   if (msgSearchInput) {
     msgSearchInput.addEventListener('input', renderMessages);
   }
+  if (msgFilterOrigin) {
+    msgFilterOrigin.addEventListener('change', renderMessages);
+  }
   if (msgFilterIntent) {
     msgFilterIntent.addEventListener('change', renderMessages);
   }
   if (msgFilterSentiment) {
     msgFilterSentiment.addEventListener('change', renderMessages);
+  }
+  if (msgFilterProsody) {
+    msgFilterProsody.addEventListener('change', renderMessages);
   }
   if (btnRefreshMessages) {
     btnRefreshMessages.addEventListener('click', () => {
@@ -401,9 +531,6 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast('Feed de mensagens atualizado!');
     });
   }
-
-  // Carrega dados do grafo
-  loadGraphData();
 });
 
 // --- API Calls & Loading ---
@@ -1204,8 +1331,10 @@ function renderMessages() {
   if (!messagesContainer) return;
 
   const searchTerm = msgSearchInput ? msgSearchInput.value.toLowerCase().trim() : '';
+  const filterOrigin = msgFilterOrigin ? msgFilterOrigin.value.toUpperCase() : '';
   const filterIntent = msgFilterIntent ? msgFilterIntent.value.toUpperCase() : '';
   const filterSentiment = msgFilterSentiment ? msgFilterSentiment.value.toUpperCase() : '';
+  const filterProsody = msgFilterProsody ? msgFilterProsody.value.toUpperCase() : '';
 
   const filtered = allMessages.filter(m => {
     const revised = (m.revised_text || '').toLowerCase();
@@ -1216,11 +1345,17 @@ function renderMessages() {
     const speaker = (m.speaker || '').toLowerCase();
     const summary = (m.summary || '').toLowerCase();
 
+    // Verificação de Origem e Prosódia
+    const isAudio = Boolean(m.audio_duration_s || (m.meta_info && m.meta_info.prosody) || m.audio_filename);
+    const voiceTone = (m.meta_info && m.meta_info.prosody && m.meta_info.prosody.voice_tone) ? m.meta_info.prosody.voice_tone.toUpperCase() : '';
+
     const matchSearch = !searchTerm || speaker.includes(searchTerm) || revised.includes(searchTerm) || raw.includes(searchTerm) || summary.includes(searchTerm);
+    const matchOrigin = !filterOrigin || (filterOrigin === 'AUDIO' ? isAudio : !isAudio);
     const matchIntent = !filterIntent || (m.intent && m.intent.toUpperCase() === filterIntent);
     const matchSentiment = !filterSentiment || (m.sentiment && m.sentiment.toUpperCase() === filterSentiment);
+    const matchProsody = !filterProsody || (voiceTone === filterProsody);
 
-    return matchSearch && matchIntent && matchSentiment;
+    return matchSearch && matchOrigin && matchIntent && matchSentiment && matchProsody;
   });
 
   const totalFiltered = filtered.length;
@@ -1234,7 +1369,7 @@ function renderMessages() {
     messagesContainer.innerHTML = `
       <div class="empty-state" style="text-align: center; padding: 3rem; color: var(--text-muted);">
         <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">Nenhuma mensagem encontrada</p>
-        <small>As notas de voz enviadas no WhatsApp aparecerão aqui em tempo real com análise semântica e métricas.</small>
+        <small>As notas de voz e mensagens enviadas aparecerão aqui em tempo real com análise semântica e métricas.</small>
       </div>
     `;
     return;
@@ -1268,6 +1403,18 @@ function renderMessages() {
       'FRUSTRATED': { emoji: '😤', label: 'Frustrado', color: '#e11d48' },
     };
     const sent = sentimentConfig[m.sentiment] || sentimentConfig['NEUTRAL'];
+
+    // Origem (Áudio vs Texto)
+    const isAudio = Boolean(m.audio_duration_s || (m.meta_info && m.meta_info.prosody) || m.audio_filename);
+    const originBadgeHtml = isAudio ? `
+      <span class="badge" style="font-size: 0.72rem; background: rgba(59, 130, 246, 0.15); color: #60a5fa;" title="Origem: Nota de Voz / Áudio (${m.audio_duration_s ? m.audio_duration_s + 's' : 'Áudio'})">
+        🎙️ Áudio ${m.audio_duration_s ? `(${Math.round(m.audio_duration_s)}s)` : ''}
+      </span>
+    ` : `
+      <span class="badge" style="font-size: 0.72rem; background: rgba(148, 163, 184, 0.15); color: #94a3b8;" title="Origem: Mensagem de Texto Direta">
+        💬 Texto
+      </span>
+    `;
 
     // Prosódia Acústica
     const prosody = m.meta_info && m.meta_info.prosody;
@@ -1330,6 +1477,7 @@ function renderMessages() {
           </div>
 
           <div class="message-badges">
+            ${originBadgeHtml}
             <span class="badge badge-executive" style="font-size: 0.72rem;">${m.intent}</span>
             <span class="badge" style="font-size: 0.72rem; background: rgba(255,255,255,0.06); color: ${urgencyColor};">${m.urgency}</span>
             <span class="badge" style="font-size: 0.72rem; background: rgba(255,255,255,0.06); color: ${sent.color};" title="Score emocional: ${m.sentiment_score || 0.0}">

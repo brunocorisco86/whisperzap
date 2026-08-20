@@ -25,7 +25,8 @@ class OpenRouterProvider(BaseLLMProvider):
         self,
         prompt: str,
         system_instruction: str | None = None,
-        temperature: float = 0.2,
+        temperature: float = 0.0,
+        max_output_tokens: int | None = None,
     ) -> str:
         """Chama a API do OpenRouter."""
         if not self.api_key or self.api_key.startswith("sua_chave"):

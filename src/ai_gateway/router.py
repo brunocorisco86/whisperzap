@@ -46,7 +46,7 @@ async def revise_transcription(request: ReviseRequest) -> ReviseResponse:
         revised_text = await provider.generate_text(
             prompt=prompt,
             system_instruction=REVISE_SYSTEM_PROMPT,
-            temperature=0.2,
+            temperature=0.0,
         )
     except Exception as exc:
         logger.error(f"Erro ao processar revisão com {provider.provider_name if 'provider' in locals() else 'unknown'}: {exc}")

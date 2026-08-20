@@ -20,7 +20,8 @@ class BaseLLMProvider(ABC):
         self,
         prompt: str,
         system_instruction: str | None = None,
-        temperature: float = 0.2,
+        temperature: float = 0.0,
+        max_output_tokens: int | None = None,
     ) -> str:
         """Gera texto assincronamente a partir do prompt."""
         pass

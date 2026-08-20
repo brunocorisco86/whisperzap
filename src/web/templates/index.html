@@ -16,6 +16,22 @@
 </head>
 <body>
 
+  <!-- Auth Overlay (Proteção com Senha WhisperZap) -->
+  <div id="auth-overlay" class="auth-overlay" style="display: none;">
+    <div class="auth-card">
+      <div class="auth-badge-icon">🔒</div>
+      <h2 class="auth-title">Acesso Restrito</h2>
+      <p class="auth-subtitle">Digite a senha para acessar o painel de controle executivo.</p>
+      <form id="auth-form" onsubmit="event.preventDefault(); window.handleAuthLogin();">
+        <div class="auth-input-wrapper">
+          <input type="password" id="auth-password-input" class="auth-input" placeholder="Digite sua senha..." autocomplete="current-password" autofocus>
+          <button type="submit" class="btn btn-primary" id="btn-auth-submit">Entrar ➔</button>
+        </div>
+        <div id="auth-error-msg" class="auth-error-text" style="display: none;">❌ Senha incorreta. Tente novamente.</div>
+      </form>
+    </div>
+  </div>
+
   <!-- Collapsible Icon Sidebar -->
   <aside class="app-sidebar" id="app-sidebar">
     <div class="sidebar-header">
@@ -102,6 +118,9 @@
       </div>
       <button class="btn btn-secondary btn-sm" id="btn-refresh-all" title="Recarregar Dados da VPS">
         🔄 Atualizar
+      </button>
+      <button class="btn btn-secondary btn-sm" id="btn-logout" title="Encerrar Sessão" onclick="window.handleAuthLogout()">
+        🔒 Sair
       </button>
     </div>
   </header>
@@ -267,6 +286,11 @@
           <input type="text" id="msg-search" placeholder="Buscar por remetente, transcrição, tarefa ou resumo...">
         </div>
         <div class="filter-group">
+          <select id="msg-filter-origin" title="Filtrar por tipo de mídia de origem">
+            <option value="">Todas as Origens</option>
+            <option value="AUDIO">🎙️ Áudio</option>
+            <option value="TEXT">💬 Texto</option>
+          </select>
           <select id="msg-filter-intent">
             <option value="">Todas as Intenções</option>
             <option value="TASK">📋 Tarefa (TASK)</option>
@@ -284,6 +308,14 @@
             <option value="URGENT">🚨 Urgente (URGENT)</option>
             <option value="ANXIOUS">😰 Ansioso (ANXIOUS)</option>
             <option value="FRUSTRATED">😤 Frustrado (FRUSTRATED)</option>
+          </select>
+          <select id="msg-filter-prosody" title="Filtrar por Tom de Voz / Prosódia Acústica">
+            <option value="">Todos os Tons de Voz</option>
+            <option value="TENSO_URGENTE">⚡ Acelerado & Tenso</option>
+            <option value="ENERGICO">🚀 Enérgico & Dinâmico</option>
+            <option value="CALMO_ESTAVEL">🌿 Calmo & Equilibrado</option>
+            <option value="HESITANTE">🤔 Hesitante & Pausado</option>
+            <option value="NEUTRO">💬 Neutro & Estável</option>
           </select>
           <button class="btn btn-secondary btn-sm" id="btn-refresh-messages">🔄 Atualizar</button>
         </div>

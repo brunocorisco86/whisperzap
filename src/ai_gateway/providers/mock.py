@@ -17,7 +17,8 @@ class MockProvider(BaseLLMProvider):
         self,
         prompt: str,
         system_instruction: str | None = None,
-        temperature: float = 0.2,
+        temperature: float = 0.0,
+        max_output_tokens: int | None = None,
     ) -> str:
         """Retorna uma resposta simulada formatada."""
         # Se for um prompt de revisão contendo "Transcrição Bruta:", simula texto limpo

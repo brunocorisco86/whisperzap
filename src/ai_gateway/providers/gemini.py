@@ -1,6 +1,7 @@
 """Provedor Google Gemini para o AI Gateway."""
 
 import logging
+from typing import Any
 import httpx
 from src.ai_gateway.providers.base import BaseLLMProvider
 
@@ -25,7 +26,8 @@ class GeminiProvider(BaseLLMProvider):
         self,
         prompt: str,
         system_instruction: str | None = None,
-        temperature: float = 0.2,
+        temperature: float = 0.0,
+        max_output_tokens: int | None = None,
     ) -> str:
         """Chama a API do Gemini para gerar resposta."""
         if not self.api_key or self.api_key.startswith("sua_chave"):
@@ -33,15 +35,19 @@ class GeminiProvider(BaseLLMProvider):
 
         url = f"{self.BASE_URL}/{self.model_name}:generateContent?key={self.api_key}"
 
+        gen_config: dict[str, Any] = {
+            "temperature": temperature,
+        }
+        if max_output_tokens:
+            gen_config["maxOutputTokens"] = max_output_tokens
+
         payload = {
             "contents": [
                 {
                     "parts": [{"text": prompt}]
                 }
             ],
-            "generationConfig": {
-                "temperature": temperature,
-            },
+            "generationConfig": gen_config,
         }
 
         if system_instruction:

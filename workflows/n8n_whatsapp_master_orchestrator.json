@@ -136,10 +136,10 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ number: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API)').item.json.body?.sender?.phone || '', text: '🎙️ *Calíope (Voz & Eloquência)*\\n\\n_Transcrição_:\\n' + ($json.text_revised || $json.text || '') }) }}",
+        "jsonBody": "={{ JSON.stringify({ number: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API)').item.json.body?.sender?.phone || '', text: ($json.text_revised || $json.text || '') }) }}",
         "options": {}
       },
-      "name": "Envia Transcrição Calíope (WhatsApp)",
+      "name": "Envia Transcrição (WhatsApp)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [1560, 120],
@@ -226,10 +226,10 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ number: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API)').item.json.body?.sender?.phone || '', text: '⚡ *Melpômene (Inteligência & Memória)*:\\n\\n' + ($json.answer || '') }) }}",
+        "jsonBody": "={{ JSON.stringify({ number: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API)').item.json.body?.sender?.phone || '', text: ($json.answer || '') }) }}",
         "options": {}
       },
-      "name": "Envia Resposta Melpômene (WhatsApp)",
+      "name": "Envia Resposta Hermes (WhatsApp)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [1580, 360],
@@ -344,7 +344,7 @@
       "main": [
         [
           {
-            "node": "Envia Transcrição Calíope (WhatsApp)",
+            "node": "Envia Transcrição (WhatsApp)",
             "type": "main",
             "index": 0
           },
