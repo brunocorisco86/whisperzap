@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from src.memory.task_sentiment_analyzer import get_spacy_nlp
+from src.memory.timezone_utils import BRASILIA_TZ, get_now_brt, to_local_tz
+from src.ai_gateway.bypass import is_owner_interaction, is_group_message, normalize_text
 
 from src.analytics.schemas import (
     AnalyticsDashboardResponse,
@@ -149,8 +151,6 @@ class AnalyticsService:
             now = datetime.now(timezone.utc)
             start_date, end_date, prev_start, prev_end = self._resolve_date_ranges(period, now)
 
-            from src.ai_gateway.bypass import is_owner_interaction
-
             # 1. Carrega mensagens do período atual e anterior
             raw_current_messages = (
                 db.query(MessageRecord)
@@ -183,7 +183,7 @@ class AnalyticsService:
             )
 
             # 3. Carrega contatos para enriquecimento
-            contacts_map = {c.name.lower(): c for c in db.query(ContactRecord).all()}
+            all_contacts = db.query(ContactRecord).all()
 
             # 4. Calcula 5 Hero KPIs
             kpi_unique = self._calculate_unique_senders_kpi(current_messages, prev_messages)
@@ -196,12 +196,12 @@ class AnalyticsService:
             timeseries = self._generate_timeseries(current_messages, current_tasks, start_date, end_date, group_by)
 
             # 6. Gera Top Interlocutores
-            top_senders = self._generate_top_senders(current_messages, current_tasks, contacts_map)
+            top_senders = self._generate_top_senders(current_messages, current_tasks, all_contacts)
 
             # 7. Gera WordMap / Nuvem Semântica de Termos
             wordmap = self._generate_wordmap(current_messages)
 
-            # 8. Gera Heatmap de Horários de Pico (24x7)
+            # 8. Gera Heatmap de Horários de Pico (24x7 no fuso de Brasília)
             heatmap = self._generate_heatmap(current_messages)
 
             # Resumo executivo de inteligência
@@ -233,41 +233,47 @@ class AnalyticsService:
                 db.close()
 
     def _resolve_date_ranges(self, period: str, now: datetime) -> Tuple[datetime, datetime, datetime, datetime]:
-        """Calcula o intervalo de datas atual e o período anterior equivalente."""
+        """Calcula o intervalo de datas no fuso de Brasília (UTC-3) e converte para UTC para as queries SQL."""
+        now_brt = to_local_tz(now) or get_now_brt()
         period_clean = (period or "30d").lower()
 
         if period_clean == "today":
-            start_date = datetime(now.year, now.month, now.day, 0, 0, 0, tzinfo=timezone.utc)
-            end_date = now
+            start_brt = datetime(now_brt.year, now_brt.month, now_brt.day, 0, 0, 0, tzinfo=BRASILIA_TZ)
+            end_brt = now_brt
             delta = timedelta(days=1)
-            prev_start = start_date - delta
-            prev_end = start_date
+            prev_start_brt = start_brt - delta
+            prev_end_brt = start_brt
         elif period_clean == "7d":
-            start_date = now - timedelta(days=7)
-            end_date = now
+            start_brt = datetime(now_brt.year, now_brt.month, now_brt.day, 0, 0, 0, tzinfo=BRASILIA_TZ) - timedelta(days=6)
+            end_brt = now_brt
             delta = timedelta(days=7)
-            prev_start = start_date - delta
-            prev_end = start_date
+            prev_start_brt = start_brt - delta
+            prev_end_brt = start_brt
         elif period_clean == "month":
-            start_date = datetime(now.year, now.month, 1, 0, 0, 0, tzinfo=timezone.utc)
-            end_date = now
-            # Mês anterior
-            last_month = (start_date - timedelta(days=1)).replace(day=1)
-            prev_start = last_month
-            prev_end = start_date
+            start_brt = datetime(now_brt.year, now_brt.month, 1, 0, 0, 0, tzinfo=BRASILIA_TZ)
+            end_brt = now_brt
+            last_month = (start_brt - timedelta(days=1)).replace(day=1)
+            prev_start_brt = last_month
+            prev_end_brt = start_brt
         elif period_clean == "all":
-            start_date = now - timedelta(days=365)
-            end_date = now
-            prev_start = start_date - timedelta(days=365)
-            prev_end = start_date
+            start_brt = now_brt - timedelta(days=365)
+            end_brt = now_brt
+            prev_start_brt = start_brt - timedelta(days=365)
+            prev_end_brt = start_brt
         else:  # default '30d'
-            start_date = now - timedelta(days=30)
-            end_date = now
+            start_brt = datetime(now_brt.year, now_brt.month, now_brt.day, 0, 0, 0, tzinfo=BRASILIA_TZ) - timedelta(days=29)
+            end_brt = now_brt
             delta = timedelta(days=30)
-            prev_start = start_date - delta
-            prev_end = start_date
+            prev_start_brt = start_brt - delta
+            prev_end_brt = start_brt
 
-        return start_date, end_date, prev_start, prev_end
+        # Converte para UTC para filtro SQL preciso
+        start_utc = start_brt.astimezone(timezone.utc)
+        end_utc = end_brt.astimezone(timezone.utc) if end_brt.tzinfo else end_brt.replace(tzinfo=timezone.utc)
+        prev_start_utc = prev_start_brt.astimezone(timezone.utc)
+        prev_end_utc = prev_end_brt.astimezone(timezone.utc)
+
+        return start_utc, end_utc, prev_start_utc, prev_end_utc
 
     def _calculate_trend(self, current_val: float, prev_val: float) -> Tuple[Optional[float], Optional[str]]:
         """Calcula a variação percentual e direção da tendência."""
@@ -336,20 +342,30 @@ class AnalyticsService:
         prev_msgs: List[MessageRecord],
         prev_tasks: List[TaskRecord],
     ) -> KPICard:
-        curr_msgs_count = len(current_msgs)
-        curr_tasks_count = len(current_tasks)
-        curr_rate = (curr_tasks_count / curr_msgs_count * 100.0) if curr_msgs_count > 0 else 0.0
+        curr_msg_ids = set(m.id for m in current_msgs)
+        curr_actionable_msg_ids = set(t.message_id for t in current_tasks if t.message_id)
+        for m in current_msgs:
+            if (m.intent or "").upper() in ("TASK", "ACTION", "COMMITMENT"):
+                curr_actionable_msg_ids.add(m.id)
+        actionable_in_curr = curr_actionable_msg_ids.intersection(curr_msg_ids)
+        curr_rate = (len(actionable_in_curr) / len(current_msgs) * 100.0) if current_msgs else 0.0
+        curr_rate = min(100.0, max(0.0, curr_rate))
 
-        prev_msgs_count = len(prev_msgs)
-        prev_tasks_count = len(prev_tasks)
-        prev_rate = (prev_tasks_count / prev_msgs_count * 100.0) if prev_msgs_count > 0 else 0.0
+        prev_msg_ids = set(m.id for m in prev_msgs)
+        prev_actionable_msg_ids = set(t.message_id for t in prev_tasks if t.message_id)
+        for m in prev_msgs:
+            if (m.intent or "").upper() in ("TASK", "ACTION", "COMMITMENT"):
+                prev_actionable_msg_ids.add(m.id)
+        actionable_in_prev = prev_actionable_msg_ids.intersection(prev_msg_ids)
+        prev_rate = (len(actionable_in_prev) / len(prev_msgs) * 100.0) if prev_msgs else 0.0
+        prev_rate = min(100.0, max(0.0, prev_rate))
 
         trend, dir_ = self._calculate_trend(curr_rate, prev_rate)
 
         return KPICard(
             title="Taxa de Ação (% Tarefas)",
             value=f"{round(curr_rate, 1)}%",
-            subtitle=f"{curr_tasks_count} tarefas geradas",
+            subtitle=f"{len(current_tasks)} tarefas ({len(actionable_in_curr)} de {len(current_msgs)} conversas)",
             trend_pct=trend,
             trend_direction=dir_,
             icon="🎯",
@@ -381,24 +397,57 @@ class AnalyticsService:
         end_date: datetime,
         group_by: str,
     ) -> List[TimeSeriesPoint]:
-        """Gera pontos agregados no tempo por dia, semana ou mês."""
+        """Gera pontos agregados no tempo por dia, semana ou mês no fuso de Brasília (UTC-3)."""
         group_by_clean = (group_by or "day").lower()
-        buckets: Dict[str, Dict[str, Any]] = defaultdict(
-            lambda: {
-                "raw_date": "",
-                "label": "",
-                "speakers": set(),
-                "total": 0,
-                "audios": 0,
-                "texts": 0,
-                "chars_list": [],
-                "durations_list": [],
-                "tasks": 0,
-            }
-        )
+        buckets: Dict[str, Dict[str, Any]] = {}
 
+        # 1. Pre-popula o intervalo para garantir série temporal contínua
+        start_brt = to_local_tz(start_date)
+        end_brt = to_local_tz(end_date)
+
+        if group_by_clean == "day" and start_brt and end_brt:
+            curr_cursor = start_brt.date()
+            end_cursor = end_brt.date()
+            while curr_cursor <= end_cursor:
+                b_key = curr_cursor.strftime("%Y-%m-%d")
+                b_label = curr_cursor.strftime("%d/%m")
+                buckets[b_key] = {
+                    "raw_date": b_key,
+                    "label": b_label,
+                    "speakers": set(),
+                    "total": 0,
+                    "audios": 0,
+                    "texts": 0,
+                    "chars_list": [],
+                    "durations_list": [],
+                    "tasks": 0,
+                }
+                curr_cursor += timedelta(days=1)
+        elif group_by_clean == "month" and start_brt and end_brt:
+            curr_cursor = start_brt.date().replace(day=1)
+            end_cursor = end_brt.date()
+            while curr_cursor <= end_cursor:
+                b_key = curr_cursor.strftime("%Y-%m")
+                b_label = curr_cursor.strftime("%b/%y")
+                buckets[b_key] = {
+                    "raw_date": b_key,
+                    "label": b_label,
+                    "speakers": set(),
+                    "total": 0,
+                    "audios": 0,
+                    "texts": 0,
+                    "chars_list": [],
+                    "durations_list": [],
+                    "tasks": 0,
+                }
+                if curr_cursor.month == 12:
+                    curr_cursor = curr_cursor.replace(year=curr_cursor.year + 1, month=1)
+                else:
+                    curr_cursor = curr_cursor.replace(month=curr_cursor.month + 1)
+
+        # 2. Agrupa mensagens convertendo para horário de Brasília
         for m in messages:
-            dt = m.created_at
+            dt = to_local_tz(m.created_at)
             if not dt:
                 continue
 
@@ -413,9 +462,20 @@ class AnalyticsService:
                 bucket_key = dt.strftime("%Y-%m-%d")
                 label = dt.strftime("%d/%m")
 
+            if bucket_key not in buckets:
+                buckets[bucket_key] = {
+                    "raw_date": bucket_key,
+                    "label": label,
+                    "speakers": set(),
+                    "total": 0,
+                    "audios": 0,
+                    "texts": 0,
+                    "chars_list": [],
+                    "durations_list": [],
+                    "tasks": 0,
+                }
+
             b = buckets[bucket_key]
-            b["raw_date"] = bucket_key
-            b["label"] = label
             if m.speaker:
                 b["speakers"].add(m.speaker)
             b["total"] += 1
@@ -430,9 +490,9 @@ class AnalyticsService:
             if text_len > 0:
                 b["chars_list"].append(text_len)
 
-        # Mapeia tarefas aos buckets
+        # 3. Mapeia tarefas aos buckets
         for t in tasks:
-            dt = t.created_at
+            dt = to_local_tz(t.created_at)
             if not dt:
                 continue
             if group_by_clean == "week":
@@ -474,11 +534,81 @@ class AnalyticsService:
         self,
         messages: List[MessageRecord],
         tasks: List[TaskRecord],
-        contacts_map: Dict[str, ContactRecord],
+        all_contacts: List[ContactRecord],
     ) -> List[TopSenderMetric]:
-        """Agrupa métricas por remetente e retorna o ranking ordenado."""
+        """Agrupa métricas por remetente canônico de Clio e retorna o ranking dos 10 principais interlocutores."""
+        # 1. Constrói índices de busca rápida dos contatos de Clio
+        contacts_by_id = {c.id: c for c in all_contacts}
+        contacts_by_name = {normalize_text(c.name): c for c in all_contacts if c.name}
+        contacts_by_nick = {normalize_text(c.nickname): c for c in all_contacts if c.nickname}
+        contacts_by_phone = {}
+        contacts_by_suffix8 = {}
+
+        for c in all_contacts:
+            if c.phone_number:
+                digits = re.sub(r"\D", "", c.phone_number)
+                if digits:
+                    contacts_by_phone[digits] = c
+                    if len(digits) >= 8:
+                        contacts_by_suffix8[digits[-8:]] = c
+
+        def resolve_contact(m: MessageRecord) -> Tuple[str, Optional[ContactRecord]]:
+            meta = m.meta_info or {}
+            raw_spk = (m.speaker or "").strip()
+            remote_jid = str(meta.get("remoteJid") or "")
+            push_name = str(meta.get("pushName") or "")
+            phone = str(meta.get("phone") or "")
+
+            # Match 1: Por ID de contato se m.speaker for 'wa_...'
+            if raw_spk in contacts_by_id:
+                return raw_spk, contacts_by_id[raw_spk]
+
+            # Match 2: Por telefone (remoteJid, phone ou m.speaker)
+            candidates = [raw_spk, remote_jid.split("@")[0], phone]
+            for cand in candidates:
+                dig = re.sub(r"\D", "", cand)
+                if not dig:
+                    continue
+                if dig in contacts_by_phone:
+                    c = contacts_by_phone[dig]
+                    return c.id, c
+                if len(dig) >= 8 and dig[-8:] in contacts_by_suffix8:
+                    c = contacts_by_suffix8[dig[-8:]]
+                    return c.id, c
+
+            # Match 3: Por nome ou apelido normalizado
+            for name_cand in [raw_spk, push_name]:
+                if not name_cand:
+                    continue
+                norm = normalize_text(name_cand)
+                if norm in contacts_by_name:
+                    c = contacts_by_name[norm]
+                    return c.id, c
+                if norm in contacts_by_nick:
+                    c = contacts_by_nick[norm]
+                    return c.id, c
+
+            # Se não encontrado em Clio:
+            clean_display = push_name if push_name and not push_name.isdigit() else raw_spk
+            dig = re.sub(r"\D", "", clean_display)
+            if len(dig) in (10, 11) and not clean_display.startswith("("):
+                ddd = dig[:2]
+                rest = dig[2:]
+                clean_display = f"({ddd}) {rest[:-4]}-{rest[-4:]}"
+            elif len(dig) in (12, 13) and dig.startswith("55") and not clean_display.startswith("("):
+                ddd = dig[2:4]
+                rest = dig[4:]
+                clean_display = f"({ddd}) {rest[:-4]}-{rest[-4:]}"
+
+            return f"raw_{clean_display}", None
+
+        # 2. Agrupa métricas
         sender_data: Dict[str, Dict[str, Any]] = defaultdict(
             lambda: {
+                "display_name": "",
+                "role": "UNKNOWN",
+                "phone_number": None,
+                "avatar_url": None,
                 "total": 0,
                 "audios": 0,
                 "total_duration": 0.0,
@@ -488,9 +618,26 @@ class AnalyticsService:
             }
         )
 
+        msg_canonical_map = {}
+
         for m in messages:
-            spk = m.speaker or "Desconhecido"
-            sd = sender_data[spk]
+            if is_owner_interaction(m.speaker, m.meta_info) or is_group_message(m.speaker):
+                continue
+
+            can_id, contact = resolve_contact(m)
+            msg_canonical_map[m.id] = can_id
+            sd = sender_data[can_id]
+
+            if contact:
+                sd["display_name"] = contact.name + (f" ({contact.nickname})" if contact.nickname and contact.nickname != contact.name else "")
+                sd["role"] = contact.role.value if hasattr(contact.role, "value") else str(contact.role or "UNKNOWN")
+                sd["phone_number"] = contact.phone_number
+                sd["avatar_url"] = contact.avatar_url
+            else:
+                if not sd["display_name"]:
+                    meta_p = (m.meta_info or {}).get("pushName")
+                    sd["display_name"] = meta_p if meta_p and not meta_p.isdigit() else can_id.replace("raw_", "")
+
             sd["total"] += 1
             if m.audio_duration_s:
                 sd["audios"] += 1
@@ -500,18 +647,17 @@ class AnalyticsService:
             if m.sentiment_score is not None:
                 sd["scores"].append(m.sentiment_score)
 
-        # Mapeia tarefas aos remetentes das mensagens
-        msg_sender_map = {m.id: (m.speaker or "Desconhecido") for m in messages}
+        # Mapeia tarefas
         for t in tasks:
-            spk = msg_sender_map.get(t.message_id)
-            if spk and spk in sender_data:
-                sender_data[spk]["tasks"] += 1
+            can_id = msg_canonical_map.get(t.message_id)
+            if can_id and can_id in sender_data:
+                sender_data[can_id]["tasks"] += 1
 
         top_list = []
-        for spk, data in sender_data.items():
-            contact = contacts_map.get(spk.lower())
-            
-            # Sentimento dominante
+        for can_id, data in sender_data.items():
+            if data["total"] == 0:
+                continue
+
             dom_sentiment = "NEUTRAL"
             if data["sentiments"]:
                 dom_sentiment = Counter(data["sentiments"]).most_common(1)[0][0]
@@ -519,10 +665,10 @@ class AnalyticsService:
 
             top_list.append(
                 TopSenderMetric(
-                    speaker=spk,
-                    role=contact.role if contact else (contact.category if contact else "UNKNOWN"),
-                    phone_number=contact.phone_number if contact else None,
-                    avatar_url=contact.avatar_url if contact else None,
+                    speaker=data["display_name"],
+                    role=data["role"],
+                    phone_number=data["phone_number"],
+                    avatar_url=data["avatar_url"],
                     total_messages=data["total"],
                     audio_count=data["audios"],
                     total_duration_s=round(data["total_duration"], 1),
@@ -532,9 +678,8 @@ class AnalyticsService:
                 )
             )
 
-        # Ordena por total de mensagens decrescente
         top_list.sort(key=lambda x: x.total_messages, reverse=True)
-        return top_list[:15]
+        return top_list[:10]
 
     def _generate_wordmap(self, messages: List[MessageRecord]) -> List[WordFrequencyItem]:
         """Gera frequência de termos estratégicos e sintagmas nominais compostos utilizando spaCy NLP."""
@@ -663,15 +808,15 @@ class AnalyticsService:
         return items
 
     def _generate_heatmap(self, messages: List[MessageRecord]) -> List[HeatmapCell]:
-        """Gera matriz 24h x 7 dias para identificar horários de pico."""
+        """Gera matriz 24h x 7 dias no Horário Oficial de Brasília (UTC-3) para identificar horários de pico."""
         matrix: Dict[Tuple[int, int], int] = defaultdict(int)
 
         for m in messages:
-            dt = m.created_at
+            dt = to_local_tz(m.created_at)
             if not dt:
                 continue
-            day_of_week = dt.weekday()  # 0 = Segunda, 6 = Domingo
-            hour = dt.hour
+            day_of_week = dt.weekday()  # 0 = Segunda, 6 = Domingo (Brasília)
+            hour = dt.hour  # 0 a 23 (Brasília)
             matrix[(day_of_week, hour)] += 1
 
         day_names = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]

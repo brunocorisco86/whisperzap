@@ -2957,7 +2957,8 @@ function renderHeatmapGrid(cells) {
     dayCells.forEach(cell => {
       const opacity = cell.count === 0 ? 0.04 : Math.min(0.2 + (cell.count / maxCount) * 0.8, 1.0);
       const bg = cell.count === 0 ? 'rgba(255,255,255,0.03)' : `rgba(14, 165, 233, ${opacity})`;
-      const title = `${dayNames[d]} às ${cell.hour}:00 - ${cell.count} mensagem(ns)`;
+      const hourFmt = String(cell.hour).padStart(2, '0');
+      const title = `${dayNames[d]} às ${hourFmt}:00 (UTC-3) — ${cell.count} mensagem(ns)`;
       cellsHtml += `<div class="heatmap-cell" style="background: ${bg};" title="${title}"></div>`;
     });
 

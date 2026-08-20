@@ -180,3 +180,113 @@ def test_wordmap_spacy_compound_phrase_extraction():
         db.close()
 
 
+def test_analytics_utc3_heatmap_and_timeseries_continuity():
+    """Valida que o heatmap calcula a hora e dia em UTC-3 e que timeseries contém dias contínuos."""
+    from src.memory.timezone_utils import BRASILIA_TZ, to_local_tz
+    from src.contacts.models import ContactRecord
+
+    db = SessionLocal()
+    try:
+        # Mensagem às 15:00 UTC (que equivale a 12:00 UTC-3 em Brasília)
+        dt_utc = datetime(2026, 8, 20, 15, 0, 0, tzinfo=timezone.utc)
+        m = MessageRecord(
+            id="test-msg-utc3",
+            created_at=dt_utc,
+            speaker="Alice Agro",
+            revised_text="Verificação do sensor de nível no silo.",
+            audio_duration_s=20.0,
+        )
+        db.add(m)
+        db.commit()
+
+        metrics = analytics_service.get_dashboard_metrics(period="7d", group_by="day", db=db)
+        
+        # 1. Heatmap deve ter marcado na hora 12 (15 UTC - 3 = 12 BRT)
+        dt_brt = to_local_tz(dt_utc)
+        target_cell = next((c for c in metrics.heatmap if c.day_of_week == dt_brt.weekday() and c.hour == 12), None)
+        assert target_cell is not None
+        assert target_cell.count >= 1
+
+        # 2. Timeseries deve ter 7 pontos contínuos cobrindo os últimos 7 dias
+        assert len(metrics.timeseries) == 7
+        assert all(isinstance(p.avg_chars, float) for p in metrics.timeseries)
+        assert all(isinstance(p.avg_audio_duration_s, float) for p in metrics.timeseries)
+    finally:
+        db.close()
+
+
+def test_analytics_top_senders_clio_contact_resolution():
+    """Garante que números de telefone ou IDs não cadastrados são mapeados aos contatos de Clio."""
+    from src.contacts.models import ContactRecord
+
+    db = SessionLocal()
+    try:
+        # Cadastra contato em Clio
+        c1 = ContactRecord(
+            id="clio-cvale-1",
+            name="Roberto Engenheiro",
+            nickname="Beto",
+            phone_number="5544988776655",
+            role="ENGINEER",
+            avatar_url="http://avatar.example.com/beto.jpg",
+        )
+        db.add(c1)
+
+        # Mensagem enviada pelo número de telefone sem o nome
+        m1 = MessageRecord(
+            id="msg-phone-unresolved",
+            created_at=datetime.now(timezone.utc),
+            speaker="5544988776655",
+            meta_info={"phone": "5544988776655", "pushName": "Beto"},
+            revised_text="Relatório dos sensores enviado.",
+            audio_duration_s=12.0,
+        )
+        db.add(m1)
+        db.commit()
+
+        metrics = analytics_service.get_dashboard_metrics(period="7d", group_by="day", db=db)
+        top_speakers = [s.speaker for s in metrics.top_senders]
+        
+        # O speaker deve ter sido resolvido para o nome de Clio: 'Roberto Engenheiro (Beto)'
+        assert any("Roberto Engenheiro" in spk for spk in top_speakers)
+        resolved_metric = next(s for s in metrics.top_senders if "Roberto Engenheiro" in s.speaker)
+        assert resolved_metric.role == "ENGINEER"
+        assert resolved_metric.avatar_url == "http://avatar.example.com/beto.jpg"
+    finally:
+        db.close()
+
+
+def test_analytics_actionability_rate_never_exceeds_100_percent():
+    """Garante que a taxa de ação é matematicamente limitada entre 0% e 100% mesmo com múltiplas tarefas por mensagem."""
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        m = MessageRecord(
+            id="msg-multi-tasks",
+            created_at=now,
+            speaker="Diretoria",
+            revised_text="Comprar insumos, contatar produtor e agendar caminhão.",
+            audio_duration_s=15.0,
+        )
+        db.add(m)
+        
+        # Adiciona 5 tarefas para 1 única mensagem
+        for i in range(5):
+            t = TaskRecord(
+                id=f"multi-task-{i}",
+                message_id="msg-multi-tasks",
+                created_at=now,
+                title=f"Ação {i}",
+                status="PENDING",
+            )
+            db.add(t)
+        db.commit()
+
+        metrics = analytics_service.get_dashboard_metrics(period="7d", group_by="day", db=db)
+        val_str = metrics.kpi_actionability_rate.value.replace("%", "").strip()
+        val_float = float(val_str)
+        assert 0.0 <= val_float <= 100.0
+    finally:
+        db.close()
+
+
