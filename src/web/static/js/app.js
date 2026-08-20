@@ -531,6 +531,57 @@ document.addEventListener('DOMContentLoaded', async () => {
       showToast('Feed de mensagens atualizado!');
     });
   }
+
+  // Euterpe Contact Sync & Terminal Listeners
+  const btnEuterpeTriggerUpload = document.getElementById('btn-euterpe-trigger-upload');
+  const euterpeFileInput = document.getElementById('euterpe-vcard-file-input');
+  const btnEuterpeUploadVCard = document.getElementById('btn-euterpe-upload-vcard');
+  const euterpeFilenameSpan = document.getElementById('euterpe-selected-filename');
+  const btnEuterpeImportDir = document.getElementById('btn-euterpe-import-dir');
+  const btnEuterpeDeduplicate = document.getElementById('btn-euterpe-deduplicate');
+  const btnEuterpeSyncAvatars = document.getElementById('btn-euterpe-sync-avatars');
+  const btnEuterpePipeline = document.getElementById('btn-euterpe-pipeline');
+  const btnEuterpeClearTerminal = document.getElementById('btn-euterpe-clear-terminal');
+  const btnEuterpeCopyLogs = document.getElementById('btn-euterpe-copy-logs');
+
+  if (btnEuterpeTriggerUpload && euterpeFileInput) {
+    btnEuterpeTriggerUpload.addEventListener('click', () => euterpeFileInput.click());
+    euterpeFileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        const file = e.target.files[0];
+        if (euterpeFilenameSpan) euterpeFilenameSpan.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+        if (btnEuterpeUploadVCard) btnEuterpeUploadVCard.style.display = 'inline-flex';
+      } else {
+        if (euterpeFilenameSpan) euterpeFilenameSpan.textContent = 'Nenhum arquivo selecionado';
+        if (btnEuterpeUploadVCard) btnEuterpeUploadVCard.style.display = 'none';
+      }
+    });
+  }
+
+  if (btnEuterpeUploadVCard) btnEuterpeUploadVCard.addEventListener('click', handleEuterpeVCardUpload);
+  if (btnEuterpeImportDir) btnEuterpeImportDir.addEventListener('click', handleEuterpeImportDirectory);
+  if (btnEuterpeDeduplicate) btnEuterpeDeduplicate.addEventListener('click', handleEuterpeDeduplicate);
+  if (btnEuterpeSyncAvatars) btnEuterpeSyncAvatars.addEventListener('click', handleEuterpeSyncAvatars);
+  if (btnEuterpePipeline) btnEuterpePipeline.addEventListener('click', handleEuterpeFullPipeline);
+
+  if (btnEuterpeClearTerminal) {
+    btnEuterpeClearTerminal.addEventListener('click', () => {
+      const term = document.getElementById('euterpe-terminal-logs');
+      if (term) term.innerHTML = '<div class="terminal-line text-muted">[00:00:00] ℹ️ Terminal limpo.</div>';
+      setEuterpeStatus('IDLE', 'badge-info');
+    });
+  }
+
+  if (btnEuterpeCopyLogs) {
+    btnEuterpeCopyLogs.addEventListener('click', () => {
+      const term = document.getElementById('euterpe-terminal-logs');
+      if (term) {
+        navigator.clipboard.writeText(term.innerText).then(() => {
+          showToast('📋 Logs do terminal copiados!');
+        });
+      }
+    });
+  }
 });
 
 // --- API Calls & Loading ---
@@ -3025,3 +3076,214 @@ function renderWordMapCloud(wordItems) {
     `;
   }).join('');
 }
+
+// ==========================================================================
+// EUTERPE — Central de Importação, Deduplicação & Terminal de Logs
+// ==========================================================================
+
+function logToEuterpeTerminal(message, type = 'info') {
+  const terminalEl = document.getElementById('euterpe-terminal-logs');
+  if (!terminalEl) return;
+
+  const now = new Date();
+  const timeStr = now.toTimeString().split(' ')[0];
+  const line = document.createElement('div');
+  line.className = `terminal-line ${type}`;
+  line.textContent = `[${timeStr}] ${message}`;
+  terminalEl.appendChild(line);
+  terminalEl.scrollTop = terminalEl.scrollHeight;
+}
+window.logToEuterpeTerminal = logToEuterpeTerminal;
+
+function setEuterpeStatus(statusText, badgeClass = 'badge-info') {
+  const statusEl = document.getElementById('euterpe-terminal-status');
+  if (statusEl) {
+    statusEl.textContent = statusText;
+    statusEl.className = `badge ${badgeClass}`;
+  }
+}
+window.setEuterpeStatus = setEuterpeStatus;
+
+// 1. Upload e Importação de Arquivo .vcf Local
+async function handleEuterpeVCardUpload() {
+  const fileInput = document.getElementById('euterpe-vcard-file-input');
+  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+    showToast('Selecione um arquivo .vcf ou .vcard primeiro', true);
+    return;
+  }
+
+  const file = fileInput.files[0];
+  setEuterpeStatus('IMPORTANDO...', 'badge-warning');
+  logToEuterpeTerminal(`📤 Enviando arquivo '${file.name}' (${(file.size / 1024).toFixed(1)} KB)...`, 'info');
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const res = await fetch('/api/v1/contacts/import-vcard', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      (data.details || []).forEach(d => logToEuterpeTerminal(d, 'success'));
+      logToEuterpeTerminal(`🎉 Importação concluída: ${data.imported_count} inseridos, ${data.updated_count} atualizados.`, 'success');
+      showToast(`vCard importado: +${data.imported_count} novos contatos!`);
+      setEuterpeStatus('CONCLUÍDO', 'badge-success');
+      await loadContacts();
+      loadStats();
+      loadGraphData();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      logToEuterpeTerminal(`❌ Erro no upload: ${err.detail || res.statusText}`, 'error');
+      setEuterpeStatus('ERRO', 'badge-danger');
+      showToast('Erro ao importar vCard', true);
+    }
+  } catch (err) {
+    logToEuterpeTerminal(`❌ Erro de conexão: ${err}`, 'error');
+    setEuterpeStatus('ERRO', 'badge-danger');
+  }
+}
+window.handleEuterpeVCardUpload = handleEuterpeVCardUpload;
+
+// 2. Importação do Diretório data/vcards/ da VPS
+async function handleEuterpeImportDirectory() {
+  setEuterpeStatus('LENDO DIRETÓRIO...', 'badge-warning');
+  logToEuterpeTerminal('📂 Solicitando importação da pasta data/vcards/ na VPS...', 'info');
+
+  try {
+    const res = await fetch('/api/v1/contacts/import-vcard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ directory: 'data/vcards' }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      (data.details || []).forEach(d => logToEuterpeTerminal(d, d.startsWith('❌') ? 'error' : d.startsWith('⚠️') ? 'warning' : 'success'));
+      logToEuterpeTerminal(`🎉 Total: ${data.imported_count} novos inseridos, ${data.updated_count} atualizados.`, 'success');
+      showToast(`Ingestão concluída: +${data.imported_count} novos contatos!`);
+      setEuterpeStatus('CONCLUÍDO', 'badge-success');
+      await loadContacts();
+      loadStats();
+      loadGraphData();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      logToEuterpeTerminal(`❌ Erro: ${err.detail || res.statusText}`, 'error');
+      setEuterpeStatus('ERRO', 'badge-danger');
+    }
+  } catch (err) {
+    logToEuterpeTerminal(`❌ Erro de conexão: ${err}`, 'error');
+    setEuterpeStatus('ERRO', 'badge-danger');
+  }
+}
+window.handleEuterpeImportDirectory = handleEuterpeImportDirectory;
+
+// 3. Deduplicação e Fusão de Contatos
+async function handleEuterpeDeduplicate() {
+  setEuterpeStatus('DEDUPLICANDO...', 'badge-warning');
+  logToEuterpeTerminal('🧹 Executando deduplicação, higienização e fusão canônica...', 'info');
+
+  try {
+    const res = await fetch('/api/v1/contacts/deduplicate', {
+      method: 'POST',
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const count = data.contacts_merged_count || 0;
+      logToEuterpeTerminal(`✨ Deduplicação concluída: ${count} contatos duplicados fundidos.`, 'success');
+      (data.merged_pairs || []).forEach(p => {
+        logToEuterpeTerminal(`  ➔ Canônico: "${p.canonical_name}" ⟵ Mesclado: "${p.merged_name}"`, 'info');
+      });
+      showToast(`Deduplicação: ${count} contatos mesclados!`);
+      setEuterpeStatus('CONCLUÍDO', 'badge-success');
+      await loadContacts();
+      loadStats();
+      loadGraphData();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      logToEuterpeTerminal(`❌ Erro na deduplicação: ${err.detail || res.statusText}`, 'error');
+      setEuterpeStatus('ERRO', 'badge-danger');
+    }
+  } catch (err) {
+    logToEuterpeTerminal(`❌ Erro de conexão: ${err}`, 'error');
+    setEuterpeStatus('ERRO', 'badge-danger');
+  }
+}
+window.handleEuterpeDeduplicate = handleEuterpeDeduplicate;
+
+// 4. Sincronização de Avatares e PushNames (Evolution API)
+async function handleEuterpeSyncAvatars() {
+  setEuterpeStatus('SINCRONIZANDO FOTOS...', 'badge-warning');
+  logToEuterpeTerminal('📸 Conectando à Evolution API para buscar fotos de perfil e nomes...', 'info');
+
+  try {
+    const res = await fetch('/api/v1/contacts/sync-avatars', {
+      method: 'POST',
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      (data.details || []).forEach(d => logToEuterpeTerminal(d, d.startsWith('❌') ? 'error' : 'success'));
+      logToEuterpeTerminal(`🎉 Sincronização concluída: ${data.updated_avatars} fotos e ${data.updated_names} nomes atualizados.`, 'success');
+      showToast(`Avatares: ${data.updated_avatars} fotos atualizadas!`);
+      setEuterpeStatus('CONCLUÍDO', 'badge-success');
+      await loadContacts();
+      loadStats();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      logToEuterpeTerminal(`❌ Erro ao buscar fotos: ${err.detail || res.statusText}`, 'error');
+      setEuterpeStatus('ERRO', 'badge-danger');
+    }
+  } catch (err) {
+    logToEuterpeTerminal(`❌ Erro de conexão: ${err}`, 'error');
+    setEuterpeStatus('ERRO', 'badge-danger');
+  }
+}
+window.handleEuterpeSyncAvatars = handleEuterpeSyncAvatars;
+
+// 5. Pipeline Mestre Completo (vCard + Dedup + Avatares + Grafo)
+async function handleEuterpeFullPipeline() {
+  setEuterpeStatus('EXECUTANDO PIPELINE...', 'badge-warning');
+  logToEuterpeTerminal('🚀 Disparando Pipeline Mestre de Contatos...', 'info');
+
+  try {
+    const res = await fetch('/api/v1/contacts/pipeline', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ directory: 'data/vcards' }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      (data.details || []).forEach(d => {
+        if (d.includes('===')) {
+          logToEuterpeTerminal(d, 'info');
+        } else if (d.startsWith('❌')) {
+          logToEuterpeTerminal(d, 'error');
+        } else if (d.startsWith('⚠️')) {
+          logToEuterpeTerminal(d, 'warning');
+        } else {
+          logToEuterpeTerminal(d, 'success');
+        }
+      });
+      showToast('🎉 Pipeline Mestre concluído com sucesso!');
+      setEuterpeStatus('CONCLUÍDO', 'badge-success');
+      await loadContacts();
+      loadStats();
+      loadGraphData();
+      renderMessages();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      logToEuterpeTerminal(`❌ Falha no Pipeline: ${err.detail || res.statusText}`, 'error');
+      setEuterpeStatus('ERRO', 'badge-danger');
+    }
+  } catch (err) {
+    logToEuterpeTerminal(`❌ Erro de conexão no Pipeline: ${err}`, 'error');
+    setEuterpeStatus('ERRO', 'badge-danger');
+  }
+}
+window.handleEuterpeFullPipeline = handleEuterpeFullPipeline;
+

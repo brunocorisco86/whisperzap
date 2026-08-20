@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 
 logger = logging.getLogger(__name__)
 from sqlalchemy.orm import Session
@@ -231,4 +231,77 @@ async def get_contact_profile(phone: str, db: Session = Depends(get_db)):
         "name": push_name,
         "profile_picture_url": picture_url,
     }
+
+
+@router.post("/import-vcard")
+async def import_vcard_endpoint(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Importa contatos a partir de texto bruto ou diretório padrão da VPS."""
+    content_type = request.headers.get("content-type", "")
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        uploaded_file = form.get("file")
+        if uploaded_file and hasattr(uploaded_file, "read"):
+            content_bytes = await uploaded_file.read()
+            vcard_text = content_bytes.decode("utf-8", errors="ignore")
+            filename = getattr(uploaded_file, "filename", "upload.vcf")
+            return contact_service.import_vcards_from_text(vcard_text, source_label=filename, db=db)
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    if payload and payload.get("content"):
+        return contact_service.import_vcards_from_text(payload["content"], source_label="raw_text", db=db)
+
+    dir_path = payload.get("directory", "data/vcards") if payload else "data/vcards"
+    return contact_service.import_vcards_from_directory(dir_path=dir_path, db=db)
+
+
+@router.post("/upload-vcard")
+async def upload_vcard_endpoint(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Faz upload de arquivo .vcf / .vcard e processa importação de contatos."""
+    content_bytes = await file.read()
+    vcard_text = content_bytes.decode("utf-8", errors="ignore")
+    return contact_service.import_vcards_from_text(vcard_text, source_label=file.filename or "upload.vcf", db=db)
+
+
+
+@router.post("/deduplicate")
+async def deduplicate_contacts_endpoint(
+    dry_run: bool = Query(default=False, description="Simula deduplicação sem aplicar alterações"),
+    db: Session = Depends(get_db),
+):
+    """Executa deduplicação profunda, expurgo de contatos inválidos/grupos e mesclagem canônica."""
+    if not dry_run:
+        contact_service.deduplicate_and_merge_contacts(db=db)
+    res = contact_service.deduplicate_contacts(dry_run=dry_run, db=db)
+    return res
+
+
+@router.post("/sync-avatars")
+async def sync_avatars_endpoint(
+    force_all: bool = Query(default=False, description="Força re-consulta mesmo para contatos com foto"),
+    db: Session = Depends(get_db),
+):
+    """Varre a base de contatos e atualiza fotos de perfil e nomes públicos via Evolution API."""
+    return await contact_service.sync_all_avatars_from_evolution(force_all=force_all, db=db)
+
+
+@router.post("/pipeline")
+async def run_contacts_pipeline_endpoint(
+    payload: Optional[dict] = None,
+    db: Session = Depends(get_db),
+):
+    """Executa a esteira completa: vCard + Deduplicação + Avatares WhatsApp + Grafo MUSA."""
+    vcard_content = payload.get("content") if payload else None
+    vcards_dir = payload.get("directory", "data/vcards") if payload else "data/vcards"
+    return await contact_service.run_full_contacts_pipeline(vcard_content=vcard_content, vcards_dir=vcards_dir, db=db)
+
 

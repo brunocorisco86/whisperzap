@@ -25,6 +25,14 @@ Todas as mudanças notáveis, refatorações arquiteturais, motores de IA e otim
 - **Pré-Preenchimento Automático**: Ao clicar no botão, o modal de contato de Clio é aberto com o número de WhatsApp formatado, o nome do remetente (ou *pushName* do WhatsApp) e nota contextual da mensagem preenchidos automaticamente.
 - **Sincronização Reativa em Tempo Real**: Ao salvar o contato, a memória e o feed de Calíope são atualizados imediatamente na interface sem necessidade de recarregar a página.
 
+### 🏛️ 5. Euterpe: Central de Operações de Contatos & Miniterminal de Execução ao Vivo
+- **Ingestão de vCards (.vcf / .vcard)**: Suporte a upload direto de arquivos vCard locais e importação em lote dos arquivos contidos em `data/vcards/` na VPS com sanitização profunda e normalização telefônica.
+- **Deduplicação & Mesclagem Canônica**: Expurgo automático de grupos e números fora do padrão, consolidação do Proprietário (*Owner*) e unificação de cartões duplicados com transferência de mensagens e nós no grafo.
+- **Sincronização de Avatares (Evolution API)**: Varredura de fotos de perfil e nomes públicos do WhatsApp para enriquecer a base de contatos.
+- **Pipeline Mestre Unificado**: Execução encadeada de 4 etapas (vCard + Deduplicação + Avatares + Grafo MUSA) com status ao vivo.
+- **Miniterminal Retrô ao Vivo**: Console integrado na aba Euterpe com feedback em tempo real das etapas de execução, logs com timestamps, botão de cópia e limpeza.
+
+
 
 
 ---

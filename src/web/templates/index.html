@@ -742,6 +742,79 @@
         </div>
       </div>
 
+      <!-- Euterpe Contact Sync & Maintenance Console -->
+      <div class="card mt-4" id="euterpe-sync-panel">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 1rem;">
+          <div>
+            <h2 style="font-family: var(--font-display); font-size: 1.3rem; display: flex; align-items: center; gap: 0.6rem; color: #fef08a;">
+              ⚙️ Euterpe — Central de Importação, Deduplicação & Avatares
+            </h2>
+            <p class="text-muted" style="font-size: 0.85rem; margin-top: 0.25rem;">
+              Ferramentas de ingestão de vCards (.vcf), higienização de contatos, deduplicação canônica e sincronização de avatares com o WhatsApp.
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button class="btn btn-primary btn-sm" id="btn-euterpe-pipeline" title="Executa a esteira completa: vCard + Deduplicação + Avatares + Grafo MUSA">
+              🚀 Executar Pipeline Completo
+            </button>
+          </div>
+        </div>
+
+        <!-- Action Control Buttons & Upload -->
+        <div class="euterpe-actions-toolbar" style="padding: 1.25rem; display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.05);">
+          
+          <!-- Upload vCard File -->
+          <div class="euterpe-upload-group" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <input type="file" id="euterpe-vcard-file-input" accept=".vcf,.vcard" style="display: none;">
+            <button class="btn btn-secondary btn-sm" id="btn-euterpe-trigger-upload" title="Selecionar arquivo .vcf do seu computador">
+              📤 Selecionar .vcf Local
+            </button>
+            <span id="euterpe-selected-filename" class="text-muted" style="font-size: 0.8rem;">Nenhum arquivo selecionado</span>
+            <button class="btn btn-primary btn-sm" id="btn-euterpe-upload-vcard" style="display: none;" title="Fazer upload e importar contatos">
+              📥 Importar Arquivo
+            </button>
+          </div>
+
+          <div style="width: 1px; height: 28px; background: rgba(255,255,255,0.1);" class="hide-mobile"></div>
+
+          <!-- Server Directory Import -->
+          <button class="btn btn-secondary btn-sm" id="btn-euterpe-import-dir" title="Lê todos os arquivos .vcf presentes na pasta data/vcards/ da VPS">
+            📂 Importar data/vcards/ da VPS
+          </button>
+
+          <!-- Deduplicate -->
+          <button class="btn btn-secondary btn-sm" id="btn-euterpe-deduplicate" title="Expurga números fora do padrão/grupos e mescla contatos com mesmo telefone">
+            🧹 Deduplicar & Fundir
+          </button>
+
+          <!-- Sync Avatars -->
+          <button class="btn btn-secondary btn-sm" id="btn-euterpe-sync-avatars" title="Busca fotos de perfil e pushNames na Evolution API para contatos sem foto">
+            📸 Sincronizar Avatares
+          </button>
+        </div>
+
+        <!-- Mini Terminal / Live Console -->
+        <div class="euterpe-terminal-wrapper" style="padding: 1.25rem;">
+          <div class="euterpe-terminal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <span class="terminal-dot" style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981;"></span>
+              <span style="font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-primary); font-weight: 600;">
+                📟 TERMINAL DE EXECUÇÃO — Euterpe Live Logs
+              </span>
+              <span id="euterpe-terminal-status" class="badge badge-info" style="font-size: 0.7rem;">IDLE</span>
+            </div>
+            <div style="display: flex; gap: 0.4rem;">
+              <button class="btn btn-secondary btn-xs" id="btn-euterpe-copy-logs" title="Copiar logs do terminal">📋 Copiar Logs</button>
+              <button class="btn btn-secondary btn-xs" id="btn-euterpe-clear-terminal" title="Limpar histórico do terminal">🧹 Limpar</button>
+            </div>
+          </div>
+
+          <div class="euterpe-terminal-screen" id="euterpe-terminal-logs">
+            <div class="terminal-line text-muted">[00:00:00] ℹ️ Euterpe Terminal pronto. Selecione uma ação acima para iniciar a importação de vCards, deduplicação ou sincronização de avatares.</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Lore das 9 Musas de Mnemosine -->
       <div class="card mt-4">
         <div class="card-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">

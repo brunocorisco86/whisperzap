@@ -754,5 +754,345 @@ class ContactService:
             if should_close:
                 db.close()
 
+    def import_vcards_from_text(self, vcard_text: str, source_label: str = "upload", db: Session | None = None) -> Dict[str, Any]:
+        """Faz parsing de vCard e importa/atualiza contatos no banco e grafo."""
+        from src.contacts.parser import parse_vcard_text
+        should_close = False
+        if db is None:
+            db = SessionLocal()
+            should_close = True
+
+        logs: List[str] = []
+        logs.append(f"🔍 Iniciando parsing de vCard ({source_label})...")
+
+        try:
+            contacts_list = parse_vcard_text(vcard_text)
+            total_parsed = len(contacts_list)
+            logs.append(f"📋 Encontrados {total_parsed} registros válidos no arquivo vCard.")
+
+            if total_parsed == 0:
+                return {
+                    "total_parsed": 0,
+                    "imported_count": 0,
+                    "updated_count": 0,
+                    "skipped_count": 0,
+                    "details": logs,
+                }
+
+            existing_by_phone = {
+                c.phone_number: c for c in db.query(ContactRecord).filter(ContactRecord.phone_number.isnot(None)).all() if c.phone_number
+            }
+            existing_by_id = {c.id: c for c in db.query(ContactRecord).all()}
+
+            inserted = 0
+            updated = 0
+            skipped = 0
+
+            for item in contacts_list:
+                phone = (item.phone_number or "").strip()
+                name = (item.name or "").strip()
+
+                if not phone:
+                    if name and len(name) > 1:
+                        knowledge_graph.add_node(name, category="PERSON", details=item.notes or "Contato vCard (sem tel)")
+                        skipped += 1
+                    continue
+
+                c_id = generate_contact_id(name, phone)
+                if not c_id:
+                    skipped += 1
+                    continue
+
+                existing = existing_by_phone.get(phone) or existing_by_id.get(c_id)
+
+                if existing:
+                    if existing.name.isdigit() or (len(name) > len(existing.name) and not existing.name.startswith("wa_")):
+                        existing.name = name
+                    if item.company and not existing.company:
+                        existing.company = item.company
+                    if item.nickname and not existing.nickname:
+                        existing.nickname = item.nickname
+                    if item.notes and "Importado" not in (existing.notes or ""):
+                        existing.notes = f"{existing.notes} | {item.notes}" if existing.notes else item.notes
+                    if item.avatar_url and not existing.avatar_url:
+                        existing.avatar_url = item.avatar_url
+                    existing.updated_at = datetime.now(timezone.utc)
+                    self._sync_contact_to_graph(existing)
+                    updated += 1
+                else:
+                    new_rec = ContactRecord(
+                        id=c_id,
+                        phone_number=phone,
+                        name=name,
+                        nickname=item.nickname,
+                        role=item.role.value if hasattr(item.role, "value") else str(item.role),
+                        company=item.company,
+                        projects_json=item.projects or [],
+                        avatar_url=item.avatar_url,
+                        custom_weight=item.custom_weight,
+                        is_favorite=item.is_favorite,
+                        can_generate_tasks=item.can_generate_tasks,
+                        notes=item.notes or f"Importado via vCard ({source_label})",
+                        last_interaction_at=item.last_interaction_at,
+                        created_at=datetime.now(timezone.utc),
+                        updated_at=datetime.now(timezone.utc),
+                    )
+                    db.add(new_rec)
+                    existing_by_phone[phone] = new_rec
+                    existing_by_id[c_id] = new_rec
+                    self._sync_contact_to_graph(new_rec)
+                    inserted += 1
+
+            db.commit()
+            knowledge_graph._save()
+            logs.append(f"✅ Sucesso: +{inserted} novos contatos inseridos, {updated} atualizados, {skipped} ignorados.")
+            return {
+                "total_parsed": total_parsed,
+                "imported_count": inserted,
+                "updated_count": updated,
+                "skipped_count": skipped,
+                "details": logs,
+            }
+        except Exception as e:
+            logger.error(f"Erro ao importar vCards: {e}")
+            db.rollback()
+            logs.append(f"❌ Erro na importação de vCards: {e}")
+            return {
+                "total_parsed": 0,
+                "imported_count": 0,
+                "updated_count": 0,
+                "skipped_count": 0,
+                "details": logs,
+                "error": str(e),
+            }
+        finally:
+            if should_close:
+                db.close()
+
+    def import_vcards_from_directory(self, dir_path: str = "data/vcards", db: Session | None = None) -> Dict[str, Any]:
+        """Lê todos os arquivos .vcf na pasta e importa para o banco."""
+        import glob
+        import os
+
+        logs: List[str] = []
+        logs.append(f"📂 Varrendo diretório '{dir_path}' em busca de arquivos vCard...")
+
+        vcf_files = sorted(glob.glob(os.path.join(dir_path, "*.vcf")) + glob.glob(os.path.join(dir_path, "*.vcard")))
+        if not vcf_files:
+            logs.append(f"⚠️ Nenhum arquivo .vcf/.vcard encontrado em '{dir_path}'.")
+            return {
+                "total_parsed": 0,
+                "imported_count": 0,
+                "updated_count": 0,
+                "skipped_count": 0,
+                "details": logs,
+            }
+
+        total_p = 0
+        total_i = 0
+        total_u = 0
+        total_s = 0
+
+        for fpath in vcf_files:
+            fname = os.path.basename(fpath)
+            fsize_kb = round(os.path.getsize(fpath) / 1024, 1)
+            logs.append(f"📄 Processando '{fname}' ({fsize_kb} KB)...")
+            try:
+                with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+                res = self.import_vcards_from_text(content, source_label=fname, db=db)
+                total_p += res.get("total_parsed", 0)
+                total_i += res.get("imported_count", 0)
+                total_u += res.get("updated_count", 0)
+                total_s += res.get("skipped_count", 0)
+                logs.extend(res.get("details", []))
+            except Exception as fe:
+                logs.append(f"❌ Erro ao ler '{fname}': {fe}")
+
+        logs.append(f"🏁 Total Diretório: {total_p} lidos, +{total_i} novos, {total_u} atualizados.")
+        return {
+            "total_parsed": total_p,
+            "imported_count": total_i,
+            "updated_count": total_u,
+            "skipped_count": total_s,
+            "details": logs,
+        }
+
+    async def sync_all_avatars_from_evolution(self, force_all: bool = False, db: Session | None = None) -> Dict[str, Any]:
+        """Varre os contatos e sincroniza fotos de perfil (profilePicUrl) e pushName via Evolution API."""
+        import httpx
+        from src.config import settings
+
+        should_close = False
+        if db is None:
+            db = SessionLocal()
+            should_close = True
+
+        logs: List[str] = []
+        logs.append(f"📡 Conectando à Evolution API ({settings.EVOLUTION_API_URL})...")
+
+        try:
+            query = db.query(ContactRecord).filter(ContactRecord.phone_number.isnot(None))
+            if not force_all:
+                query = query.filter(ContactRecord.avatar_url.is_(None))
+            contacts = query.all()
+
+            logs.append(f"👥 Encontrados {len(contacts)} contatos elegíveis para sincronização de avatar.")
+
+            if not contacts:
+                logs.append("✨ Todos os contatos elegíveis já possuem foto de perfil sincronizada.")
+                return {
+                    "total_checked": 0,
+                    "updated_avatars": 0,
+                    "updated_names": 0,
+                    "failed_count": 0,
+                    "details": logs,
+                }
+
+            headers = {
+                "apikey": settings.EVOLUTION_API_KEY,
+                "Content-Type": "application/json",
+            }
+
+            updated_pics = 0
+            updated_names = 0
+            failed = 0
+
+            async with httpx.AsyncClient(timeout=2.5) as client:
+                # Teste rápido de conectividade com a Evolution API
+                try:
+                    test_url = f"{settings.EVOLUTION_API_URL.rstrip('/')}/instance/connectionState/{settings.EVOLUTION_INSTANCE}"
+                    await client.get(test_url, headers=headers)
+                except Exception as ce:
+                    logs.append(f"⚠️ Evolution API indisponível no momento ({settings.EVOLUTION_API_URL}): {ce}")
+                    return {
+                        "total_checked": len(contacts),
+                        "updated_avatars": 0,
+                        "updated_names": 0,
+                        "failed_count": len(contacts),
+                        "details": logs,
+                    }
+
+                for idx, c in enumerate(contacts, 1):
+                    digits = re.sub(r"\D", "", c.phone_number or "")
+                    if len(digits) in (10, 11) and not digits.startswith("55"):
+                        digits = f"55{digits}"
+                    if not digits or len(digits) < 10:
+                        continue
+
+                    pic_url = None
+                    push_name = None
+
+                    # 1. Foto de perfil
+                    try:
+                        url_pic = f"{settings.EVOLUTION_API_URL.rstrip('/')}/chat/fetchProfilePictureUrl/{settings.EVOLUTION_INSTANCE}"
+                        res_pic = await client.post(url_pic, headers=headers, json={"number": digits})
+                        if res_pic.status_code == 200:
+                            data_pic = res_pic.json()
+                            pic_url = data_pic.get("profilePictureUrl") or data_pic.get("url")
+                    except Exception:
+                        failed += 1
+
+                    # 2. PushName
+                    try:
+                        url_contacts = f"{settings.EVOLUTION_API_URL.rstrip('/')}/chat/findContacts/{settings.EVOLUTION_INSTANCE}"
+                        res_contacts = await client.post(url_contacts, headers=headers, json={"where": {"remoteJid": f"{digits}@s.whatsapp.net"}})
+                        if res_contacts.status_code == 200:
+                            data_contacts = res_contacts.json()
+                            if isinstance(data_contacts, list) and len(data_contacts) > 0:
+                                push_name = data_contacts[0].get("pushName")
+                                if not pic_url:
+                                    pic_url = data_contacts[0].get("profilePicUrl")
+                    except Exception:
+                        pass
+
+                    changed = False
+                    if pic_url and pic_url != c.avatar_url:
+                        c.avatar_url = pic_url
+                        updated_pics += 1
+                        changed = True
+                    if push_name and (c.name.isdigit() or c.name.startswith("55") or c.name.startswith("wa_") or not c.nickname):
+                        if not c.nickname:
+                            c.nickname = push_name
+                        changed = True
+                        updated_names += 1
+
+                    if changed:
+                        c.updated_at = datetime.now(timezone.utc)
+                        logs.append(f"[{idx}/{len(contacts)}] 📸 {c.name} ({digits}): avatar/nome atualizado.")
+
+                db.commit()
+
+            logs.append(f"🎉 Concluído: {updated_pics} fotos sincronizadas, {updated_names} nomes atualizados.")
+            return {
+                "total_checked": len(contacts),
+                "updated_avatars": updated_pics,
+                "updated_names": updated_names,
+                "failed_count": failed,
+                "details": logs,
+            }
+        except Exception as e:
+            logger.error(f"Erro ao sincronizar avatares da Evolution API: {e}")
+            logs.append(f"❌ Erro ao conectar na Evolution API: {e}")
+            return {
+                "total_checked": 0,
+                "updated_avatars": 0,
+                "updated_names": 0,
+                "failed_count": 0,
+                "details": logs,
+                "error": str(e),
+            }
+        finally:
+            if should_close:
+                db.close()
+
+    async def run_full_contacts_pipeline(self, vcard_content: str | None = None, vcards_dir: str = "data/vcards", db: Session | None = None) -> Dict[str, Any]:
+        """Executa a esteira completa: Importação vCard + Deduplicação/Merge + Sincronização de Avatares + Grafo MUSA."""
+        logs: List[str] = []
+        logs.append("================================================================")
+        logs.append("🚀 INICIANDO PIPELINE MESTRE DE SINCRONIZAÇÃO DE CONTATOS")
+        logs.append("================================================================")
+
+        # Passo 1: Importação de vCards
+        logs.append("📦 [ETAPA 1/4] Importação e Normalização de vCards...")
+        if vcard_content:
+            res_import = self.import_vcards_from_text(vcard_content, source_label="upload", db=db)
+        else:
+            res_import = self.import_vcards_from_directory(dir_path=vcards_dir, db=db)
+        logs.extend(res_import.get("details", []))
+
+        # Passo 2: Deduplicação e Limpeza
+        logs.append("🧹 [ETAPA 2/4] Executando Deduplicação Profunda e Consolidação...")
+        self.deduplicate_and_merge_contacts(db=db or SessionLocal())
+        res_dedup = self.deduplicate_contacts(dry_run=False, db=db)
+        merged_count = res_dedup.get("contacts_merged_count", 0)
+        logs.append(f"✨ Deduplicação: {merged_count} contatos duplicados fundidos e consolidados.")
+
+        # Passo 3: Sincronização de Avatares
+        logs.append("📸 [ETAPA 3/4] Sincronização de Fotos de Perfil e PushNames (Evolution API)...")
+        res_avatars = await self.sync_all_avatars_from_evolution(force_all=False, db=db)
+        logs.extend(res_avatars.get("details", []))
+
+        # Passo 4: Sincronização no Grafo
+        logs.append("🧠 [ETAPA 4/4] Atualizando Topologia Relacional no Grafo de Conhecimento...")
+        knowledge_graph._save()
+        total_nodes = knowledge_graph.graph.number_of_nodes()
+        total_edges = knowledge_graph.graph.number_of_edges()
+        logs.append(f"✨ Grafo MUSA atualizado: {total_nodes} entidades, {total_edges} conexões relacionais.")
+
+        logs.append("================================================================")
+        logs.append("🎉 PIPELINE MESTRE CONCLUÍDO COM SUCESSO!")
+        logs.append("================================================================")
+
+        return {
+            "status": "success",
+            "import_stats": res_import,
+            "dedup_stats": res_dedup,
+            "avatar_stats": res_avatars,
+            "graph_stats": {"nodes": total_nodes, "edges": total_edges},
+            "details": logs,
+        }
+
 
 contact_service = ContactService()
+
