@@ -185,35 +185,41 @@ async def get_contact_profile(phone: str, db: Session = Depends(get_db)):
         "Content-Type": "application/json",
     }
 
-    from src.contacts.service import get_evolution_working_proxy
+    from src.contacts.service import get_evolution_working_proxy, invalidate_evolution_proxy_cache
 
     picture_url = None
     push_name = None
 
     proxy = await get_evolution_working_proxy()
-    async with httpx.AsyncClient(proxy=proxy, timeout=6.0) as client:
-        # 1. Busca foto de perfil
-        try:
-            url_pic = f"{settings.EVOLUTION_API_URL.rstrip('/')}/chat/fetchProfilePictureUrl/{settings.EVOLUTION_INSTANCE}"
-            res_pic = await client.post(url_pic, headers=headers, json={"number": digits})
-            if res_pic.status_code == 200:
-                data_pic = res_pic.json()
-                picture_url = data_pic.get("profilePictureUrl") or data_pic.get("url")
-        except Exception as e:
-            logger.warning(f"Erro ao buscar foto na Evolution API para {digits}: {e}")
+    try:
+        async with httpx.AsyncClient(proxy=proxy, timeout=6.0) as client:
+            # 1. Busca foto de perfil
+            try:
+                url_pic = f"{settings.EVOLUTION_API_URL.rstrip('/')}/chat/fetchProfilePictureUrl/{settings.EVOLUTION_INSTANCE}"
+                res_pic = await client.post(url_pic, headers=headers, json={"number": digits})
+                if res_pic.status_code == 200:
+                    data_pic = res_pic.json()
+                    picture_url = data_pic.get("profilePictureUrl") or data_pic.get("url")
+            except Exception as e:
+                invalidate_evolution_proxy_cache()
+                logger.warning(f"Erro ao buscar foto na Evolution API para {digits}: {e}")
 
-        # 2. Busca pushName do contato no WhatsApp
-        try:
-            url_contacts = f"{settings.EVOLUTION_API_URL.rstrip('/')}/chat/findContacts/{settings.EVOLUTION_INSTANCE}"
-            res_contacts = await client.post(url_contacts, headers=headers, json={"where": {"remoteJid": f"{digits}@s.whatsapp.net"}})
-            if res_contacts.status_code == 200:
-                data_contacts = res_contacts.json()
-                if isinstance(data_contacts, list) and len(data_contacts) > 0:
-                    push_name = data_contacts[0].get("pushName")
-                    if not picture_url:
-                        picture_url = data_contacts[0].get("profilePicUrl")
-        except Exception as e:
-            logger.warning(f"Erro ao buscar pushName na Evolution API para {digits}: {e}")
+            # 2. Busca pushName do contato no WhatsApp
+            try:
+                url_contacts = f"{settings.EVOLUTION_API_URL.rstrip('/')}/chat/findContacts/{settings.EVOLUTION_INSTANCE}"
+                res_contacts = await client.post(url_contacts, headers=headers, json={"where": {"remoteJid": f"{digits}@s.whatsapp.net"}})
+                if res_contacts.status_code == 200:
+                    data_contacts = res_contacts.json()
+                    if isinstance(data_contacts, list) and len(data_contacts) > 0:
+                        push_name = data_contacts[0].get("pushName")
+                        if not picture_url:
+                            picture_url = data_contacts[0].get("profilePicUrl")
+            except Exception as e:
+                invalidate_evolution_proxy_cache()
+                logger.warning(f"Erro ao buscar pushName na Evolution API para {digits}: {e}")
+    except Exception as ce:
+        invalidate_evolution_proxy_cache()
+        logger.warning(f"Falha de conexão com Evolution API ({settings.EVOLUTION_API_URL}): {ce}")
 
     # Atualiza banco SQL se encontrado
     try:

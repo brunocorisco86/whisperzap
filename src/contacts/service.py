@@ -94,15 +94,26 @@ def record_to_response(
 
 
 _cached_working_proxy: Optional[str] = None
-_proxy_checked: bool = False
+_proxy_checked_at: float = 0.0
+_PROXY_CACHE_TTL_SECONDS = 300.0  # 5 minutos
 
-async def get_evolution_working_proxy() -> Optional[str]:
-    """Descobre e armazena em cache o proxy funcional para conexão com a Evolution API."""
-    global _cached_working_proxy, _proxy_checked
+
+def invalidate_evolution_proxy_cache() -> None:
+    """Invalida o cache de proxy para forçar nova sondagem no próximo acesso."""
+    global _cached_working_proxy, _proxy_checked_at
+    _cached_working_proxy = None
+    _proxy_checked_at = 0.0
+
+
+async def get_evolution_working_proxy(force_refresh: bool = False) -> Optional[str]:
+    """Descobre e armazena em cache o proxy funcional para conexão com a Evolution API com TTL auto-renovável."""
+    global _cached_working_proxy, _proxy_checked_at
+    import time
     import httpx
     from src.config import settings
 
-    if _proxy_checked:
+    now_ts = time.time()
+    if not force_refresh and (now_ts - _proxy_checked_at) < _PROXY_CACHE_TTL_SECONDS and _proxy_checked_at > 0:
         return _cached_working_proxy
 
     headers = {
@@ -122,13 +133,13 @@ async def get_evolution_working_proxy() -> Optional[str]:
                 res = await client.get(test_url, headers=headers)
                 if res.status_code in (200, 201, 401, 403, 404):
                     _cached_working_proxy = proxy
-                    _proxy_checked = True
+                    _proxy_checked_at = now_ts
                     return proxy
         except Exception:
             continue
 
-    _proxy_checked = True
     _cached_working_proxy = None
+    _proxy_checked_at = now_ts
     return None
 
 
