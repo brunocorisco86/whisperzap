@@ -367,6 +367,19 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
      - *Camada 3 (Cloud Pro)*: Conectores contínuos via protocolo CardDAV (Apple iCloud) e Google People API (OAuth2 com syncToken).
   3. Adotar modelo modular de Musas adicionais via *Feature Flags* no banco de dados (`active_muses`), permitindo upsell progressivo de *Terpsícore*, *Polímnia*, *Erato*, *Tália*, *Urânia* e *Melpômene*.
 
+---
+
+### ADR 012 — Ideação Arquitetural de Billing, Gateways de Pagamento (Asaas/Stripe) e Escala SaaS
+- **Data**: 2026-08-20
+- **Status**: Documentado para Roadmap Futuro (Somente Ideação / Sem Implementação de Código Imediata)
+- **Contexto**: Para viabilizar a comercialização futura do Mnemosine como produto SaaS B2B com alta escala, foi estruturada a estratégia de canais de pagamento e monetização automatizada para o Brasil e exterior.
+- **Diretrizes Estratégicas Registradas**:
+  1. **Gateway Nacional (Brasil / Agro / PMEs)**: Adoção do **Asaas** como gateway primário no Brasil, suportando **Pix Instantâneo** com webhook em $< 2\text{s}$, **Boleto Bancário Registrado** (essencial para cooperativas e produtores rurais), **Cartão de Crédito Recorrente** (sem comprometer o limite total do cliente) e **Emissão Automática de Nota Fiscal (NFS-e)**.
+  2. **Gateway Internacional**: Adoção do **Stripe Billing** para cobranças globais em USD/EUR, com Apple Pay e Google Pay.
+  3. **Auto-Provisionamento & Smart Dunning**: Fluxo de liberação de QR Code WhatsApp pós-confirmação via webhook e recuperação de inadimplência amigável com lembretes diretamente pelo WhatsApp.
+  4. **Escala Técnica em Kubernetes (K8s)**: Escala elástica de workers de Speech-to-Text orientada a eventos (KEDA) em instâncias Spot, Row-Level Security (RLS) no PostgreSQL para multi-tenancy e cache semântico local mantendo margem bruta superior a 88%.
+
+
 
 
 
