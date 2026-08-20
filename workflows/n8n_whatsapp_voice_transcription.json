@@ -54,9 +54,9 @@
         "conditions": {
           "string": [
             {
-              "value1": "={{ $json.body?.data?.messageType || $json.body?.messageType || ($json.body?.data?.message?.audioMessage ? 'audioMessage' : '') }}",
-              "operation": "contains",
-              "value2": "audio"
+              "value1": "={{ (() => { const msgType = $json.body?.data?.messageType || $json.body?.messageType || ''; const docMime = $json.body?.data?.message?.documentMessage?.mimetype || $json.body?.data?.message?.documentWithCaptionMessage?.message?.documentMessage?.mimetype || ''; const hasAudioMsg = !!($json.body?.data?.message?.audioMessage); if (msgType.includes('audio') || hasAudioMsg || (msgType.includes('document') && docMime.startsWith('audio/'))) return 'AUDIO'; return 'TEXT'; })() }}",
+              "operation": "equal",
+              "value2": "AUDIO"
             }
           ]
         }
@@ -83,7 +83,9 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"message\": {\n    \"key\": {\n      \"id\": \"{{ $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.id }}\",\n      \"fromMe\": {{ $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.fromMe ? true : false }},\n      \"remoteJid\": \"{{ $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid }}\"\n    }\n  },\n  \"convertToMp4\": false\n}",
-        "options": {}
+        "options": {
+          "timeout": 300000
+        }
       },
       "name": "Baixar Base64 (Evolution API)",
       "type": "n8n-nodes-base.httpRequest",
@@ -98,7 +100,9 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"base64\": \"{{ $json.base64 }}\",\n  \"language\": \"pt\"\n}",
-        "options": {}
+        "options": {
+          "timeout": 300000
+        }
       },
       "name": "Speech-to-Text (POST /transcribe)",
       "type": "n8n-nodes-base.httpRequest",
@@ -113,8 +117,11 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ text: $json.text, context: 'Mensagem de voz via WhatsApp do usuário.' }) }}",
-        "options": {}
+        "options": {
+          "timeout": 120000
+        }
       },
+      "onError": "continueRegularOutput",
       "name": "AI Gateway (POST /ai/revise)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
@@ -136,7 +143,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ number: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API)').item.json.body?.sender?.phone || '', text: ($json.text_revised || $json.text || '') }) }}",
+        "jsonBody": "={{ JSON.stringify({ number: $('Webhook WhatsApp (Evolution API)').item.json.body?.data?.key?.remoteJid || $('Webhook WhatsApp (Evolution API)').item.json.body?.sender?.phone || '', text: ($json.text_revised || $json.text || $('Speech-to-Text (POST /transcribe)').item.json.text || '') }) }}",
         "options": {}
       },
       "name": "Envia Transcrição (WhatsApp)",

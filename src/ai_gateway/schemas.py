@@ -20,6 +20,10 @@ class ReviseRequest(BaseModel):
         default=None,
         description="Metadados adicionais da mensagem de áudio",
     )
+    enable_highlights: bool = Field(
+        default=True,
+        description="Se deve gerar resumo executivo em tópicos quando o texto for longo (> 350 caracteres)",
+    )
 
 
 class ReviseResponse(BaseModel):
@@ -33,6 +37,14 @@ class ReviseResponse(BaseModel):
     provider: str = Field(..., description="Provedor de LLM utilizado na revisão")
     model: str = Field(..., description="Modelo utilizado na revisão")
     processing_time_ms: float = Field(..., description="Tempo de processamento em milissegundos")
+    is_fallback: bool = Field(
+        default=False,
+        description="Indica se o texto retornado é fallback bruto do Whisper por instabilidade da LLM",
+    )
+    summary_highlights: Optional[str] = Field(
+        default=None,
+        description="Destaques executivos (Key Points e Ações) quando a mensagem é extensa",
+    )
 
 
 class ExtractedTask(BaseModel):

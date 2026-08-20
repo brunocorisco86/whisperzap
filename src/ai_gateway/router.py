@@ -41,28 +41,37 @@ async def revise_transcription(request: ReviseRequest) -> ReviseResponse:
         context_block=context_block,
     )
 
+    is_fallback = False
+    provider_name = "unknown"
+    model_name = "unknown"
+
     try:
         provider = get_ai_provider(task="revise")
+        provider_name = provider.provider_name
+        model_name = provider.model_name
         revised_text = await provider.generate_text(
             prompt=prompt,
             system_instruction=REVISE_SYSTEM_PROMPT,
             temperature=0.0,
         )
     except Exception as exc:
-        logger.error(f"Erro ao processar revisão com {provider.provider_name if 'provider' in locals() else 'unknown'}: {exc}")
-        # Fallback gracioso caso haja falha externa: se der erro de API, não trava o usuário, retorna o texto original limpo
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Falha na comunicação com o provedor de IA: {str(exc)}",
+        logger.warning(
+            f"⚠️ [AI Gateway Revise] Falha ao comunicar com provedor de IA ({provider_name}): {exc}. "
+            "Acionando fallback gracioso com texto original do Whisper."
         )
+        is_fallback = True
+        revised_text = request.text.strip()
+        provider_name = "fallback-whisper-raw"
+        model_name = "none"
 
     duration_ms = (time.perf_counter() - start_time) * 1000
 
     return ReviseResponse(
         text_revised=revised_text,
-        provider=provider.provider_name,
-        model=provider.model_name,
+        provider=provider_name,
+        model=model_name,
         processing_time_ms=round(duration_ms, 2),
+        is_fallback=is_fallback,
     )
 
 

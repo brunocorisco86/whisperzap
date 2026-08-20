@@ -4,6 +4,7 @@ import json
 import logging
 import re
 import time
+from typing import Any
 from src.ai_gateway.prompts import EXTRACT_SYSTEM_PROMPT, EXTRACT_USER_TEMPLATE
 from src.ai_gateway.providers import get_ai_provider
 from src.ai_gateway.schemas import (
@@ -121,6 +122,31 @@ class SemanticExtractor:
         raw_unclear = parsed_data.get("unclear_terms", [])
         unclear_terms = [UnclearTerm(**u) if isinstance(u, dict) else u for u in raw_unclear if isinstance(u, (dict, UnclearTerm))]
 
+        # Normaliza strings de decisions, ideas e topics caso a LLM retorne dicts
+        def _to_string_list(items: Any) -> list[str]:
+            if not isinstance(items, list):
+                return []
+            result: list[str] = []
+            for item in items:
+                if isinstance(item, str):
+                    s = item.strip()
+                    if s:
+                        result.append(s)
+                elif isinstance(item, dict):
+                    # Se vier {"description": "...", "date": "..."}, extrai a descrição ou valores
+                    desc = item.get("description") or item.get("title") or item.get("text") or item.get("decision") or item.get("idea")
+                    if desc:
+                        result.append(str(desc).strip())
+                    else:
+                        result.append(", ".join(f"{k}: {v}" for k, v in item.items() if v))
+                elif item is not None:
+                    result.append(str(item).strip())
+            return result
+
+        decisions = _to_string_list(parsed_data.get("decisions", []))
+        ideas = _to_string_list(parsed_data.get("ideas", []))
+        topics = _to_string_list(parsed_data.get("topics", []))
+
         return SemanticExtractionResponse(
             intent=parsed_data.get("intent", "NOTE"),
             summary=parsed_data.get("summary", request.text[:100]),
@@ -130,9 +156,9 @@ class SemanticExtractor:
             entities=entities,
             triples=triples,
             unclear_terms=unclear_terms,
-            decisions=parsed_data.get("decisions", []),
-            ideas=parsed_data.get("ideas", []),
-            topics=parsed_data.get("topics", []),
+            decisions=decisions,
+            ideas=ideas,
+            topics=topics,
             urgency=parsed_data.get("urgency", "MEDIUM"),
             provider=self.provider.provider_name,
             model=self.provider.model_name,

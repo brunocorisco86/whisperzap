@@ -55,7 +55,7 @@ class GeminiProvider(BaseLLMProvider):
                 "parts": [{"text": system_instruction}]
             }
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(url, json=payload)
             if response.status_code != 200:
                 logger.error(f"Erro na API do Gemini: {response.status_code} - {response.text}")
