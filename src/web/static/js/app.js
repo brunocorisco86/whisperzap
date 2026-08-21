@@ -2347,6 +2347,35 @@ async function rejectCandidate(candidateId) {
   }
 }
 
+async function mergeSimilarDictionaryTerms() {
+  const confirmMsg = "Deseja analisar e mesclar termos semelhantes, duplicados ou flexionados (singular/plural, variações fonéticas e ortográficas) em Polímnia usando spaCy NLP?\n\nAs variações fonéticas, expansões e descrições serão unificadas no termo canônico ideal.";
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    showToast('🔄 Analisando semântica e morfologia com spaCy...', false);
+    const res = await fetch('/api/v1/dictionary/merge-similar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Erro na requisição: ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    if (data.merged_clusters_count > 0 || data.candidates_merged_count > 0) {
+      showToast(`🔀 ${data.message}`);
+    } else {
+      showToast(`ℹ️ ${data.message}`);
+    }
+    await loadDictionary();
+  } catch (err) {
+    console.error('Erro ao mesclar termos do dicionário:', err);
+    showToast('Erro ao mesclar termos: ' + err.message, 'error');
+  }
+}
+window.mergeSimilarDictionaryTerms = mergeSimilarDictionaryTerms;
+
 // --- WhatsApp Avatar & Profile Fetcher ---
 
 async function fetchWhatsAppAvatar(phone) {

@@ -257,5 +257,143 @@ class DictionaryService:
                     corrected = pattern.sub(t.term, corrected)
         return corrected
 
+    def merge_similar_terms(self, similarity_threshold: float = 0.80) -> list[dict]:
+        """Mescla termos semelhantes, duplicados ou flexionados (ex: singular/plural) usando spaCy NLP."""
+        import difflib
+        from src.ai_gateway.bypass import normalize_text
+        from src.memory.task_sentiment_analyzer import get_spacy_nlp
+
+        nlp = get_spacy_nlp()
+        term_list = list(self.terms.values())
+        if len(term_list) < 2:
+            return []
+
+        visited_ids = set()
+        merged_clusters = []
+
+        for i, t1 in enumerate(term_list):
+            if t1.id in visited_ids:
+                continue
+
+            cluster = [t1]
+            t1_norm = normalize_text(t1.term)
+            t1_lemma = ""
+            if nlp:
+                try:
+                    doc1 = nlp(t1.term)
+                    t1_lemma = " ".join([token.lemma_.lower() for token in doc1 if not token.is_punct])
+                except Exception:
+                    t1_lemma = t1_norm
+            else:
+                t1_lemma = t1_norm
+
+            t1_vars_norm = {normalize_text(v) for v in t1.phonetic_variations}
+
+            for j, t2 in enumerate(term_list):
+                if i == j or t2.id in visited_ids:
+                    continue
+
+                t2_norm = normalize_text(t2.term)
+                t2_lemma = ""
+                if nlp:
+                    try:
+                        doc2 = nlp(t2.term)
+                        t2_lemma = " ".join([token.lemma_.lower() for token in doc2 if not token.is_punct])
+                    except Exception:
+                        t2_lemma = t2_norm
+                else:
+                    t2_lemma = t2_norm
+
+                t2_vars_norm = {normalize_text(v) for v in t2.phonetic_variations}
+
+                # Critérios de similaridade para agrupamento:
+                # 1. Mesma forma normalizada (independente de maiúsculas/minúsculas e acentos)
+                is_same_norm = (t1_norm == t2_norm)
+
+                # 2. Mesmo lema via spaCy (ex: 'silo' e 'silos', 'clorador' e 'cloradores')
+                is_same_lemma = bool(t1_lemma and t2_lemma and t1_lemma == t2_lemma)
+
+                # 3. Intersecção de variações fonéticas
+                is_in_variations = (t2_norm in t1_vars_norm or t1_norm in t2_vars_norm)
+
+                # 4. Alta similaridade de caracteres (SequenceMatcher >= threshold)
+                char_ratio = difflib.SequenceMatcher(None, t1_norm, t2_norm).ratio()
+                is_fuzzy_similar = (char_ratio >= similarity_threshold and len(t1_norm) >= 4 and len(t2_norm) >= 4)
+
+                if is_same_norm or is_same_lemma or is_in_variations or is_fuzzy_similar:
+                    cluster.append(t2)
+                    visited_ids.add(t2.id)
+
+            if len(cluster) > 1:
+                visited_ids.add(t1.id)
+
+                # Determina termo canônico ideal
+                # Preferência: 1. Sigla em maiúsculas (ex: FAL, TMS) 2. TitleCase 3. Termo com mais metadados
+                def score_canonical(term_obj: DictionaryTerm) -> int:
+                    score = 0
+                    raw = term_obj.term
+                    if raw.isupper() and len(raw) <= 6:
+                        score += 50
+                    elif raw[0].isupper() if raw else False:
+                        score += 25
+                    if term_obj.expansion:
+                        score += 20
+                    if term_obj.description:
+                        score += 10
+                    if term_obj.category and term_obj.category.upper() != "GERAL":
+                        score += 15
+                    score += len(term_obj.phonetic_variations)
+                    return score
+
+                cluster.sort(key=score_canonical, reverse=True)
+                canonical = cluster[0]
+
+                # Consolida metadados de todos os termos do cluster
+                all_variations = set(canonical.phonetic_variations)
+                merged_term_names = []
+
+                for other in cluster[1:]:
+                    merged_term_names.append(other.term)
+                    # Adiciona o próprio nome do termo secundário como variação do canônico
+                    if other.term.lower() != canonical.term.lower():
+                        all_variations.add(other.term)
+                    all_variations.update(other.phonetic_variations)
+
+                    # Preserva expansão se a canônica não tiver
+                    if other.expansion and not canonical.expansion:
+                        canonical.expansion = other.expansion
+
+                    # Preserva descrição se a canônica não tiver
+                    if other.description:
+                        if not canonical.description:
+                            canonical.description = other.description
+                        elif other.description not in canonical.description:
+                            canonical.description = f"{canonical.description} | {other.description}"
+
+                    # Preserva categoria especializada
+                    if other.category and other.category.upper() != "GERAL" and canonical.category == "GERAL":
+                        canonical.category = other.category
+
+                    # Remove termo secundário
+                    if other.id in self.terms:
+                        del self.terms[other.id]
+
+                # Limpa e formata as variações fonéticas consolidadas
+                all_variations.discard(canonical.term)
+                canonical.phonetic_variations = sorted(list(all_variations))
+                self.terms[canonical.id] = canonical
+
+                merged_clusters.append({
+                    "canonical_term": canonical.term,
+                    "merged_terms": merged_term_names,
+                    "phonetic_variations_total": len(canonical.phonetic_variations),
+                    "category": canonical.category,
+                })
+
+        if merged_clusters:
+            self._save()
+
+        return merged_clusters
+
 
 dictionary_service = DictionaryService()

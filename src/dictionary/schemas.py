@@ -54,3 +54,23 @@ class DictionaryHintResponse(BaseModel):
         description="Bloco de texto com glossário para injeção no prompt de contexto do AI Gateway",
     )
     total_terms: int = Field(..., description="Total de termos cadastrados")
+
+
+class DictionaryMergeCluster(BaseModel):
+    """Detalhes de um cluster de termos unificados no dicionário."""
+
+    canonical_term: str
+    merged_terms: list[str] = []
+    phonetic_variations_total: int = 0
+    category: str = "GERAL"
+
+
+class DictionaryMergeResponse(BaseModel):
+    """Resposta estruturada da operação de mesclagem do Dicionário Léxico com spaCy."""
+
+    status: str = "success"
+    merged_terms_count: int = 0
+    merged_clusters_count: int = 0
+    candidates_merged_count: int = 0
+    clusters: list[DictionaryMergeCluster] = []
+    message: str

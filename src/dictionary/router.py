@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from src.dictionary.harvester import lexical_harvester
 from src.dictionary.schemas import (
     DictionaryHintResponse,
+    DictionaryMergeCluster,
+    DictionaryMergeResponse,
     DictionaryTerm,
     DictionaryTermCreate,
 )
@@ -48,6 +50,57 @@ async def get_dictionary_hints():
         whisper_initial_prompt=dictionary_service.get_whisper_initial_prompt(),
         prompt_context_hint=dictionary_service.get_prompt_context_hint(),
         total_terms=len(terms),
+    )
+
+
+@router.post("/merge-similar", response_model=DictionaryMergeResponse, summary="Mescla termos semelhantes e duplicados com spaCy")
+async def merge_similar_dictionary_terms(
+    similarity_threshold: float = Query(default=0.80, ge=0.5, le=1.0, description="Limiar de similaridade para agrupamento"),
+    db: Session = Depends(get_db),
+):
+    """Mescla termos semelhantes/flexionados no Dicionário Léxico e no Buffer de Candidatos usando spaCy."""
+    dict_clusters = dictionary_service.merge_similar_terms(similarity_threshold=similarity_threshold)
+
+    # Mescla candidatos duplicados no banco
+    from collections import defaultdict
+    from src.ai_gateway.bypass import normalize_text
+
+    pending_cands = db.query(LexicalCandidateRecord).filter(LexicalCandidateRecord.status == "PENDING").all()
+    cands_by_norm = defaultdict(list)
+    for c in pending_cands:
+        norm = normalize_text(c.raw_term)
+        cands_by_norm[norm].append(c)
+
+    candidates_merged = 0
+    for norm, cand_group in cands_by_norm.items():
+        if len(cand_group) > 1:
+            primary_cand = cand_group[0]
+            for other_cand in cand_group[1:]:
+                primary_cand.occurrence_count = (primary_cand.occurrence_count or 1) + (other_cand.occurrence_count or 1)
+                if not primary_cand.suggested_term and other_cand.suggested_term:
+                    primary_cand.suggested_term = other_cand.suggested_term
+                db.delete(other_cand)
+                candidates_merged += 1
+    if candidates_merged > 0:
+        db.commit()
+
+    total_dict_terms_merged = sum(len(c["merged_terms"]) for c in dict_clusters)
+
+    msg_parts = []
+    if dict_clusters:
+        msg_parts.append(f"{len(dict_clusters)} grupo(s) de termos do vocabulário unificados ({total_dict_terms_merged} termos mesclados)")
+    if candidates_merged > 0:
+        msg_parts.append(f"{candidates_merged} termos duplicados consolidados no buffer de candidatos")
+
+    final_msg = "; ".join(msg_parts) if msg_parts else "Nenhum termo duplicado ou semelhante encontrado para mesclagem."
+
+    return DictionaryMergeResponse(
+        status="success",
+        merged_terms_count=total_dict_terms_merged,
+        merged_clusters_count=len(dict_clusters),
+        candidates_merged_count=candidates_merged,
+        clusters=[DictionaryMergeCluster(**c) for c in dict_clusters],
+        message=final_msg,
     )
 
 
