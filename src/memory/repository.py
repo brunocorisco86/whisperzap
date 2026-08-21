@@ -502,9 +502,20 @@ class MemoryRepository:
             import re
             from sqlalchemy import or_
 
-            # Extrai tokens limpos sem pontuação
-            query_tokens = [w for w in re.findall(r"\w+", query.lower()) if len(w) >= 3]
-            is_today = any(t in ("hoje", "atual", "recente") for t in query_tokens)
+            CONVERSATIONAL_STOPWORDS = {
+                "que", "para", "com", "como", "onde", "qual", "quais", "quem", "hoje", "ontem",
+                "amanha", "amanhã", "queria", "disse", "pediu", "falou", "conversou", "conversa",
+                "conversando", "recente", "recentemente", "sobre", "comigo", "contigo", "dele", "dela",
+                "eles", "elas", "meu", "minha", "nosso", "nossa", "isso", "aquilo", "estava", "estou",
+                "estao", "tudo", "nada", "mais", "menos", "algum", "alguma", "falar", "saber", "passar",
+                "me", "te", "se", "lhe", "nos", "vos", "lhes", "voce", "você", "sr", "sra", "viu", "olha"
+            }
+
+            # Extrai tokens limpos sem pontuação e sem stopwords
+            all_raw_tokens = [w for w in re.findall(r"\w+", query.lower()) if len(w) >= 2]
+            query_tokens = [w for w in all_raw_tokens if w not in CONVERSATIONAL_STOPWORDS and len(w) >= 3]
+            is_today = any(t in ("hoje", "atual", "recente", "recentemente") for t in all_raw_tokens)
+            is_dialogue_query = any(t in ("conversou", "conversa", "conversando", "falou", "disse", "pediu", "mandou", "avisou", "queria", "precisa", "perguntou", "falando", "discutiu", "comentou") for t in all_raw_tokens)
 
             # Checagem de Cache Semântico Local (Zero Tokens)
             from src.memory.semantic_cache import semantic_cache
@@ -513,70 +524,85 @@ class MemoryRepository:
             if cached_res:
                 return HermesQueryResponse(**cached_res)
 
-            # 1. Busca Semântica Vetorial
-            search_results = await self.search_memories(
-                query=query,
-                top_k=top_k,
-                min_similarity=min_similarity,
-                db=db,
-            )
+            # 1. Identificação Inteligente de Interlocutor na Pergunta
+            from src.contacts.models import ContactRecord
+            all_contacts = db.query(ContactRecord).all()
+            matched_contact_name = None
+
+            for c in all_contacts:
+                c_first_name = c.name.lower().split()[0] if c.name else ""
+                c_nick = (c.nickname or "").lower()
+                if (c_first_name and c_first_name in all_raw_tokens and len(c_first_name) >= 3) or (c_nick and c_nick in all_raw_tokens):
+                    matched_contact_name = c.name
+                    break
+
+            # Se não achou na tabela de contatos, verifica speakers existentes no banco
+            if not matched_contact_name:
+                distinct_speakers = [s[0] for s in db.query(MessageRecord.speaker).distinct().all() if s[0]]
+                for spk in distinct_speakers:
+                    spk_first = spk.lower().split()[0] if spk else ""
+                    if spk_first and spk_first in all_raw_tokens and len(spk_first) >= 3:
+                        matched_contact_name = spk
+                        break
 
             seen_ids = set()
             sources: list[MemorySourceCitation] = []
-
             from src.memory.timezone_utils import format_brt
 
-            for sr in search_results:
-                seen_ids.add(sr.message_id)
-                sources.append(
-                    MemorySourceCitation(
-                        message_id=sr.message_id,
-                        speaker=sr.speaker,
-                        text_snippet=sr.summary or sr.text[:140],
-                        similarity=sr.similarity,
-                        created_at=format_brt(sr.created_at) if sr.created_at else None,
-                    )
-                )
-
-            # 2. Busca Híbrida Direta por Remetente / Pessoa Mencionada na Query
-            for tok in query_tokens:
-                if tok in ("que", "para", "com", "como", "onde", "qual", "quais", "quem", "hoje", "ontem", "queria", "disse", "pediu", "falou"):
-                    continue
-
-                # Busca mensagens enviadas ou que citam o nome da pessoa
-                person_messages = (
+            # Se a pergunta cita uma pessoa específica, prioriza imediatamente as mensagens desse locutor
+            if matched_contact_name:
+                speaker_first = matched_contact_name.split()[0]
+                target_messages = (
                     db.query(MessageRecord)
-                    .filter(
-                        or_(
-                            MessageRecord.speaker.ilike(f"%{tok}%"),
-                            MessageRecord.revised_text.ilike(f"%{tok}%"),
-                            MessageRecord.raw_text.ilike(f"%{tok}%"),
-                            MessageRecord.summary.ilike(f"%{tok}%"),
-                        )
-                    )
+                    .filter(MessageRecord.speaker.ilike(f"%{speaker_first}%"))
                     .order_by(MessageRecord.created_at.desc())
                     .limit(10)
                     .all()
                 )
+                for tm in target_messages:
+                    seen_ids.add(tm.id)
+                    snippet = tm.revised_text or tm.raw_text or tm.summary or ""
+                    sources.append(
+                        MemorySourceCitation(
+                            message_id=tm.id,
+                            speaker=tm.speaker or matched_contact_name,
+                            text_snippet=snippet,
+                            similarity=0.98,
+                            created_at=format_brt(tm.created_at) if tm.created_at else None,
+                        )
+                    )
 
-                for pm in person_messages:
-                    if pm.id not in seen_ids:
-                        seen_ids.add(pm.id)
-                        snippet = pm.revised_text or pm.raw_text or pm.summary or ""
-                        if len(snippet) > 200:
-                            snippet = snippet[:197] + "..."
+            # 2. Busca Semântica Vetorial (se necessário complementar)
+            if len(sources) < top_k:
+                search_results = await self.search_memories(
+                    query=query,
+                    top_k=top_k,
+                    min_similarity=min_similarity,
+                    db=db,
+                )
+
+                for sr in search_results:
+                    if sr.message_id not in seen_ids:
+                        # Se há interlocutor alvo especificado, só inclui se for da pessoa ou a citar
+                        if matched_contact_name and is_dialogue_query:
+                            spk_norm = (sr.speaker or "").lower()
+                            first_norm = matched_contact_name.split()[0].lower()
+                            if first_norm not in spk_norm and first_norm not in (sr.text or "").lower():
+                                continue
+
+                        seen_ids.add(sr.message_id)
                         sources.append(
                             MemorySourceCitation(
-                                message_id=pm.id,
-                                speaker=pm.speaker or "Desconhecido",
-                                text_snippet=snippet,
-                                similarity=0.95 if (pm.speaker and tok in pm.speaker.lower()) else 0.85,
-                                created_at=format_brt(pm.created_at) if pm.created_at else None,
+                                message_id=sr.message_id,
+                                speaker=sr.speaker,
+                                text_snippet=sr.summary or sr.text[:140],
+                                similarity=sr.similarity,
+                                created_at=format_brt(sr.created_at) if sr.created_at else None,
                             )
                         )
 
-            # Se pediu informações de "hoje", ordena priorizando mensagens recentes/do dia
-            if is_today:
+            # Se pediu informações de "hoje" ou "recente", ordena priorizando cronologia recente
+            if is_today or is_dialogue_query:
                 sources.sort(key=lambda s: s.created_at or "", reverse=True)
 
             # 3. GraphRAG Híbrido: Extração de entidades com spaCy e Expansão Topológica de 2 Saltos
@@ -584,47 +610,52 @@ class MemoryRepository:
             if include_graph:
                 from src.memory.hybrid_graph_rag import hybrid_graph_rag
 
-                # 3.1 Extrai entidades da query e expande subgrafo de 2 graus no NetworkX
-                seed_entities = hybrid_graph_rag.extract_query_entities(query)
-                # Inclui também tokens brutos caso o spaCy não tenha pego
-                seed_entities.extend([t for t in query_tokens if len(t) > 3])
-                
-                subgraph_data = hybrid_graph_rag.expand_subgraph_2_hop(seed_entities, max_hops=2)
-                related_entities.extend(subgraph_data.get("node_details", []))
-                related_entities.extend(subgraph_data.get("triples", []))
+                # 3.1 Extrai entidades da query e limpa stopwords
+                raw_seeds = hybrid_graph_rag.extract_query_entities(query)
+                seed_entities = []
+                for s in raw_seeds:
+                    s_clean = s.lower().strip()
+                    if s_clean not in CONVERSATIONAL_STOPWORDS and len(s_clean) >= 3:
+                        seed_entities.append(s)
 
-                # 3.2 Busca cruzada na tabela SQL de Contatos
-                from src.contacts.models import ContactRecord
-                sql_contacts = db.query(ContactRecord).all()
-                for c in sql_contacts:
-                    c_matches = (
-                        any(t in c.name.lower() for t in query_tokens)
-                        or (c.nickname and any(t in c.nickname.lower() for t in query_tokens))
-                        or (c.notes and any(t in c.notes.lower() for t in query_tokens))
-                        or (c.company and any(t in c.company.lower() for t in query_tokens))
-                    )
-                    if c_matches:
+                if matched_contact_name and matched_contact_name not in seed_entities:
+                    seed_entities.append(matched_contact_name)
+
+                # Inclui também tokens substantivos relevantes
+                for t in query_tokens:
+                    if t not in CONVERSATIONAL_STOPWORDS and len(t) > 3 and t not in seed_entities:
+                        seed_entities.append(t)
+
+                if seed_entities:
+                    subgraph_data = hybrid_graph_rag.expand_subgraph_2_hop(seed_entities[:5], max_hops=2)
+                    # Limita a quantidade de nós e triplas para não poluir o prompt
+                    related_entities.extend(subgraph_data.get("node_details", [])[:6])
+                    related_entities.extend(subgraph_data.get("triples", [])[:6])
+
+                # 3.2 Busca precisa na tabela SQL de Contatos apenas para o interlocutor correspondente
+                for c in all_contacts:
+                    c_first = c.name.lower().split()[0] if c.name else ""
+                    if c_first and c_first in query_tokens and len(c_first) >= 3:
                         c_parts = [f"Contato Oficial: {c.name}"]
                         if c.role:
-                            c_parts.append(f"Cargo/Role: {c.role}")
+                            c_parts.append(f"Cargo: {c.role}")
                         if c.phone_number:
                             c_parts.append(f"Telefone: {c.phone_number}")
                         if c.company:
                             c_parts.append(f"Empresa: {c.company}")
-                        if c.notes:
-                            c_parts.append(f"Detalhes: {c.notes}")
                         related_entities.append(" | ".join(c_parts))
 
             # 4. Busca de tarefas pendentes relacionadas (por Solicitante, Responsável ou Título)
             pending_tasks_objs = self.list_tasks(status="PENDING", db=db)
             related_tasks = []
             for t in pending_tasks_objs:
-                t_tokens = [w.lower() for w in t.title.split() if len(w) > 3]
+                t_tokens = [w.lower() for w in t.title.split() if len(w) > 3 and w not in CONVERSATIONAL_STOPWORDS]
                 spk = (t.speaker or "").lower()
                 asg = (t.assignee or "").lower()
 
                 matches_task = (
                     any(tok in query.lower() for tok in t_tokens)
+                    or (matched_contact_name and matched_contact_name.split()[0].lower() in spk)
                     or any(tok in spk for tok in query_tokens)
                     or any(tok in asg for tok in query_tokens)
                     or (t.message_id in seen_ids)
@@ -638,7 +669,7 @@ class MemoryRepository:
                     related_tasks.append(f"{speaker_info}{t.title}{assignee}{due}{notes} [Prioridade: {t.priority}]")
 
             # 5. Fusão e Re-ranqueamento com Boost de Subgrafo
-            if include_graph:
+            if include_graph and seed_entities:
                 from src.memory.hybrid_graph_rag import hybrid_graph_rag
                 fused = hybrid_graph_rag.fuse_vector_and_graph_results(
                     vector_sources=sources,
@@ -652,9 +683,9 @@ class MemoryRepository:
             # 6. Chama o Agente Hermes para inferência e resposta estrita
             result = await hermes_agent_service.answer_hermes_query(
                 query=query,
-                sources=final_sources[:12],  # Limite confortável de fontes relevantes
-                related_entities=list(set(related_entities)),
-                pending_tasks=related_tasks,
+                sources=final_sources[:10],
+                related_entities=list(set(related_entities))[:8],
+                pending_tasks=related_tasks[:5],
             )
             # Armazena no cache semântico para consultas subsequentes (0 tokens)
             semantic_cache.set(query, result.model_dump())

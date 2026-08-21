@@ -96,7 +96,22 @@ class HermesAgentService:
             answer_text = llm_response.strip()
         except Exception as exc:
             logger.warning(f"Chamada LLM para consulta Hermes falhou ({exc}). Gerando resposta estruturada direta.")
-            answer_text = f"Com base nas memórias registradas:\n{retrieved_context}\nEntidades conectadas: {graph_context}"
+            lines = ["Com base nas memórias registradas para esta consulta:"]
+            if sources:
+                lines.append("\n💬 **Mensagens Registradas:**")
+                for s in sources[:6]:
+                    date_str = f" em {s.created_at}" if s.created_at else ""
+                    lines.append(f"• **{s.speaker}**{date_str}:\n  \"{s.text_snippet}\"")
+            if pending_tasks:
+                lines.append("\n📋 **Tarefas & Pendências Identificadas:**")
+                for t in pending_tasks[:4]:
+                    lines.append(f"• {t}")
+            if related_entities:
+                lines.append("\n🔗 **Entidades e Relações Relevantes:**")
+                clean_entities = [e for e in related_entities if not e.startswith("Contato Oficial:") and "-[" in e]
+                for e in (clean_entities or related_entities)[:5]:
+                    lines.append(f"• {e}")
+            answer_text = "\n".join(lines)
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
 

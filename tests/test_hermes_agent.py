@@ -135,3 +135,67 @@ def test_hermes_query_speaker_and_task_matching():
     data = response.json()
     assert any(s["speaker"] == "Ailton" for s in data["sources"])
     assert any("caseiro" in t.lower() or "ailton" in t.lower() for t in data["pending_tasks_mentioned"])
+
+
+def test_hermes_query_interlocutor_dialogue_filtering():
+    """Testa se a pergunta 'Sobre o que Gracieli conversou comigo recentemente?' prioriza mensagens dela e evita poluição de terceiros."""
+    from src.contacts.models import ContactRecord
+    from src.memory.database import SessionLocal
+    from src.memory.semantic_cache import semantic_cache
+
+    semantic_cache._cache.clear()
+
+    db_init = SessionLocal()
+    try:
+        if not db_init.query(ContactRecord).filter(ContactRecord.name == "Gracieli Patel").first():
+            db_init.add(ContactRecord(
+                id="c-gracieli-test",
+                name="Gracieli Patel",
+                phone_number="554499722779",
+                role="PRODUCER_COOPERATED",
+            ))
+        if not db_init.query(ContactRecord).filter(ContactRecord.name == "Larissa Ajala").first():
+            db_init.add(ContactRecord(
+                id="c-larissa-test",
+                name="Larissa Ajala",
+                phone_number="5544999887766",
+                role="COLLEAGUE",
+            ))
+        db_init.commit()
+    finally:
+        db_init.close()
+
+    client = TestClient(app)
+
+    # 1. Salva mensagens de Gracieli e mensagens não relacionadas de terceiros
+    res_g = client.post("/api/v1/memory/messages", json={
+        "speaker": "Gracieli Patel",
+        "revised_text": "E sem essa peça nada funciona. Ele saiu da empresa e vai demorar.",
+        "summary": "Gracieli informou urgência sobre peça essencial e saída de contato.",
+    })
+    assert res_g.status_code in (200, 201)
+
+    res_l = client.post("/api/v1/memory/messages", json={
+        "speaker": "Larissa Ajala",
+        "revised_text": "Mesmo se excluir no EP cai naquilo do soft delete.",
+        "summary": "Larissa comentou sobre o soft delete no eProdutor.",
+    })
+    assert res_l.status_code in (200, 201)
+
+    # 2. Faz a query
+    res = client.post("/api/v1/memory/query", json={
+        "query": "Sobre o que Gracieli conversou comigo recentemente?",
+        "top_k": 5,
+        "include_graph": True,
+    })
+    assert res.status_code == 200
+    data = res.json()
+
+    assert len(data["sources"]) >= 1
+    # A primeira fonte deve ser de Gracieli Patel
+    assert data["sources"][0]["speaker"] == "Gracieli Patel"
+    assert "peça" in data["sources"][0]["text_snippet"].lower()
+
+    # Verifica que não vazam IDs internos na resposta
+    assert "[ID:" not in data["answer"]
+    assert "peça" in data["answer"].lower() or "gracieli" in data["answer"].lower()
