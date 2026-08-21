@@ -1,18 +1,20 @@
 {
   "version": "1.1",
-  "last_optimized_at": "2026-08-20T01:45:21.347189+00:00",
+  "last_optimized_at": "2026-08-21T03:15:40.071270+00:00",
   "total_cancelled_analyzed": 2,
   "negative_guidelines": [
-    "NUNCA crie tarefas para observações de campo ou relatos passivos sem ação explícita (ex: 'Frango sentado', 'Nível de amônia alto'). Registre apenas como tópicos ou notas.",
-    "NUNCA crie tarefas para atualizações de status informando espera ou atraso (ex: 'Ainda não me responderam', 'Era pra hoje foi pra terça').",
-    "NUNCA crie tarefas para conversas conceituais ou itens de roadmap discutidos informalmente (ex: 'Tá no roadmap', 'Ideia para o futuro').",
-    "NUNCA crie tarefas para conselhos ou comentários condicionais hipotéticos (ex: 'A menos que eles exijam, mande o link')."
+    "NUNCA crie tarefas baseadas em observações passivas, descritivas ou de monitoramento ambiental que não exijam uma intervenção humana imediata.",
+    "NUNCA gere tarefas a partir de contextos vazios, ausentes ou sem uma solicitação explícita de ação no texto de origem.",
+    "NUNCA interprete comportamentos naturais de animais ou rotinas operacionais padrão como incidentes que necessitem de investigação.",
+    "NUNCA crie tarefas para eventos que não possuam um gatilho de problema, urgência ou necessidade de resolução clara.",
+    "NUNCA converta descrições de estado (ex: 'aves sentadas') em ordens de serviço, a menos que haja um indicador de anomalia ou risco explícito."
   ],
   "noise_taxonomies": {
     "FIELD_OBSERVATION": "Frases nominais curtas descrevendo sintomas ou estados sem comando imperativo.",
     "STATUS_UPDATE": "Mensagens relatando progresso, espera ou remarcação passiva de prazos.",
     "ROADMAP_CHAT": "Discussões de ideias futuras ou brainstormings não atribuídos.",
-    "HYPOTHETICAL_ADVICE": "Sugestões que dependem de condições incertas não acionáveis no momento."
+    "HYPOTHETICAL_ADVICE": "Sugestões que dependem de condições incertas não acionáveis no momento.",
+    "LLM_SUMMARY": "O sistema está confundindo observações descritivas de rotina e estados naturais de ambiente com demandas de trabalho, gerando tarefas sem valor acionável ou necessidade de intervenção."
   },
   "metrics": {
     "cancelled_count": 2,

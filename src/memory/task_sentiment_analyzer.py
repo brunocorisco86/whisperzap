@@ -230,5 +230,135 @@ class TaskSentimentAnalyzer:
         analysis = self.analyze_task_text(title, source_text)
         return analysis["actionability_score"] >= threshold and analysis["noise_category"] is None
 
+    def extract_task_tags(
+        self,
+        title: str,
+        source_text: str = "",
+        existing_entities: Optional[List[str]] = None,
+        priority: Optional[str] = None,
+    ) -> List[str]:
+        """Extrai tags contextuais da tarefa via spaCy NLP e dicionário de domínio (zero custo de API)."""
+        tags: List[str] = []
+        clean_title = (title or "").strip()
+        clean_source = (source_text or "").strip()
+        full_text = f"{clean_title}. {clean_source}".strip()
+
+        if not full_text:
+            return tags
+
+        # 1. Tags de domínio Agro / Logística / Corporativo baseadas em palavras-chave e lemas
+        domain_keywords_map = {
+            "Logística": ["logistica", "entrega", "transporte", "caminhao", "frete", "embarque", "descarga", "rota", "expedicao", "rastreio"],
+            "Ração": ["racao", "farelo", "milho", "soja", "nutricao", "alimentacao", "fabrica de racao"],
+            "Silos": ["silo", "silos", "armazenamento", "sensor", "capacidade", "nivel de silo", "abastecimento"],
+            "Granja": ["granja", "aviario", "galpao", "lote", "aves", "frango", "pintainho", "produtor"],
+            "TMS": ["tms", "sistema de transporte", "despacho", "gestao de frotas"],
+            "C.Vale": ["cvale", "c.vale", "cooperativa", "cooperado", "associado"],
+            "Financeiro": ["financeiro", "pagamento", "boleto", "nota fiscal", "nf", "faturamento", "cobranca", "banco", "custo", "preco", "orcamento"],
+            "Reunião": ["reuniao", "alinhamento", "call", "encontro", "briefing", "conversa", "pauta"],
+            "Contratos": ["contrato", "acordo", "termo", "assinatura", "juridico", "clausula"],
+            "Compras": ["compra", "cotacao", "fornecedor", "aquisicao", "pedido de compra"],
+            "Manutenção": ["manutencao", "reparo", "conserto", "calibracao", "eletrica", "mecanica", "peca", "troca"],
+            "Qualidade": ["qualidade", "auditoria", "laudo", "inspecao", "padrao", "conformidade"],
+            "Abatedouro": ["abatedouro", "frigorifico", "abate", "rendimento", "pesagem", "evisceracao"],
+            "TI & Automação": ["sistema", "servidor", "api", "software", "dashboard", "banco de dados", "integracao", "n8n", "evolution", "homelab"],
+        }
+
+        from src.ai_gateway.bypass import normalize_text
+        norm_text = normalize_text(full_text)
+
+        for tag_label, kw_list in domain_keywords_map.items():
+            for kw in kw_list:
+                kw_norm = normalize_text(kw)
+                if re.search(r"\b" + re.escape(kw_norm) + r"\b", norm_text):
+                    if tag_label not in tags:
+                        tags.append(tag_label)
+                    break
+
+        # 2. Entidades nomeadas spaCy (NER)
+        if self.nlp:
+            try:
+                doc = self.nlp(clean_title)
+                for ent in doc.ents:
+                    ent_text = ent.text.strip()
+                    if ent.label_ in ("ORG", "LOC", "MISC", "PER") and len(ent_text) >= 3:
+                        # Limpa pontuações e artigos
+                        ent_clean = re.sub(r"^[oOaAeEmMdD]s?\s+", "", ent_text).strip().title()
+                        if ent_clean and ent_clean not in tags and len(ent_clean) >= 3:
+                            if len(tags) < 6:
+                                tags.append(ent_clean)
+            except Exception as e:
+                logger.debug(f"Erro ao extrair entidades spaCy para tags: {e}")
+
+        # 3. Entidades já extraídas passadas explicitamente
+        if existing_entities:
+            for ent_str in existing_entities:
+                if ent_str and len(ent_str.strip()) >= 3:
+                    clean_ent = ent_str.strip().title()
+                    if clean_ent not in tags and len(tags) < 6:
+                        tags.append(clean_ent)
+
+        # 4. Tag de Prioridade / Urgência
+        if priority and priority.upper() in ("URGENT", "HIGH"):
+            p_tag = "⚡ Urgente" if priority.upper() == "URGENT" else "🔥 Alta Prioridade"
+            if p_tag not in tags:
+                tags.insert(0, p_tag)
+
+        # Fallback genérico se nenhuma tag foi encontrada
+        if not tags:
+            tags.append("Operacional")
+
+        return tags[:5]
+
+    def compute_task_similarity(
+        self,
+        title_a: str,
+        notes_a: str,
+        title_b: str,
+        notes_b: str,
+    ) -> float:
+        """Calcula similaridade lexical e semântica entre duas tarefas com spaCy e SequenceMatcher."""
+        import difflib
+        from src.ai_gateway.bypass import normalize_text
+
+        text_a = f"{title_a or ''} {notes_a or ''}".strip()
+        text_b = f"{title_b or ''} {notes_b or ''}".strip()
+
+        if not text_a or not text_b:
+            return 0.0
+
+        norm_a = normalize_text(text_a)
+        norm_b = normalize_text(text_b)
+
+        # 1. Similaridade direta de caracteres (SequenceMatcher)
+        seq_sim = difflib.SequenceMatcher(None, norm_a, norm_b).ratio()
+
+        # 2. Similaridade de Jaccard sobre lemas / tokens significativos
+        tokens_a = set()
+        tokens_b = set()
+
+        if self.nlp:
+            try:
+                doc_a = self.nlp(text_a)
+                doc_b = self.nlp(text_b)
+                tokens_a = {t.lemma_.lower() for t in doc_a if not t.is_stop and not t.is_punct and len(t.text) > 2}
+                tokens_b = {t.lemma_.lower() for t in doc_b if not t.is_stop and not t.is_punct and len(t.text) > 2}
+            except Exception:
+                tokens_a = {w for w in norm_a.split() if len(w) > 2}
+                tokens_b = {w for w in norm_b.split() if len(w) > 2}
+        else:
+            tokens_a = {w for w in norm_a.split() if len(w) > 2}
+            tokens_b = {w for w in norm_b.split() if len(w) > 2}
+
+        jaccard_sim = 0.0
+        if tokens_a and tokens_b:
+            intersection = len(tokens_a.intersection(tokens_b))
+            union = len(tokens_a.union(tokens_b))
+            jaccard_sim = intersection / union if union > 0 else 0.0
+
+        # Ponderação híbrida: 60% Jaccard lemas + 40% SequenceMatcher
+        final_sim = (0.60 * jaccard_sim) + (0.40 * seq_sim)
+        return round(final_sim, 4)
+
 
 task_sentiment_analyzer = TaskSentimentAnalyzer()

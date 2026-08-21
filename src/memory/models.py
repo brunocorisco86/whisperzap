@@ -212,7 +212,24 @@ class TaskResponse(BaseModel):
     raw_text: Optional[str] = None
     message_summary: Optional[str] = None
     source_text_snippet: Optional[str] = None
+    tags: list[str] = []
 
+
+class TaskMergeCluster(BaseModel):
+    speaker: str
+    primary_task_id: str
+    primary_title: str
+    merged_task_ids: list[str] = []
+    merged_titles: list[str] = []
+    notes_consolidated_preview: Optional[str] = None
+
+
+class MergeTasksResponse(BaseModel):
+    status: str = "success"
+    merged_groups_count: int = 0
+    tasks_merged_count: int = 0
+    clusters: list[TaskMergeCluster] = []
+    message: str
 
 
 class TaskUpdate(BaseModel):

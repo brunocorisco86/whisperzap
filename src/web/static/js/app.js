@@ -40,6 +40,7 @@ const contactFilterPeriod = document.getElementById('contact-filter-period');
 const dictSearchInput = document.getElementById('dict-search');
 const dictFilterCategory = document.getElementById('dict-filter-category');
 const tasksSearchInput = document.getElementById('tasks-search');
+const tasksFilterSpeaker = document.getElementById('tasks-filter-speaker');
 const tasksFilterStatus = document.getElementById('tasks-filter-status');
 const tasksFilterPriority = document.getElementById('tasks-filter-priority');
 const msgSearchInput = document.getElementById('msg-search');
@@ -282,6 +283,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   if (tasksSearchInput) tasksSearchInput.addEventListener('input', renderTasks);
+  if (tasksFilterSpeaker) tasksFilterSpeaker.addEventListener('change', renderTasks);
   if (tasksFilterStatus) tasksFilterStatus.addEventListener('change', renderTasks);
   if (tasksFilterPriority) tasksFilterPriority.addEventListener('change', renderTasks);
 
@@ -681,12 +683,29 @@ async function loadDictionary() {
   }
 }
 
+function updateTasksSpeakerOptions() {
+  const speakerSelect = document.getElementById('tasks-filter-speaker');
+  if (!speakerSelect) return;
+  const currentVal = speakerSelect.value;
+  const speakersSet = new Set();
+  allTasks.forEach(t => {
+    if (t.speaker && t.speaker.trim()) {
+      speakersSet.add(t.speaker.trim());
+    }
+  });
+  const sortedSpeakers = Array.from(speakersSet).sort((a, b) => a.localeCompare(b));
+  
+  speakerSelect.innerHTML = '<option value="">👥 Todas as Pessoas (Origem)</option>' +
+    sortedSpeakers.map(spk => `<option value="${spk}" ${spk === currentVal ? 'selected' : ''}>👤 ${spk}</option>`).join('');
+}
+
 async function loadTasks() {
   try {
     const res = await fetch('/api/v1/memory/tasks');
     if (res.ok) {
       allTasks = await res.json();
       if (countTasksEl) countTasksEl.textContent = allTasks.filter(t => t.status === 'PENDING').length;
+      updateTasksSpeakerOptions();
       renderTasks();
     }
   } catch (err) {
@@ -1182,23 +1201,37 @@ async function toggleContactTasks(contactId) {
 }
 window.toggleContactTasks = toggleContactTasks;
 
+function filterTasksByTag(tag) {
+  if (tasksSearchInput) {
+    tasksSearchInput.value = tag;
+    renderTasks();
+    showToast(`🔍 Filtrando tarefas por tag #${tag}`);
+  }
+}
+window.filterTasksByTag = filterTasksByTag;
+
 function renderTasks() {
   if (!tasksContainer) return;
 
   const searchTerm = (tasksSearchInput ? tasksSearchInput.value : '').toLowerCase().trim();
+  const filterSpeaker = tasksFilterSpeaker ? tasksFilterSpeaker.value.toLowerCase().trim() : '';
   const filterStatus = tasksFilterStatus ? tasksFilterStatus.value.toUpperCase() : '';
   const filterPriority = tasksFilterPriority ? tasksFilterPriority.value.toUpperCase() : '';
 
   const filtered = allTasks.filter(t => {
+    const matchTags = t.tags && Array.isArray(t.tags) && t.tags.some(tag => tag.toLowerCase().includes(searchTerm));
     const matchSearch = (
+      !searchTerm ||
       t.title.toLowerCase().includes(searchTerm) ||
       (t.assignee && t.assignee.toLowerCase().includes(searchTerm)) ||
       (t.speaker && t.speaker.toLowerCase().includes(searchTerm)) ||
-      (t.message_summary && t.message_summary.toLowerCase().includes(searchTerm))
+      (t.message_summary && t.message_summary.toLowerCase().includes(searchTerm)) ||
+      matchTags
     );
+    const matchSpeaker = !filterSpeaker || (t.speaker && t.speaker.toLowerCase().trim() === filterSpeaker);
     const matchStatus = !filterStatus || t.status === filterStatus;
     const matchPriority = !filterPriority || t.priority === filterPriority;
-    return matchSearch && matchStatus && matchPriority;
+    return matchSearch && matchSpeaker && matchStatus && matchPriority;
   });
 
   const totalFiltered = filtered.length;
@@ -1259,6 +1292,11 @@ function renderTasks() {
               ${isCancelled ? '<span style="color: #ef4444; font-size: 0.85rem; margin-right: 0.4rem;">[IGNORADA]</span>' : ''}
               ${t.title}
             </div>
+            ${(t.tags && t.tags.length > 0) ? `
+              <div class="task-tags-container">
+                ${t.tags.map(tag => `<span class="task-tag" onclick="filterTasksByTag('${tag.replace(/'/g, "\\'")}')" title="Filtrar tarefas por #${tag}">#${tag}</span>`).join('')}
+              </div>
+            ` : ''}
           </div>
 
           <!-- Box de Ancoragem do Solicitante (Gatilho) -->
@@ -1363,7 +1401,11 @@ function renderTasks() {
             ${t.created_at ? `<span>⏱️ ${typeof t.created_at === 'string' ? t.created_at.substring(0, 10) : ''}</span>` : ''}
           </div>
 
-          <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <button class="btn btn-secondary btn-sm" onclick="generateTaskPDF('${t.id}')" title="Gerar visualização e PDF formatado desta tarefa para compartilhamento">
+              📄 Gerar PDF
+            </button>
+
             ${waLink ? `
               <a href="${waLink}" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration: none; color: #25d366;" title="Falar com ${speakerName} no WhatsApp">
                 💬 WhatsApp
@@ -1388,6 +1430,292 @@ function renderTasks() {
     `;
   }).join('');
 }
+
+function generateTaskPDF(taskId) {
+  const t = allTasks.find(item => item.id === taskId);
+  if (!t) {
+    showToast('Tarefa não encontrada para geração de PDF.', 'error');
+    return;
+  }
+
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    showToast('Pop-up bloqueado pelo navegador. Permita pop-ups para visualizar e imprimir o PDF.', 'error');
+    return;
+  }
+
+  const priorityColor = t.priority === 'URGENT' ? '#dc2626' : t.priority === 'HIGH' ? '#d97706' : '#059669';
+  const speakerName = t.speaker || 'Não identificado';
+  const phoneClean = (t.sender_phone || '').replace(/[^0-9]/g, '');
+  const roleBadge = t.sender_role || 'Contato';
+  const emissionDate = new Date().toLocaleString('pt-BR');
+
+  const tagsHtml = (t.tags && Array.isArray(t.tags) && t.tags.length > 0)
+    ? t.tags.map(tag => `<span style="display:inline-block; padding: 4px 10px; border-radius: 9999px; background: #e0f2fe; color: #0369a1; font-size: 12px; font-weight: 600; margin-right: 6px; border: 1px solid #bae6fd;">#${tag}</span>`).join('')
+    : '<span style="color:#64748b; font-size:12px;">Nenhuma tag vinculada</span>';
+
+  const notesHtml = t.notes
+    ? `<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px; white-space:pre-wrap; font-size:13px; color:#334155; line-height:1.6;">${t.notes}</div>`
+    : `<div style="color:#94a3b8; font-style:italic; font-size:13px;">Sem anotações ou observações adicionais.</div>`;
+
+  const originalMsg = t.revised_text || t.raw_text || t.source_text_snippet || 'Texto original não disponível.';
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Tarefa: ${t.title} — MNEMOSINE</title>
+  <style>
+    @page { size: A4; margin: 16mm 14mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #0f172a;
+      background: #f1f5f9;
+      padding: 24px;
+    }
+    .sheet {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 32px 36px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+    .no-print-bar {
+      max-width: 800px;
+      margin: 0 auto 16px auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #334155;
+      text-decoration: none;
+      transition: all 0.15s;
+    }
+    .btn:hover { background: #f8fafc; border-color: #94a3b8; }
+    .btn-primary { background: #059669; color: #ffffff; border-color: #047857; }
+    .btn-primary:hover { background: #047857; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+    .brand-title { font-size: 20px; font-weight: 800; letter-spacing: 0.05em; color: #0f172a; }
+    .brand-sub { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+    .meta-doc { text-align: right; font-size: 11px; color: #64748b; line-height: 1.4; }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .task-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.35;
+      margin-bottom: 16px;
+    }
+    .section-box {
+      margin-bottom: 20px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #475569;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .grid-info {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px 20px;
+      font-size: 13px;
+    }
+    .grid-label { color: #64748b; font-size: 11px; margin-bottom: 2px; text-transform: uppercase; }
+    .grid-value { font-weight: 600; color: #1e293b; }
+    .quote-box {
+      background: #f1f5f9;
+      border-left: 4px solid #0284c7;
+      padding: 12px 16px;
+      border-radius: 0 6px 6px 0;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #1e293b;
+      font-style: italic;
+    }
+    .footer {
+      margin-top: 32px;
+      padding-top: 14px;
+      border-top: 1px dashed #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+    @media print {
+      body { background: transparent; padding: 0; }
+      .sheet { box-shadow: none; padding: 0; max-width: 100%; }
+      .no-print-bar { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print-bar">
+    <div>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Salvar como PDF / Imprimir</button>
+      <button class="btn" onclick="copyFormattedTaskText()">📋 Copiar Resumo</button>
+      ${phoneClean.length >= 10 ? `<a href="https://wa.me/${phoneClean}?text=${encodeURIComponent('Olá, segue o protocolo da tarefa: ' + t.title)}" target="_blank" class="btn">💬 WhatsApp</a>` : ''}
+    </div>
+    <button class="btn" onclick="window.close()">✖️ Fechar</button>
+  </div>
+
+  <div class="sheet">
+    <div class="header">
+      <div>
+        <div class="brand-title">MNEMOSINE</div>
+        <div class="brand-sub">Neural Intelligence & Voice Engine • Terpsícore</div>
+      </div>
+      <div class="meta-doc">
+        <div><strong>Protocolo:</strong> ${t.id.substring(0, 13)}</div>
+        <div><strong>Emissão:</strong> ${emissionDate}</div>
+      </div>
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; gap:12px;">
+      <h1 class="task-title" style="flex:1;">${t.title}</h1>
+      <div style="display:flex; gap:6px; flex-shrink:0;">
+        <span class="badge" style="background:#e2e8f0; color:#334155;">Status: ${t.status}</span>
+        <span class="badge" style="background:${priorityColor}; color:#ffffff;">● ${t.priority}</span>
+      </div>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+      ${tagsHtml}
+    </div>
+
+    <div class="section-box">
+      <div class="section-title">👤 Rastreamento de Origem & Atribuição</div>
+      <div class="grid-info">
+        <div>
+          <div class="grid-label">Gatilho / Solicitante</div>
+          <div class="grid-value">${speakerName} (${roleBadge})</div>
+        </div>
+        <div>
+          <div class="grid-label">Atribuído a / Responsável</div>
+          <div class="grid-value">${t.assignee || 'Bruno Conter'} ${t.due_date ? '• Prazo: ' + t.due_date : ''}</div>
+        </div>
+        <div>
+          <div class="grid-label">Contato / Telefone</div>
+          <div class="grid-value">${t.sender_phone || 'Não informado'}</div>
+        </div>
+        <div>
+          <div class="grid-label">Horário do Disparo</div>
+          <div class="grid-value">${t.message_time || emissionDate} ${t.audio_duration_s ? '(' + Math.round(t.audio_duration_s) + 's de áudio)' : ''}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-box">
+      <div class="section-title">🎙️ Transcrição / Mensagem Original do Gatilho</div>
+      <div class="quote-box">
+        "${originalMsg}"
+      </div>
+      ${t.message_summary ? `
+        <div style="margin-top:12px; font-size:12.5px; color:#475569; background:#ffffff; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px;">
+          <strong>💡 Resumo Cognitivo:</strong> ${t.message_summary}
+        </div>
+      ` : ''}
+    </div>
+
+    <div class="section-box">
+      <div class="section-title">📝 Anotações, Observações & Acompanhamentos</div>
+      ${notesHtml}
+    </div>
+
+    <div class="footer">
+      <div>MNEMOSINE Engine — Voice Assistant C.Vale & Homelab</div>
+      <div>Autenticidade Verificada • ID ${t.id}</div>
+    </div>
+  </div>
+
+  <script>
+    function copyFormattedTaskText() {
+      const text = '📋 *TAREFA MNEMOSINE*\\n*Título:* ' + ${JSON.stringify(t.title)} + '\\n*De:* ' + ${JSON.stringify(speakerName)} + '\\n*Responsável:* ' + ${JSON.stringify(t.assignee || 'Bruno Conter')} + '\\n*Prioridade:* ' + ${JSON.stringify(t.priority)} + '\\n*Status:* ' + ${JSON.stringify(t.status)} + '\\n*Mensagem:* ' + ${JSON.stringify(originalMsg)} + '\\n*Notas:* ' + ${JSON.stringify(t.notes || 'Sem anotações.')};
+      navigator.clipboard.writeText(text).then(() => {
+        alert('📋 Resumo formatado copiado para a área de transferência!');
+      }).catch(err => {
+        alert('Erro ao copiar: ' + err);
+      });
+    }
+  </script>
+</body>
+</html>
+  `;
+
+  printWindow.document.open();
+  printWindow.document.write(htmlContent);
+  printWindow.document.close();
+}
+window.generateTaskPDF = generateTaskPDF;
+
+async function mergeSimilarTasks() {
+  const confirmMsg = "Deseja analisar e mesclar tarefas semelhantes com status PENDENTE agrupadas por pessoa de origem?\n\nOs títulos serão consolidados e todos os comentários e observações serão unificados na tarefa principal.";
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    showToast('🔄 Analisando similaridade lexical e semântica com spaCy...', false);
+    const res = await fetch('/api/v1/memory/tasks/merge-similar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Erro na requisição: ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    if (data.merged_groups_count > 0) {
+      showToast(`🔀 ${data.message}`);
+    } else {
+      showToast(`ℹ️ ${data.message}`);
+    }
+    await loadTasks();
+  } catch (err) {
+    console.error('Erro ao mesclar tarefas:', err);
+    showToast('Erro ao mesclar tarefas: ' + err.message, 'error');
+  }
+}
+window.mergeSimilarTasks = mergeSimilarTasks;
 
 function toggleTaskAccordion(taskId) {
   const body = document.getElementById(`task-accordion-body-${taskId}`);

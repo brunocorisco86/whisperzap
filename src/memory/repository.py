@@ -668,9 +668,10 @@ class MemoryRepository:
         status: str | None = None,
         priority: str | None = None,
         assignee: str | None = None,
+        speaker: str | None = None,
         db: Session | None = None,
     ) -> list[Any]:
-        """Lista tarefas filtradas por status, prioridade ou responsável com ancoragem do solicitante."""
+        """Lista tarefas filtradas por status, prioridade, responsável ou remetente com tags e ancoragem."""
         should_close = False
         if db is None:
             db = SessionLocal()
@@ -679,6 +680,7 @@ class MemoryRepository:
         try:
             from src.contacts.models import ContactRecord
             from src.memory.models import TaskResponse
+            from src.memory.task_sentiment_analyzer import task_sentiment_analyzer
 
             contacts_map = {c.name.lower(): c for c in db.query(ContactRecord).all()}
 
@@ -695,6 +697,13 @@ class MemoryRepository:
             for r in records:
                 msg = r.message
                 speaker_name = msg.speaker if msg else "user"
+                
+                # Filtro por remetente/origem se especificado
+                if speaker:
+                    spk_clean = speaker.strip().lower()
+                    if spk_clean and spk_clean != "all" and spk_clean not in speaker_name.lower():
+                        continue
+
                 contact_match = contacts_map.get(speaker_name.lower()) if speaker_name else None
 
                 sender_phone = ""
@@ -708,6 +717,16 @@ class MemoryRepository:
                 sender_role = contact_match.role if contact_match else (contact_match.category if contact_match else None)
                 msg_summary = msg.summary if msg else None
                 source_snippet = (msg.revised_text[:140] + "...") if msg and len(msg.revised_text) > 140 else (msg.revised_text if msg else None)
+
+                # Extrai tags via spaCy sem custo de tokens de API
+                msg_entities = [e.name for e in msg.entities] if (msg and msg.entities) else []
+                source_full = (msg.revised_text or msg.raw_text or "") if msg else ""
+                tags = task_sentiment_analyzer.extract_task_tags(
+                    title=r.title,
+                    source_text=source_full,
+                    existing_entities=msg_entities,
+                    priority=r.priority,
+                )
 
                 responses.append(
                     TaskResponse(
@@ -730,9 +749,147 @@ class MemoryRepository:
                         raw_text=msg.raw_text if msg else None,
                         message_summary=msg_summary,
                         source_text_snippet=source_snippet,
+                        tags=tags,
                     )
                 )
             return responses
+        finally:
+            if should_close:
+                db.close()
+
+    def merge_similar_pending_tasks(
+        self,
+        similarity_threshold: float = 0.55,
+        db: Session | None = None,
+    ) -> dict:
+        """Mescla tarefas semelhantes com status PENDING agrupando por pessoa de origem e unificando comentários."""
+        should_close = False
+        if db is None:
+            db = SessionLocal()
+            should_close = True
+
+        try:
+            from src.memory.models import TaskRecord, TaskMergeCluster, MergeTasksResponse
+            from src.memory.task_sentiment_analyzer import task_sentiment_analyzer
+            from collections import defaultdict
+
+            pending_tasks = db.query(TaskRecord).filter(TaskRecord.status == "PENDING").all()
+            if not pending_tasks:
+                return MergeTasksResponse(
+                    status="success",
+                    merged_groups_count=0,
+                    tasks_merged_count=0,
+                    clusters=[],
+                    message="Nenhuma tarefa pendente encontrada para mesclagem.",
+                ).model_dump()
+
+            # 1. Agrupa por pessoa de origem (speaker)
+            tasks_by_speaker = defaultdict(list)
+            for t in pending_tasks:
+                spk = t.message.speaker if t.message and t.message.speaker else "user"
+                tasks_by_speaker[spk].append(t)
+
+            merged_clusters: list[TaskMergeCluster] = []
+            total_tasks_merged = 0
+
+            priority_order = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "URGENT": 4}
+
+            for speaker, tasks in tasks_by_speaker.items():
+                if len(tasks) < 2:
+                    continue
+
+                # Encontra grupos de similaridade dentro do mesmo remetente
+                visited_ids = set()
+                for i, t1 in enumerate(tasks):
+                    if t1.id in visited_ids:
+                        continue
+
+                    cluster = [t1]
+                    for j, t2 in enumerate(tasks):
+                        if i == j or t2.id in visited_ids:
+                            continue
+
+                        sim = task_sentiment_analyzer.compute_task_similarity(
+                            title_a=t1.title,
+                            notes_a=t1.notes or "",
+                            title_b=t2.title,
+                            notes_b=t2.notes or "",
+                        )
+
+                        # Similaridade acima do threshold ou títulos quase idênticos
+                        if sim >= similarity_threshold:
+                            cluster.append(t2)
+                            visited_ids.add(t2.id)
+
+                    if len(cluster) > 1:
+                        visited_ids.add(t1.id)
+                        # Ordena o cluster para determinar a tarefa primária (mais antiga ou mais detalhada)
+                        cluster.sort(key=lambda x: x.created_at or datetime.now(timezone.utc))
+                        primary = cluster[0]
+
+                        # Consolida prioridade máxima do cluster
+                        max_prio = primary.priority or "MEDIUM"
+                        for c_item in cluster:
+                            if priority_order.get(c_item.priority, 1) > priority_order.get(max_prio, 1):
+                                max_prio = c_item.priority
+                        primary.priority = max_prio
+
+                        merged_ids = []
+                        merged_titles = []
+                        additional_notes = []
+
+                        for other in cluster[1:]:
+                            merged_ids.append(other.id)
+                            merged_titles.append(other.title)
+                            created_str = other.created_at.strftime("%d/%m/%Y %H:%M") if other.created_at else ""
+                            note_text = (other.notes or "").strip()
+                            if not note_text:
+                                note_text = f"Origem: Mensagem '{other.title}'"
+                            
+                            additional_notes.append(
+                                f"📌 [Mesclado de \"{other.title}\" em {created_str}]:\n{note_text}"
+                            )
+
+                            # Marca a tarefa secundária como CANCELLED / Mesclada
+                            other.status = "CANCELLED"
+                            other.notes = f"[Mesclada na tarefa principal ID: {primary.id}]\n{other.notes or ''}".strip()
+
+                        # Unifica os comentários na tarefa primária
+                        orig_notes = (primary.notes or "").strip()
+                        divider = "\n\n---\n" if orig_notes else ""
+                        primary.notes = (orig_notes + divider + "\n\n".join(additional_notes)).strip()
+
+                        total_tasks_merged += len(merged_ids)
+                        merged_clusters.append(
+                            TaskMergeCluster(
+                                speaker=speaker,
+                                primary_task_id=primary.id,
+                                primary_title=primary.title,
+                                merged_task_ids=merged_ids,
+                                merged_titles=merged_titles,
+                                notes_consolidated_preview=primary.notes[:200] if primary.notes else None,
+                            )
+                        )
+
+            db.commit()
+
+            msg_feedback = (
+                f"{len(merged_clusters)} grupo(s) de tarefas semelhantes mesclados ({total_tasks_merged} tarefas consolidadas)."
+                if merged_clusters
+                else "Nenhuma tarefa duplicada/semelhante encontrada para mesclagem."
+            )
+
+            return MergeTasksResponse(
+                status="success",
+                merged_groups_count=len(merged_clusters),
+                tasks_merged_count=total_tasks_merged,
+                clusters=merged_clusters,
+                message=msg_feedback,
+            ).model_dump()
+        except Exception as exc:
+            db.rollback()
+            logger.error(f"Erro ao mesclar tarefas semelhantes: {exc}", exc_info=True)
+            raise exc
         finally:
             if should_close:
                 db.close()

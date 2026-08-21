@@ -13,6 +13,7 @@ from src.memory.graph import knowledge_graph
 from src.memory.models import (
     MemoryStats,
     MessageCreate,
+    MergeTasksResponse,
     SearchQuery,
     SearchResult,
     TaskResponse,
@@ -122,13 +123,23 @@ async def get_weekly_report(
 
 @router.get("/tasks", response_model=list[TaskResponse])
 async def list_tasks(
-    status: str | None = Query(default=None, description="Filtrar por status: PENDING, IN_PROGRESS, DONE"),
+    status: str | None = Query(default=None, description="Filtrar por status: PENDING, IN_PROGRESS, DONE, CANCELLED"),
     priority: str | None = Query(default=None, description="Filtrar por prioridade: LOW, MEDIUM, HIGH, URGENT"),
     assignee: str | None = Query(default=None, description="Filtrar por responsável"),
+    speaker: str | None = Query(default=None, description="Filtrar por pessoa de origem / remetente"),
     db: Session = Depends(get_db),
 ):
     """Lista tarefas extraídas com filtros."""
-    return memory_repository.list_tasks(status=status, priority=priority, assignee=assignee, db=db)
+    return memory_repository.list_tasks(status=status, priority=priority, assignee=assignee, speaker=speaker, db=db)
+
+
+@router.post("/tasks/merge-similar", response_model=MergeTasksResponse)
+async def merge_similar_tasks(
+    similarity_threshold: float = Query(default=0.55, ge=0.1, le=1.0, description="Limiar de similaridade para agrupamento"),
+    db: Session = Depends(get_db),
+):
+    """Mescla tarefas semelhantes com status PENDING agrupando por pessoa de origem e consolidando anotações."""
+    return memory_repository.merge_similar_pending_tasks(similarity_threshold=similarity_threshold, db=db)
 
 
 @router.patch("/tasks/{task_id}", response_model=TaskResponse)

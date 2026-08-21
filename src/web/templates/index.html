@@ -245,6 +245,9 @@
           <input type="text" id="tasks-search" placeholder="Buscar tarefas...">
         </div>
         <div class="filter-group">
+          <select id="tasks-filter-speaker" title="Filtrar pela pessoa de onde saiu o gatilho da tarefa">
+            <option value="">👥 Todas as Pessoas (Origem)</option>
+          </select>
           <select id="tasks-filter-status">
             <option value="">Todos os Status</option>
             <option value="PENDING" selected>Pendentes (PENDING)</option>
@@ -258,6 +261,9 @@
             <option value="MEDIUM">Média (MEDIUM)</option>
             <option value="LOW">Baixa (LOW)</option>
           </select>
+          <button class="btn btn-secondary btn-sm" id="btn-merge-tasks" title="Mesclar tarefas semelhantes agrupadas por pessoa de origem (somente pendentes)" onclick="window.mergeSimilarTasks()">
+            🔀 Mesclar Semelhantes
+          </button>
         </div>
       </div>
 
