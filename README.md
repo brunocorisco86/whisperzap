@@ -173,11 +173,23 @@ flowchart TD
 - **Auto-correção Fuzzy**: Termos com typos são auto-corrigidos para sua forma canônica (`senosr` ➔ `Sensor`, `fihlos` ➔ `Filho`).
 - **Zero Nós com Erro**: Qualquer erro ortográfico não corrigível é sumariamente impedido de virar nó no grafo.
 
-### 8. ⛏️ Mineração de Jargões & Gerador Fonético do Dicionário
-- **Descoberta Autônoma**: O spaCy varre as mensagens e descobre jargões e siglas inéditas (`C-Value` / `Termhood`) sem supervisão.
-- **Gerador Fonético**: Gera automaticamente variações fonéticas prováveis do Whisper para qualquer termo novo.
+### 8. ⛏️ Mineração de Jargões, Categorias Dinâmicas & Mesclagem em Polímnia
+- **Taxonomia Especializada com Teto de 12 Categorias**: Racionalização e descoberta dinâmica de categorias cruzando o Grafo de Urânia e spaCy NLP (`ZOOTECNIA_MANEJO`, `NUTRICAO_RACAO`, `LOGISTICA_SILOS`, `SISTEMAS_ERP`, `AGRONEGOCIO_COOP`, etc.).
+- **Mesclagem Inteligente de Termos**: Agrupamento morfológico e fonético (singular/plural, maiúsculas para siglas, Title Case para entidades).
+- **Descoberta Autônoma & Gerador Fonético**: Mineração com spaCy e geração automática de variações prováveis para priming do Whisper.
 
-### 9. 🇧🇷 Alinhamento de Fuso Horário de Brasília (America/Sao_Paulo)
+### 9. 💃 Gestão Avançada de Tarefas em Terpsícore
+- **Filtro por Solicitante / Interlocutor**: Rastreabilidade precisa da origem de cada pendência.
+- **Tags Contextuais Inteligentes**: Extração de tópicos e entidades via spaCy NLP e AI Gateway.
+- **Exportação em PDF Formatado**: Geração de relatórios executivos de tarefas para compartilhamento rápido.
+- **Mesclagem de Tarefas Similares por Pessoa**: Agrupamento de pendências correlatas com unificação de comentários e notas.
+
+### 10. 🧠 Oráculo Melpômene: Query Engine Dinâmica & Humanizador de Respostas
+- **Pré-Processamento Morfossintático (`HermesQueryUnderstanding`)**: Interpretação de intenções (`INTERLOCUTOR_DIALOGUE`, `TASK_LOOKUP`, `CONCEPT_STATUS`, `TIME_FILTER`) e resolução de interlocutores contra contatos e mensagens do banco.
+- **Pós-Processamento Anti-Lixo Técnico (`HermesResponseHumanizer`)**: Purga profunda de UUIDs, metadados internos de banco, tags vCard e triplas brutas, aplicando polimento sintático com spaCy.
+- **Síntese Cognitiva Local Extrativa (`LocalCognitiveSynthesizer`)**: Resumos executivos fluidos estruturados por tópicos temáticos (Equipamentos/Operação, Contato/Fornecedores, Acompanhamento/Retorno) com **0 custo de tokens de API**.
+
+### 11. 🇧🇷 Alinhamento de Fuso Horário de Brasília (America/Sao_Paulo)
 - Conversão precisa de todos os timestamps do banco para o Horário de Brasília (UTC-3), garantindo que consultas sobre "hoje" e "ontem" operem no fuso brasileiro sem distorções de UTC.
 
 ---
