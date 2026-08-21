@@ -93,20 +93,26 @@ class HermesResponseHumanizer:
 
             # Mantém cabeçalhos markdown ou marcadores de tópicos intactos
             if trimmed.startswith(("#", "•", "-", "*", "💬", "📋", "🌾", "🔗", "📌")):
-                # Se for um item de lista, garante espaçamento após marcador
                 trimmed = re.sub(r"^([•\-\*])\s*", r"• ", trimmed)
                 polished_lines.append(trimmed)
+                continue
+
+            # Se for uma citação de fala (entre aspas), apenas limpa espaços internos
+            if trimmed.startswith(('"', "'", "“")) and trimmed.endswith(('"', "'", "”")):
+                inner = trimmed[1:-1].strip()
+                # Garante primeira letra maiúscula
+                if inner:
+                    inner = inner[0].upper() + inner[1:]
+                polished_lines.append(f'  "{inner}"')
                 continue
 
             doc = self.nlp(trimmed)
             sents = [s.text.strip() for s in doc.sents if s.text.strip()]
             fixed_sents = []
             for s in sents:
-                # Garante primeira letra maiúscula
                 if len(s) > 1:
                     s = s[0].upper() + s[1:]
-                # Garante pontuação final
-                if s and s[-1] not in (".", "!", "?", ":", ";"):
+                if s and s[-1] not in (".", "!", "?", ":", ";", '"', "'", "”"):
                     s += "."
                 fixed_sents.append(s)
 
