@@ -110,3 +110,73 @@ def test_dictionary_merge_api_endpoint():
     assert "merged_clusters_count" in data
     assert "clusters" in data
     assert "message" in data
+
+
+def test_get_available_categories(temp_dict_service):
+    """Testa a listagem de categorias dinâmicas disponíveis."""
+    categories = temp_dict_service.get_available_categories()
+    assert len(categories) >= 10
+    codes = [c["code"] for c in categories]
+    assert "ZOOTECNIA_MANEJO" in codes
+    assert "LOGISTICA_SILOS" in codes
+    assert "SISTEMAS_ERP" in codes
+    for cat in categories:
+        assert "label" in cat
+        assert "description" in cat
+        assert "terms_count" in cat
+
+
+def test_rationalize_and_expand_categories(temp_dict_service):
+    """Testa a racionalização de termos com spaCy e grafo de Urânia."""
+    # Adiciona termos com categorias antigas ou genéricas
+    temp_dict_service.add_term(DictionaryTermCreate(
+        term="Telemetria de Silo 4",
+        phonetic_variations=["sensor do silo", "nivel de racao no silo"],
+        category="EQUIPAMENTOS",
+        description="Sensor de nível e telemetria de silo de ração",
+    ))
+    temp_dict_service.add_term(DictionaryTermCreate(
+        term="Contrato de Parceria Avícola C.Vale",
+        phonetic_variations=["contrato cvale", "parceria integrado"],
+        category="GERAL",
+        description="Contrato de integração avícola firmado com cooperado",
+    ))
+
+    result = temp_dict_service.rationalize_and_expand_categories(max_categories=12)
+    assert result["total_categories_count"] <= 12
+    assert result["max_categories_limit"] == 12
+
+    # Verifica se os termos foram reclassificados para categorias de alta precisão
+    silo_term = next((t for t in temp_dict_service.list_terms() if "Telemetria de Silo" in t.term), None)
+    assert silo_term is not None
+    assert silo_term.category in ("LOGISTICA_SILOS", "EQUIPAMENTOS_IOT")
+
+    coop_term = next((t for t in temp_dict_service.list_terms() if "Contrato de Parceria" in t.term), None)
+    assert coop_term is not None
+    assert coop_term.category in ("AGRONEGOCIO_COOP", "FINANCEIRO_GESTAO")
+
+
+def test_categories_and_rationalize_api_endpoints():
+    """Testa os endpoints GET /categories e POST /rationalize-categories."""
+    from fastapi.testclient import TestClient
+    from src.main import app
+
+    client = TestClient(app)
+
+    # 1. GET /categories
+    res_get = client.get("/api/v1/dictionary/categories")
+    assert res_get.status_code == 200
+    cats = res_get.json()
+    assert isinstance(cats, list)
+    assert len(cats) >= 10
+    assert any(c["code"] == "ZOOTECNIA_MANEJO" for c in cats)
+
+    # 2. POST /rationalize-categories
+    res_post = client.post("/api/v1/dictionary/rationalize-categories?max_categories=12")
+    assert res_post.status_code == 200
+    data = res_post.json()
+    assert data["status"] == "success"
+    assert "reclassified_terms_count" in data
+    assert "categories" in data
+    assert data["max_categories_limit"] == 12
+

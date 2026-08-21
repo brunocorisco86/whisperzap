@@ -669,8 +669,49 @@ async function loadContacts(forceReload = false) {
   }
 }
 
+let allDictionaryCategories = [];
+
+async function loadDictionaryCategories() {
+  try {
+    const res = await fetch('/api/v1/dictionary/categories');
+    if (res.ok) {
+      allDictionaryCategories = await res.json();
+      updateCategoryDropdowns();
+    }
+  } catch (err) {
+    console.error('Erro ao carregar categorias dinâmicas:', err);
+  }
+}
+
+function updateCategoryDropdowns() {
+  const filterSelect = document.getElementById('dict-filter-category');
+  const modalSelect = document.getElementById('term-category');
+
+  if (filterSelect) {
+    const currentVal = filterSelect.value.toUpperCase();
+    let optionsHtml = '<option value="">📁 Todas as Categorias</option>';
+    allDictionaryCategories.forEach(c => {
+      const selected = (c.code.toUpperCase() === currentVal) ? 'selected' : '';
+      const countSuffix = (c.terms_count !== undefined && c.terms_count > 0) ? ` (${c.terms_count})` : '';
+      optionsHtml += `<option value="${c.code}" ${selected}>${c.label}${countSuffix}</option>`;
+    });
+    filterSelect.innerHTML = optionsHtml;
+  }
+
+  if (modalSelect) {
+    const currentVal = modalSelect.value.toUpperCase();
+    let optionsHtml = '';
+    allDictionaryCategories.forEach(c => {
+      const selected = (c.code.toUpperCase() === currentVal) ? 'selected' : '';
+      optionsHtml += `<option value="${c.code}" ${selected}>${c.label}</option>`;
+    });
+    modalSelect.innerHTML = optionsHtml;
+  }
+}
+
 async function loadDictionary() {
   try {
+    await loadDictionaryCategories();
     const res = await fetch('/api/v1/dictionary');
     if (res.ok) {
       allDictionaryTerms = await res.json();
@@ -2201,12 +2242,14 @@ function renderDictionary() {
 
   dictionaryContainer.innerHTML = displayedTerms.map(t => {
     const variationsHtml = (t.phonetic_variations || []).map(v => `<span class="variation-chip">${v}</span>`).join('');
+    const catObj = allDictionaryCategories.find(c => c.code.toUpperCase() === (t.category || '').toUpperCase());
+    const catLabel = catObj ? catObj.label : (t.category || 'GERAL');
 
     return `
       <div class="dict-card">
         <div class="dict-header">
           <span class="dict-term">${t.term}</span>
-          <span class="badge badge-executive">${t.category}</span>
+          <span class="badge badge-executive" title="${catObj ? catObj.description : ''}">${catLabel}</span>
         </div>
 
         ${t.expansion ? `<div class="dict-expansion">${t.expansion}</div>` : ''}
@@ -2375,6 +2418,31 @@ async function mergeSimilarDictionaryTerms() {
   }
 }
 window.mergeSimilarDictionaryTerms = mergeSimilarDictionaryTerms;
+
+async function rationalizeCategoriesWithUrania() {
+  const confirmMsg = "Deseja expandir e racionalizar as categorias de Polímnia utilizando o Grafo Neural de Urânia e spaCy NLP?\n\nO sistema analisará os conceitos de avicultura, silos, telemetria, C.Vale e ERPs, redistribuindo os termos nas categorias mais precisas (teto máximo de 12 categorias).";
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    showToast('🔮 Urânia & spaCy analisando topologia do grafo...', false);
+    const res = await fetch('/api/v1/dictionary/rationalize-categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Erro na requisição: ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    showToast(`🔮 ${data.message}`);
+    await loadDictionary();
+  } catch (err) {
+    console.error('Erro ao racionalizar categorias:', err);
+    showToast('Erro ao racionalizar categorias: ' + err.message, 'error');
+  }
+}
+window.rationalizeCategoriesWithUrania = rationalizeCategoriesWithUrania;
 
 // --- WhatsApp Avatar & Profile Fetcher ---
 

@@ -16,7 +16,7 @@
       "si vale"
     ],
     "expansion": "Cooperativa Agroindustrial C.Vale",
-    "category": "AGRONEGOCIO",
+    "category": "AGRONEGOCIO_COOP",
     "description": "Cooperativa agroindustrial de integração avícola e grãos.",
     "id": "2ae3ba5f",
     "created_at": "2026-08-14T22:47:18.174163"
@@ -31,7 +31,7 @@
       "agro senter"
     ],
     "expansion": "Portal Agrocenter C.Vale",
-    "category": "SISTEMAS",
+    "category": "AGRONEGOCIO_COOP",
     "description": "Portal ERP e centralizador de pedidos de ração e insumos agropecuários.",
     "id": "7a8b9c01",
     "created_at": "2026-08-15T01:06:00.000000"
@@ -45,7 +45,7 @@
       "aplicativo do produtor"
     ],
     "expansion": "Aplicativo eProdutor C.Vale",
-    "category": "SISTEMAS",
+    "category": "AGRONEGOCIO_COOP",
     "description": "Aplicativo mobile utilizado pelos cooperados e integrados para lançamento de dados de campo.",
     "id": "3dd119a9",
     "created_at": "2026-08-14T22:47:18.174150"
@@ -62,7 +62,7 @@
       "mtech systems"
     ],
     "expansion": "Mtech Systems",
-    "category": "SISTEMAS",
+    "category": "SISTEMAS_ERP",
     "description": "Software global de gestão de integração e rastreabilidade avícola.",
     "id": "8b9c0d12",
     "created_at": "2026-08-15T01:06:00.000000"
@@ -77,7 +77,7 @@
       "amino sql"
     ],
     "expansion": "Mtech Amino ERP",
-    "category": "SISTEMAS",
+    "category": "SISTEMAS_ERP",
     "description": "Banco de dados MS SQL Server e backend do ecossistema Mtech Systems.",
     "id": "9c0d1e23",
     "created_at": "2026-08-15T01:06:00.000000"
@@ -92,7 +92,7 @@
       "modulo brim"
     ],
     "expansion": "Broiler Integration Module (Mtech)",
-    "category": "SISTEMAS",
+    "category": "SISTEMAS_ERP",
     "description": "Módulo de controle zootécnico e acompanhamento de lotes de frango de corte.",
     "id": "0d1e2f34",
     "created_at": "2026-08-15T01:06:00.000000"
@@ -107,7 +107,7 @@
       "modulo fmim"
     ],
     "expansion": "Feed Mill Integration Module (Mtech)",
-    "category": "SISTEMAS",
+    "category": "SISTEMAS_ERP",
     "description": "Módulo de gestão de fábrica de ração e formulação nutricional.",
     "id": "1e2f3a45",
     "created_at": "2026-08-15T01:06:00.000000"
@@ -128,7 +128,7 @@
       "temesse"
     ],
     "expansion": "Transportation Management System",
-    "category": "LOGISTICA",
+    "category": "LOGISTICA_SILOS",
     "description": "Sistema de gestão de transporte utilizado para alocação de cargas e logística de ração",
     "id": "2f3a4b56",
     "created_at": "2026-08-15T01:06:00.000000"
@@ -144,7 +144,7 @@
       "sensores de silos"
     ],
     "expansion": "Monitoramento de Nível de Silos de Ração",
-    "category": "EQUIPAMENTOS",
+    "category": "EQUIPAMENTOS_IOT",
     "description": "Sensores IoT de pesagem e nível nos silos de armazenagem de ração.",
     "id": "7e72e302",
     "created_at": "2026-08-14T22:47:18.174189"
@@ -166,7 +166,7 @@
       "ficha de acompanhamento de lote"
     ],
     "expansion": "Ficha de Acompanhamento de Lote",
-    "category": "ZOOTECNIA",
+    "category": "ZOOTECNIA_MANEJO",
     "description": "Documento e registro diário com mortalidade, consumo de ração e peso das aves.",
     "id": "21d8730a",
     "created_at": "2026-08-14T22:47:18.174119"
@@ -180,7 +180,7 @@
       "índice de eficiência produtiva"
     ],
     "expansion": "Índice de Eficiência Produtiva",
-    "category": "ZOOTECNIA",
+    "category": "ZOOTECNIA_MANEJO",
     "description": "Métrica zootécnica de desempenho global do lote avícola.",
     "id": "e2a27761",
     "created_at": "2026-08-14T22:47:18.174196"
@@ -195,7 +195,7 @@
       "taxa de conversao"
     ],
     "expansion": "Taxa de Conversão Alimentar (CA)",
-    "category": "ZOOTECNIA",
+    "category": "NUTRICAO_RACAO",
     "description": "Quilogramas de ração consumida por quilograma de peso vivo produzido.",
     "id": "9b8cbe88",
     "created_at": "2026-08-14T22:47:18.174203"
@@ -210,7 +210,7 @@
       "perda de lote"
     ],
     "expansion": "Mortalidade Diária do Aviário",
-    "category": "ZOOTECNIA",
+    "category": "ZOOTECNIA_MANEJO",
     "description": "Contagem de perdas diárias no lote avícola.",
     "id": "c2b9e1ac",
     "created_at": "2026-08-14T22:47:18.174173"
@@ -224,7 +224,7 @@
       "intervalo de lote"
     ],
     "expansion": "Período de Vazio Sanitário",
-    "category": "ZOOTECNIA",
+    "category": "SANIDADE_QUALIDADE",
     "description": "Período de desinfecção, descanso e preparação do aviário entre lotes sucessivos.",
     "id": "58a103bf",
     "created_at": "2026-08-14T22:47:18.174181"
@@ -239,7 +239,7 @@
       "alojamento"
     ],
     "expansion": "Alojamento de Pintainhos de 1 Dia",
-    "category": "ZOOTECNIA",
+    "category": "ZOOTECNIA_MANEJO",
     "description": "Chegada e recepção do lote de aves no aviário com aquecimento e forragem.",
     "id": "3a4b5c67",
     "created_at": "2026-08-15T01:06:00.000000"
@@ -254,7 +254,7 @@
       "carregamento"
     ],
     "expansion": "Programação de Apanha e Abate de Frangos",
-    "category": "LOGISTICA",
+    "category": "FRIGORIFICO_ABATE",
     "description": "Operação de captura, pesagem final e transporte de aves para o frigorífico.",
     "id": "4b5c6d78",
     "created_at": "2026-08-15T01:06:00.000000"
@@ -268,7 +268,7 @@
       "copiloto hermes"
     ],
     "expansion": "Hermes Voice Memory & Reasoning Agent",
-    "category": "TECNOLOGIA",
+    "category": "IA_AUTOMACAO",
     "description": "Agente cognitivo com RAG híbrido, memória vetorial e grafo de conhecimento.",
     "id": "5c6d7e89",
     "created_at": "2026-08-15T01:06:00.000000"

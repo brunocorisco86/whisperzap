@@ -74,3 +74,24 @@ class DictionaryMergeResponse(BaseModel):
     candidates_merged_count: int = 0
     clusters: list[DictionaryMergeCluster] = []
     message: str
+
+
+class DictionaryCategoryInfo(BaseModel):
+    """Metadados de uma categoria dinâmica descoberta ou racionalizada."""
+
+    code: str = Field(..., description="Código da categoria em maiúsculas")
+    label: str = Field(..., description="Rótulo amigável com ícone")
+    description: str = Field(default="", description="Escopo temático da categoria")
+    terms_count: int = Field(default=0, description="Quantidade de termos ativos nesta categoria")
+
+
+class CategoryRationalizeResponse(BaseModel):
+    """Resposta da operação de racionalização e expansão de categorias via Urânia + spaCy."""
+
+    status: str = "success"
+    reclassified_terms_count: int = 0
+    total_categories_count: int = 0
+    max_categories_limit: int = 12
+    categories: list[DictionaryCategoryInfo] = []
+    message: str
+

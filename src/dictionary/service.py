@@ -395,5 +395,225 @@ class DictionaryService:
 
         return merged_clusters
 
+    def get_available_categories(self) -> list[dict]:
+        """Retorna as categorias dinâmicas disponíveis com contagem de termos ativos."""
+        counts = {}
+        for t in self.terms.values():
+            cat = t.category.upper() if t.category else "GERAL"
+            counts[cat] = counts.get(cat, 0) + 1
+
+        result = []
+        # Adiciona categorias conhecidas do registro
+        for code, info in DYNAMIC_CATEGORIES_REGISTRY.items():
+            result.append({
+                "code": code,
+                "label": info["label"],
+                "description": info["description"],
+                "terms_count": counts.get(code, 0),
+            })
+
+        # Adiciona qualquer outra categoria presente nos dados
+        known_codes = set(DYNAMIC_CATEGORIES_REGISTRY.keys())
+        for cat_code, count in counts.items():
+            if cat_code not in known_codes:
+                result.append({
+                    "code": cat_code,
+                    "label": f"📁 {cat_code.title()}",
+                    "description": f"Categoria customizada: {cat_code}",
+                    "terms_count": count,
+                })
+
+        return result
+
+    def rationalize_and_expand_categories(self, max_categories: int = 12) -> dict:
+        """Racionaliza e reclassifica os termos do dicionário usando o grafo neural de Urânia e spaCy NLP."""
+        from src.ai_gateway.bypass import normalize_text
+        from src.memory.graph import knowledge_graph
+        from src.memory.task_sentiment_analyzer import get_spacy_nlp
+
+        nlp = get_spacy_nlp()
+        reclassified_count = 0
+
+        # Coleta nós e conexões do grafo de Urânia para enriquecimento contextual
+        urania_nodes = set(knowledge_graph.graph.nodes()) if knowledge_graph.graph else set()
+
+        for term_obj in self.terms.values():
+            old_cat = term_obj.category.upper() if term_obj.category else "GERAL"
+            best_cat = "GERAL"
+            best_score = 0.0
+
+            # 1. Monta texto completo do termo para análise semântica
+            full_text = f"{term_obj.term} {term_obj.expansion or ''} {term_obj.description or ''} {' '.join(term_obj.phonetic_variations)}"
+            norm_full = normalize_text(full_text)
+
+            lemmas = set()
+            if nlp:
+                try:
+                    doc = nlp(full_text)
+                    lemmas = {token.lemma_.lower() for token in doc if not token.is_punct and not token.is_stop}
+                except Exception:
+                    lemmas = set(norm_full.split())
+            else:
+                lemmas = set(norm_full.split())
+
+            # 2. Conhecimento neural do Grafo de Urânia (verifica nós vizinhos e relações)
+            graph_boosts = {}
+            term_norm = normalize_text(term_obj.term)
+            for node in urania_nodes:
+                node_norm = normalize_text(node)
+                if node_norm in term_norm or term_norm in node_norm:
+                    try:
+                        neighbors = list(knowledge_graph.graph.neighbors(node))
+                        neighbor_text = " ".join([normalize_text(n) for n in neighbors])
+                        for cat_code, cat_info in DYNAMIC_CATEGORIES_REGISTRY.items():
+                            for kw in cat_info["keywords"]:
+                                if kw in neighbor_text:
+                                    graph_boosts[cat_code] = graph_boosts.get(cat_code, 0.0) + 1.5
+                    except Exception:
+                        pass
+
+            # 3. Calcula pontuação para cada categoria dinâmica
+            for cat_code, cat_info in DYNAMIC_CATEGORIES_REGISTRY.items():
+                if cat_code == "GERAL":
+                    continue
+
+                score = 0.0
+                keywords = cat_info["keywords"]
+
+                # A. Casamento direto de palavras-chave / lemas
+                for kw in keywords:
+                    if kw in lemmas:
+                        score += 3.0
+                    elif kw in norm_full:
+                        score += 1.5
+
+                # B. Boost do grafo de Urânia
+                score += graph_boosts.get(cat_code, 0.0)
+
+                # C. Mapeamento legado de categorias anteriores
+                if old_cat == "ZOOTECNIA" and cat_code in ("ZOOTECNIA_MANEJO", "NUTRICAO_RACAO", "SANIDADE_QUALIDADE", "FRIGORIFICO_ABATE"):
+                    score += 0.8
+                elif old_cat == "LOGISTICA" and cat_code in ("LOGISTICA_SILOS", "FRIGORIFICO_ABATE"):
+                    score += 0.8
+                elif old_cat == "SISTEMAS" and cat_code in ("SISTEMAS_ERP", "IA_AUTOMACAO"):
+                    score += 0.8
+                elif old_cat == "EQUIPAMENTOS" and cat_code in ("AMBIENCIA_CLIMA", "EQUIPAMENTOS_IOT"):
+                    score += 0.8
+                elif old_cat == "AGRONEGOCIO" and cat_code in ("AGRONEGOCIO_COOP", "FINANCEIRO_GESTAO"):
+                    score += 0.8
+                elif old_cat == "TECNOLOGIA" and cat_code in ("IA_AUTOMACAO", "SISTEMAS_ERP"):
+                    score += 0.8
+
+                if score > best_score:
+                    best_score = score
+                    best_cat = cat_code
+
+            # Se encontrou uma categoria com pontuação satisfatória (> 1.0) e diferente da atual
+            if best_score >= 1.0 and best_cat != old_cat:
+                term_obj.category = best_cat
+                reclassified_count += 1
+            elif old_cat in DYNAMIC_CATEGORIES_REGISTRY:
+                term_obj.category = old_cat
+            elif old_cat == "ZOOTECNIA":
+                term_obj.category = "ZOOTECNIA_MANEJO"
+                reclassified_count += 1
+            elif old_cat == "LOGISTICA":
+                term_obj.category = "LOGISTICA_SILOS"
+                reclassified_count += 1
+            elif old_cat == "SISTEMAS":
+                term_obj.category = "SISTEMAS_ERP"
+                reclassified_count += 1
+            elif old_cat == "EQUIPAMENTOS":
+                term_obj.category = "EQUIPAMENTOS_IOT"
+                reclassified_count += 1
+            elif old_cat == "AGRONEGOCIO":
+                term_obj.category = "AGRONEGOCIO_COOP"
+                reclassified_count += 1
+            elif old_cat == "TECNOLOGIA":
+                term_obj.category = "IA_AUTOMACAO"
+                reclassified_count += 1
+
+        if reclassified_count > 0:
+            self._save()
+
+        categories_summary = self.get_available_categories()
+
+        return {
+            "reclassified_terms_count": reclassified_count,
+            "total_categories_count": len(categories_summary),
+            "max_categories_limit": max_categories,
+            "categories": categories_summary,
+            "message": (
+                f"{reclassified_count} termo(s) reclassificados em {len(categories_summary)} categorias dinâmicas "
+                f"com o Grafo de Urânia e spaCy NLP."
+                if reclassified_count > 0
+                else f"Categorias já estavam otimizadas ({len(categories_summary)} categorias ativas)."
+            ),
+        }
+
+
+# Taxonomia Dinâmica e Registro de Categorias Especializadas (Teto: 12 Categorias)
+DYNAMIC_CATEGORIES_REGISTRY = {
+    "ZOOTECNIA_MANEJO": {
+        "label": "🐥 Zootecnia & Manejo de Lotes",
+        "description": "FAL, Pintainhos, Alojamento, IEP, Mortalidade, Densidade, CA e pesagens",
+        "keywords": {"fal", "lote", "aves", "pintainho", "pintinho", "iep", "mortalidade", "alojamento", "peso", "zootecnia", "viabilidade", "densidade", "pesagem"},
+    },
+    "NUTRICAO_RACAO": {
+        "label": "🌾 Nutrição & Fábrica de Ração",
+        "description": "Formulação, fábrica de ração, farelo, soja, milho, premix, aditivos e conversão alimentar",
+        "keywords": {"racao", "nutricao", "conversao", "alimentar", "fabrica", "farelo", "soja", "milho", "premix", "aditivo", "ingrediente", "fmim"},
+    },
+    "LOGISTICA_SILOS": {
+        "label": "🚚 Logística, Frotas & Silos",
+        "description": "TMS, Roteirização, Sensores de Silo, Nível de Ração, Frotas, Caminhões e Despacho",
+        "keywords": {"tms", "silo", "silos", "logistica", "frota", "caminhao", "entrega", "transporte", "despacho", "motorista", "roteirizador", "capacidade"},
+    },
+    "AGRONEGOCIO_COOP": {
+        "label": "🏛️ Agronegócio & C.Vale",
+        "description": "Cooperativa C.Vale, Cooperados, Integrados, Agrocenter, Contratos e Governança",
+        "keywords": {"c.vale", "cvale", "sevale", "agrocenter", "cooperativa", "cooperado", "integrado", "associado", "agronegocio", "contrato", "parceria", "assembleia"},
+    },
+    "SISTEMAS_ERP": {
+        "label": "💻 Sistemas, Mtech & ERPs",
+        "description": "Mtech Systems, Amino, BRIM, FMIM, eProdutor, Agrocenter ERP, Bancos de Dados e APIs",
+        "keywords": {"mtech", "amino", "brim", "fmim", "eprodutor", "software", "sistema", "erp", "banco", "sql", "api", "modulo", "app"},
+    },
+    "AMBIENCIA_CLIMA": {
+        "label": "🌡️ Ambiência & Climatização",
+        "description": "Dark House, Pressão Negativa, Exaustores, Placas Evaporativas, Aquecedores e Temperatura",
+        "keywords": {"dark", "house", "climatizado", "exaustor", "placa", "evaporativa", "aquecedor", "temperatura", "umidade", "pressao", "negativa", "ventilador", "ambiencia"},
+    },
+    "EQUIPAMENTOS_IOT": {
+        "label": "⚙️ Equipamentos & Telemetria IoT",
+        "description": "Cloradores, Dosadores de Cloro, Sensores LoRa, Balanças, Motores e Telemetria",
+        "keywords": {"clorador", "dosador", "sensor", "telemetria", "iot", "lora", "balanca", "motor", "equipamento", "maquina", "hardware"},
+    },
+    "SANIDADE_QUALIDADE": {
+        "label": "🛡️ Sanidade & Biosseguridade",
+        "description": "Vazio Sanitário, Desinfecção, Vacinas, Biosseguridade, Coletas e Laudos Sanitários",
+        "keywords": {"vazio", "sanitario", "desinfeccao", "vacina", "sanidade", "biosseguridade", "laudo", "veterinario", "qualidade", "coleta", "analise", "sangue"},
+    },
+    "FRIGORIFICO_ABATE": {
+        "label": "🍗 Abatedouro & Industrialização",
+        "description": "Apanha de Frangos, Programação de Abate, Rendimento de Carcaça e Frigorífico",
+        "keywords": {"abate", "apanha", "frigorifico", "industrializacao", "carcaca", "rendimento", "pesagem", "evisceracao", "escaldagem"},
+    },
+    "FINANCEIRO_GESTAO": {
+        "label": "💰 Financeiro & Liquidação",
+        "description": "Faturamento, Crédito Rural, Liquidação de Lote, Bonificações, Custos e Pagamentos",
+        "keywords": {"financeiro", "liquidacao", "faturamento", "credito", "custo", "pagamento", "preco", "bonificacao", "resultado", "margem"},
+    },
+    "IA_AUTOMACAO": {
+        "label": "🧠 IA, Copiloto Hermes & Homelab",
+        "description": "Hermes Voice Agent, Whisper, n8n, Evolution API, RAG Híbrido e Automações Homelab",
+        "keywords": {"hermes", "whisper", "ia", "inteligencia", "copiloto", "rag", "n8n", "evolution", "homelab", "docker", "pipeline", "automacao", "webhook"},
+    },
+    "GERAL": {
+        "label": "📋 Geral & Administrativo",
+        "description": "Conceitos gerais, recados administrativos e termos operacionais transversais",
+        "keywords": {"geral", "administrativo", "operacional", "reuniao", "tarefa", "informe"},
+    },
+}
 
 dictionary_service = DictionaryService()

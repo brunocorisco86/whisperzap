@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from src.dictionary.harvester import lexical_harvester
 from src.dictionary.schemas import (
+    CategoryRationalizeResponse,
+    DictionaryCategoryInfo,
     DictionaryHintResponse,
     DictionaryMergeCluster,
     DictionaryMergeResponse,
@@ -25,6 +27,20 @@ router = APIRouter(prefix="/api/v1/dictionary", tags=["Dicionário Léxico & Glo
 async def list_terms(category: str | None = Query(default=None, description="Filtrar por categoria")):
     """Lista todos os termos cadastrados no glossário de domínio."""
     return dictionary_service.list_terms(category=category)
+
+
+@router.get("/categories", response_model=list[DictionaryCategoryInfo], summary="Lista as categorias dinâmicas ativas")
+async def get_dictionary_categories():
+    """Retorna a taxonomia e categorias ativas do Dicionário com contagem de termos."""
+    return dictionary_service.get_available_categories()
+
+
+@router.post("/rationalize-categories", response_model=CategoryRationalizeResponse, summary="Racionaliza categorias com Urânia e spaCy")
+async def rationalize_dictionary_categories(
+    max_categories: int = Query(default=12, ge=5, le=20, description="Teto máximo de categorias"),
+):
+    """Executa a descoberta neural do Grafo de Urânia e reclassificação morfossintática spaCy."""
+    return dictionary_service.rationalize_and_expand_categories(max_categories=max_categories)
 
 
 @router.post("", response_model=DictionaryTerm, status_code=status.HTTP_201_CREATED)
