@@ -55,8 +55,9 @@ class HermesAgentService:
         sources: list[MemorySourceCitation],
         related_entities: list[str],
         pending_tasks: list[str],
+        parsed_query: Any = None,
     ) -> HermesQueryResponse:
-        """Gera resposta contextual com o Agente Hermes citando fontes estritas."""
+        """Gera resposta contextual com o Agente Hermes citando fontes estritas e humanizando o texto final."""
         start_time = time.perf_counter()
 
         # Monta blocos textuais de contexto
@@ -113,11 +114,15 @@ class HermesAgentService:
                     lines.append(f"• {e}")
             answer_text = "\n".join(lines)
 
+        # Humanização e Sanitização Anti-Lixo Técnico com spaCy e Polímnia
+        from src.ai_gateway.humanizer import hermes_response_humanizer
+        humanized_answer = hermes_response_humanizer.humanize(answer_text, parsed=parsed_query)
+
         elapsed_ms = (time.perf_counter() - start_time) * 1000
 
         return HermesQueryResponse(
             query=query,
-            answer=answer_text,
+            answer=humanized_answer,
             sources=sources,
             related_entities=related_entities,
             pending_tasks_mentioned=pending_tasks,

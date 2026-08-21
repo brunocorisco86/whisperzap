@@ -186,6 +186,10 @@ class DictionaryService:
             terms = [t for t in terms if t.category.upper() == category.upper()]
         return sorted(terms, key=lambda t: t.term)
 
+    def get_all_terms(self) -> list[DictionaryTerm]:
+        """Retorna todos os termos do dicionário."""
+        return self.list_terms()
+
     def get_term(self, term_id: str) -> DictionaryTerm | None:
         """Obtém um termo por ID."""
         return self.terms.get(term_id)

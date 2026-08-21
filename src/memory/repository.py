@@ -498,63 +498,29 @@ class MemoryRepository:
 
         try:
             from src.ai_gateway.agent import hermes_agent_service
-            from src.ai_gateway.schemas import MemorySourceCitation
-            import re
+            from src.ai_gateway.schemas import MemorySourceCitation, HermesQueryResponse
+            from src.memory.semantic_cache import semantic_cache
+            from src.memory.query_understanding import hermes_query_understanding
+            from src.memory.timezone_utils import format_brt
             from sqlalchemy import or_
 
-            CONVERSATIONAL_STOPWORDS = {
-                "que", "para", "com", "como", "onde", "qual", "quais", "quem", "hoje", "ontem",
-                "amanha", "amanhã", "queria", "disse", "pediu", "falou", "conversou", "conversa",
-                "conversando", "recente", "recentemente", "sobre", "comigo", "contigo", "dele", "dela",
-                "eles", "elas", "meu", "minha", "nosso", "nossa", "isso", "aquilo", "estava", "estou",
-                "estao", "tudo", "nada", "mais", "menos", "algum", "alguma", "falar", "saber", "passar",
-                "me", "te", "se", "lhe", "nos", "vos", "lhes", "voce", "você", "sr", "sra", "viu", "olha"
-            }
-
-            # Extrai tokens limpos sem pontuação e sem stopwords
-            all_raw_tokens = [w for w in re.findall(r"\w+", query.lower()) if len(w) >= 2]
-            query_tokens = [w for w in all_raw_tokens if w not in CONVERSATIONAL_STOPWORDS and len(w) >= 3]
-            is_today = any(t in ("hoje", "atual", "recente", "recentemente") for t in all_raw_tokens)
-            is_dialogue_query = any(t in ("conversou", "conversa", "conversando", "falou", "disse", "pediu", "mandou", "avisou", "queria", "precisa", "perguntou", "falando", "discutiu", "comentou") for t in all_raw_tokens)
-
             # Checagem de Cache Semântico Local (Zero Tokens)
-            from src.memory.semantic_cache import semantic_cache
-            from src.ai_gateway.schemas import HermesQueryResponse
             cached_res = semantic_cache.get(query)
             if cached_res:
                 return HermesQueryResponse(**cached_res)
 
-            # 1. Identificação Inteligente de Interlocutor na Pergunta
-            from src.contacts.models import ContactRecord
-            all_contacts = db.query(ContactRecord).all()
-            matched_contact_name = None
-
-            for c in all_contacts:
-                c_first_name = c.name.lower().split()[0] if c.name else ""
-                c_nick = (c.nickname or "").lower()
-                if (c_first_name and c_first_name in all_raw_tokens and len(c_first_name) >= 3) or (c_nick and c_nick in all_raw_tokens):
-                    matched_contact_name = c.name
-                    break
-
-            # Se não achou na tabela de contatos, verifica speakers existentes no banco
-            if not matched_contact_name:
-                distinct_speakers = [s[0] for s in db.query(MessageRecord.speaker).distinct().all() if s[0]]
-                for spk in distinct_speakers:
-                    spk_first = spk.lower().split()[0] if spk else ""
-                    if spk_first and spk_first in all_raw_tokens and len(spk_first) >= 3:
-                        matched_contact_name = spk
-                        break
+            # 1. Análise Semântica e Morfossintática com spaCy + Polímnia
+            parsed = hermes_query_understanding.analyze_query(query, db=db)
 
             seen_ids = set()
             sources: list[MemorySourceCitation] = []
-            from src.memory.timezone_utils import format_brt
 
-            # Se a pergunta cita uma pessoa específica, prioriza imediatamente as mensagens desse locutor
-            if matched_contact_name:
-                speaker_first = matched_contact_name.split()[0]
+            # 2. Priorização por Interlocutor Identificado Dinamicamente
+            if parsed.target_speaker_full_name or parsed.target_speaker:
+                spk_filter = (parsed.target_speaker_full_name or parsed.target_speaker).split()[0]
                 target_messages = (
                     db.query(MessageRecord)
-                    .filter(MessageRecord.speaker.ilike(f"%{speaker_first}%"))
+                    .filter(MessageRecord.speaker.ilike(f"%{spk_filter}%"))
                     .order_by(MessageRecord.created_at.desc())
                     .limit(10)
                     .all()
@@ -565,14 +531,14 @@ class MemoryRepository:
                     sources.append(
                         MemorySourceCitation(
                             message_id=tm.id,
-                            speaker=tm.speaker or matched_contact_name,
+                            speaker=tm.speaker or parsed.target_speaker_full_name or parsed.target_speaker,
                             text_snippet=snippet,
                             similarity=0.98,
                             created_at=format_brt(tm.created_at) if tm.created_at else None,
                         )
                     )
 
-            # 2. Busca Semântica Vetorial (se necessário complementar)
+            # 3. Busca Semântica Vetorial (se necessário complementar)
             if len(sources) < top_k:
                 search_results = await self.search_memories(
                     query=query,
@@ -583,10 +549,9 @@ class MemoryRepository:
 
                 for sr in search_results:
                     if sr.message_id not in seen_ids:
-                        # Se há interlocutor alvo especificado, só inclui se for da pessoa ou a citar
-                        if matched_contact_name and is_dialogue_query:
+                        if parsed.intent == "INTERLOCUTOR_DIALOGUE" and (parsed.target_speaker_full_name or parsed.target_speaker):
                             spk_norm = (sr.speaker or "").lower()
-                            first_norm = matched_contact_name.split()[0].lower()
+                            first_norm = (parsed.target_speaker_full_name or parsed.target_speaker).split()[0].lower()
                             if first_norm not in spk_norm and first_norm not in (sr.text or "").lower():
                                 continue
 
@@ -601,63 +566,54 @@ class MemoryRepository:
                             )
                         )
 
-            # Se pediu informações de "hoje" ou "recente", ordena priorizando cronologia recente
-            if is_today or is_dialogue_query:
+            # Se a busca envolve temporalidade recente ou diálogo, ordena por ordem cronológica recente
+            if parsed.is_recent or parsed.intent == "INTERLOCUTOR_DIALOGUE":
                 sources.sort(key=lambda s: s.created_at or "", reverse=True)
 
-            # 3. GraphRAG Híbrido: Extração de entidades com spaCy e Expansão Topológica de 2 Saltos
+            # 4. GraphRAG Híbrido com Sementes Higienizadas e Termos de Polímnia
             related_entities = []
+            subgraph_data = {}
             if include_graph:
                 from src.memory.hybrid_graph_rag import hybrid_graph_rag
 
-                # 3.1 Extrai entidades da query e limpa stopwords
-                raw_seeds = hybrid_graph_rag.extract_query_entities(query)
-                seed_entities = []
-                for s in raw_seeds:
-                    s_clean = s.lower().strip()
-                    if s_clean not in CONVERSATIONAL_STOPWORDS and len(s_clean) >= 3:
-                        seed_entities.append(s)
+                # 4.1 Injeta termos mapeados em Polímnia
+                for dt in parsed.domain_terms:
+                    exp_str = f" ({dt['expansion']})" if dt.get('expansion') else ""
+                    desc_str = f" — {dt['description']}" if dt.get('description') else ""
+                    related_entities.append(f"Glossário Polímnia: {dt['term']}{exp_str}{desc_str}")
 
-                if matched_contact_name and matched_contact_name not in seed_entities:
-                    seed_entities.append(matched_contact_name)
-
-                # Inclui também tokens substantivos relevantes
-                for t in query_tokens:
-                    if t not in CONVERSATIONAL_STOPWORDS and len(t) > 3 and t not in seed_entities:
-                        seed_entities.append(t)
-
-                if seed_entities:
-                    subgraph_data = hybrid_graph_rag.expand_subgraph_2_hop(seed_entities[:5], max_hops=2)
-                    # Limita a quantidade de nós e triplas para não poluir o prompt
+                # 4.2 Expande subgrafo NetworkX
+                if parsed.clean_seed_entities:
+                    subgraph_data = hybrid_graph_rag.expand_subgraph_2_hop(parsed.clean_seed_entities[:5], max_hops=2)
                     related_entities.extend(subgraph_data.get("node_details", [])[:6])
                     related_entities.extend(subgraph_data.get("triples", [])[:6])
 
-                # 3.2 Busca precisa na tabela SQL de Contatos apenas para o interlocutor correspondente
-                for c in all_contacts:
-                    c_first = c.name.lower().split()[0] if c.name else ""
-                    if c_first and c_first in query_tokens and len(c_first) >= 3:
-                        c_parts = [f"Contato Oficial: {c.name}"]
-                        if c.role:
-                            c_parts.append(f"Cargo: {c.role}")
-                        if c.phone_number:
-                            c_parts.append(f"Telefone: {c.phone_number}")
-                        if c.company:
-                            c_parts.append(f"Empresa: {c.company}")
+                # 4.3 Dados oficiais de contato se identificados
+                if parsed.target_speaker_full_name:
+                    from src.contacts.models import ContactRecord
+                    matched_c = db.query(ContactRecord).filter(ContactRecord.name == parsed.target_speaker_full_name).first()
+                    if matched_c:
+                        c_parts = [f"Contato Oficial: {matched_c.name}"]
+                        if matched_c.role:
+                            c_parts.append(f"Cargo: {matched_c.role}")
+                        if matched_c.company:
+                            c_parts.append(f"Empresa: {matched_c.company}")
                         related_entities.append(" | ".join(c_parts))
 
-            # 4. Busca de tarefas pendentes relacionadas (por Solicitante, Responsável ou Título)
+            # 5. Busca de tarefas pendentes relacionadas
             pending_tasks_objs = self.list_tasks(status="PENDING", db=db)
             related_tasks = []
+            target_spk_raw = (parsed.target_speaker_full_name or parsed.target_speaker or "").strip()
+            target_spk_first = target_spk_raw.split()[0].lower() if target_spk_raw else ""
+
             for t in pending_tasks_objs:
-                t_tokens = [w.lower() for w in t.title.split() if len(w) > 3 and w not in CONVERSATIONAL_STOPWORDS]
                 spk = (t.speaker or "").lower()
                 asg = (t.assignee or "").lower()
+                title_lower = t.title.lower()
 
                 matches_task = (
-                    any(tok in query.lower() for tok in t_tokens)
-                    or (matched_contact_name and matched_contact_name.split()[0].lower() in spk)
-                    or any(tok in spk for tok in query_tokens)
-                    or any(tok in asg for tok in query_tokens)
+                    (target_spk_first and (target_spk_first in spk or target_spk_first in asg or target_spk_first in title_lower))
+                    or any(tok.lower() in title_lower for tok in parsed.clean_seed_entities)
                     or (t.message_id in seen_ids)
                 )
 
@@ -668,8 +624,8 @@ class MemoryRepository:
                     notes = f" (Notas: {t.notes})" if t.notes else ""
                     related_tasks.append(f"{speaker_info}{t.title}{assignee}{due}{notes} [Prioridade: {t.priority}]")
 
-            # 5. Fusão e Re-ranqueamento com Boost de Subgrafo
-            if include_graph and seed_entities:
+            # 6. Fusão e Re-ranqueamento com Boost de Subgrafo
+            if include_graph and parsed.clean_seed_entities and subgraph_data:
                 from src.memory.hybrid_graph_rag import hybrid_graph_rag
                 fused = hybrid_graph_rag.fuse_vector_and_graph_results(
                     vector_sources=sources,
@@ -680,12 +636,13 @@ class MemoryRepository:
             else:
                 final_sources = sources
 
-            # 6. Chama o Agente Hermes para inferência e resposta estrita
+            # 7. Chama o Agente Hermes para inferência e resposta estrita com humanização
             result = await hermes_agent_service.answer_hermes_query(
                 query=query,
                 sources=final_sources[:10],
                 related_entities=list(set(related_entities))[:8],
                 pending_tasks=related_tasks[:5],
+                parsed_query=parsed,
             )
             # Armazena no cache semântico para consultas subsequentes (0 tokens)
             semantic_cache.set(query, result.model_dump())
