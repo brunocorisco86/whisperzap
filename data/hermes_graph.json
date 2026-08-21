@@ -5,7 +5,7 @@
   "nodes": [
     {
       "category": "PERSON",
-      "mentions": 380,
+      "mentions": 384,
       "role": "UNKNOWN",
       "phone": "",
       "company": "",
@@ -14,7 +14,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 464,
+      "mentions": 472,
       "details": "Contato de trabalho",
       "role": "UNKNOWN",
       "phone": "",
@@ -24,41 +24,41 @@
     },
     {
       "category": "EQUIPMENT",
-      "mentions": 411,
+      "mentions": 414,
       "details": "Armazenamento de ração",
       "id": "Silo 3"
     },
     {
       "category": "LOCATION",
-      "mentions": 787,
+      "mentions": 792,
       "details": "Cooperativa",
       "id": "C.Vale"
     },
     {
       "category": "SYSTEM",
-      "mentions": 394,
+      "mentions": 396,
       "details": "Ficha de Acompanhamento de Lote",
       "id": "FAL"
     },
     {
       "category": "PROJECT",
-      "mentions": 159,
+      "mentions": 161,
       "id": "Expansão"
     },
     {
       "category": "PROJECT",
-      "mentions": 83,
+      "mentions": 84,
       "id": "Pessoal"
     },
     {
       "category": "LOCATION",
-      "mentions": 95,
+      "mentions": 97,
       "details": "Mtech Systems",
       "id": "Mtech"
     },
     {
       "category": "PROJECT",
-      "mentions": 377,
+      "mentions": 381,
       "details": "Transportation Management System",
       "id": "TMS"
     },
@@ -70,22 +70,22 @@
     },
     {
       "category": "LOCATION",
-      "mentions": 98,
+      "mentions": 99,
       "id": "C.Vale Matriz"
     },
     {
       "category": "PROJECT",
-      "mentions": 98,
+      "mentions": 99,
       "id": "Agrocenter"
     },
     {
       "category": "LOCATION",
-      "mentions": 100,
+      "mentions": 101,
       "id": "Consultoria"
     },
     {
       "category": "PROJECT",
-      "mentions": 100,
+      "mentions": 101,
       "id": "Sanidade"
     },
     {
@@ -156,7 +156,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 41,
+      "mentions": 42,
       "role": "FAMILY_CORE",
       "phone": "44988881111",
       "company": null,
@@ -167,7 +167,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 41,
+      "mentions": 42,
       "role": "COLLEAGUE",
       "phone": "44977772222",
       "company": "Mtech",
@@ -178,7 +178,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 172,
+      "mentions": 176,
       "role": "EXECUTIVE",
       "phone": "44999991234",
       "company": "C.Vale",
@@ -190,7 +190,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 63,
+      "mentions": 64,
       "role": "EXECUTIVE",
       "phone": "44999991234",
       "company": "C.Vale Matriz",
@@ -201,7 +201,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 63,
+      "mentions": 64,
       "role": "STAKEHOLDER",
       "phone": "44988885678",
       "company": "Consultoria",
@@ -212,7 +212,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 63,
+      "mentions": 64,
       "role": "EXECUTIVE",
       "phone": "44999991234",
       "company": null,
@@ -223,7 +223,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 63,
+      "mentions": 64,
       "role": "SERVICE_VENDOR",
       "phone": "44911112222",
       "company": null,
@@ -244,41 +244,41 @@
     },
     {
       "category": "PERSON",
-      "mentions": 182,
+      "mentions": 190,
       "role": "COLLEAGUE",
       "phone": "554499999000",
       "company": null,
       "weight": 0.7,
       "can_generate_tasks": false,
-      "last_interaction_at": "2026-08-21T04:17:15.407143",
+      "last_interaction_at": "2026-08-21T04:23:40.271501",
       "id": "Participante_0"
     },
     {
       "category": "PROJECT",
-      "mentions": 89,
+      "mentions": 92,
       "details": "Armazenagem de ração",
       "id": "Silo"
     },
     {
       "category": "PERSON",
-      "mentions": 140,
+      "mentions": 146,
       "role": "COLLEAGUE",
       "phone": "554499999001",
       "company": null,
       "weight": 0.7,
       "can_generate_tasks": false,
-      "last_interaction_at": "2026-08-21T04:17:15.366691",
+      "last_interaction_at": "2026-08-21T04:23:40.239015",
       "id": "Participante_1"
     },
     {
       "category": "PERSON",
-      "mentions": 141,
+      "mentions": 147,
       "role": "COLLEAGUE",
       "phone": "554499999002",
       "company": null,
       "weight": 0.7,
       "can_generate_tasks": false,
-      "last_interaction_at": "2026-08-21T04:17:15.386121",
+      "last_interaction_at": "2026-08-21T04:23:40.254312",
       "id": "Participante_2"
     },
     {
@@ -300,13 +300,13 @@
     },
     {
       "category": "EQUIPMENT",
-      "mentions": 290,
+      "mentions": 300,
       "details": null,
       "id": "Silo 04"
     },
     {
       "category": "PERSON",
-      "mentions": 39,
+      "mentions": 40,
       "role": "UNKNOWN",
       "phone": "",
       "company": "",
@@ -9171,7 +9171,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 7,
+      "mentions": 8,
       "role": "UNKNOWN",
       "phone": "554499722779",
       "company": "C.Vale",
@@ -23228,7 +23228,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 76,
+      "mentions": 78,
       "role": "COLLEAGUE",
       "phone": "44999112233",
       "company": null,
@@ -23239,7 +23239,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 38,
+      "mentions": 39,
       "role": "PRODUCER_COOPERATED",
       "phone": "44988776655",
       "company": null,
@@ -23250,18 +23250,18 @@
     },
     {
       "category": "PERSON",
-      "mentions": 226,
+      "mentions": 235,
       "role": "OWNER",
       "phone": "554497604925",
       "company": "Hermes Memory / Homelab",
       "weight": 1.0,
       "can_generate_tasks": false,
-      "last_interaction_at": "2026-08-21T04:18:04.484358",
+      "last_interaction_at": "2026-08-21T04:24:25.131590",
       "id": "Bruno Conter"
     },
     {
       "category": "LOCATION",
-      "mentions": 167,
+      "mentions": 174,
       "id": "Hermes Memory / Homelab"
     },
     {
@@ -23277,25 +23277,25 @@
     },
     {
       "category": "PERSON",
-      "mentions": 128,
+      "mentions": 132,
       "role": "COLLEAGUE",
       "phone": "5544999990002",
       "company": null,
       "weight": 0.7,
       "can_generate_tasks": true,
-      "last_interaction_at": "2026-08-21T04:18:00.748538",
+      "last_interaction_at": "2026-08-21T04:24:21.539116",
       "id": "Contato Sem Permissao"
     },
     {
       "category": "PERSON",
-      "mentions": 32,
-      "last_interaction_at": "2026-06-22T04:18:01.111119+00:00",
+      "mentions": 33,
+      "last_interaction_at": "2026-06-22T04:24:21.883106+00:00",
       "id": "Contato Inativo Antigo"
     },
     {
       "category": "PERSON",
-      "mentions": 32,
-      "last_interaction_at": "2026-08-19T04:18:01.111119+00:00",
+      "mentions": 33,
+      "last_interaction_at": "2026-08-19T04:24:21.883106+00:00",
       "id": "Contato Ativo Recente"
     },
     {
@@ -23322,12 +23322,12 @@
     },
     {
       "category": "PERSON",
-      "mentions": 14,
+      "mentions": 15,
       "id": "User"
     },
     {
       "category": "PERSON",
-      "mentions": 26,
+      "mentions": 28,
       "role": "EXECUTIVE",
       "phone": "44999990000",
       "company": "C.Vale",
@@ -23344,7 +23344,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 9,
+      "mentions": 10,
       "role": "UNKNOWN",
       "phone": "5544991234567",
       "company": "C.Vale Cooperativa",
@@ -23355,12 +23355,12 @@
     },
     {
       "category": "LOCATION",
-      "mentions": 9,
+      "mentions": 10,
       "id": "C.Vale Cooperativa"
     },
     {
       "category": "PERSON",
-      "mentions": 9,
+      "mentions": 10,
       "role": "UNKNOWN",
       "phone": "5544998887766",
       "company": "Mtech",
@@ -23376,32 +23376,37 @@
     },
     {
       "category": "PERSON",
-      "mentions": 5,
+      "mentions": 6,
       "id": "Lucas Gerente"
+    },
+    {
+      "category": "PERSON",
+      "mentions": 2,
+      "id": "Fernando Varolo"
     }
   ],
   "links": [
     {
       "relation": "DELEGATED_TO",
-      "weight": 350.0,
+      "weight": 354.0,
       "source": "Bruno",
       "target": "João"
     },
     {
       "relation": "MENTIONED",
-      "weight": 297.0,
+      "weight": 299.0,
       "source": "Bruno",
       "target": "Silo 3"
     },
     {
       "relation": "MENTIONED",
-      "weight": 271.0,
+      "weight": 272.0,
       "source": "Bruno",
       "target": "C.Vale"
     },
     {
       "relation": "MENTIONED",
-      "weight": 294.0,
+      "weight": 296.0,
       "source": "Bruno",
       "target": "FAL"
     },
@@ -23425,7 +23430,7 @@
     },
     {
       "relation": "CO_OCCURRED",
-      "weight": 371.0,
+      "weight": 376.0,
       "source": "João",
       "target": "Silo 3"
     },
@@ -23437,7 +23442,7 @@
     },
     {
       "relation": "ASSIGNED_WITH",
-      "weight": 351.0,
+      "weight": 355.0,
       "source": "João",
       "target": "FAL"
     },
@@ -23455,7 +23460,7 @@
     },
     {
       "relation": "CO_OCCURRED",
-      "weight": 394.0,
+      "weight": 396.0,
       "source": "Silo 3",
       "target": "FAL"
     },
@@ -23545,7 +23550,7 @@
     },
     {
       "relation": "MANAGES",
-      "weight": 470.0,
+      "weight": 480.0,
       "source": "Carlos",
       "target": "Silo 04"
     },
@@ -23647,19 +23652,19 @@
     },
     {
       "relation": "WORKS_ON",
-      "weight": 41.0,
+      "weight": 42.0,
       "source": "Maria Esposa",
       "target": "Pessoal"
     },
     {
       "relation": "AFFILIATED_AS_COLLEAGUE",
-      "weight": 41.0,
+      "weight": 42.0,
       "source": "Lucas Colega",
       "target": "Mtech"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 40.0,
+      "weight": 41.0,
       "source": "Lucas Colega",
       "target": "TMS"
     },
@@ -23671,7 +23676,7 @@
     },
     {
       "relation": "AFFILIATED_AS_EXECUTIVE",
-      "weight": 122.0,
+      "weight": 124.0,
       "source": "João Silva",
       "target": "C.Vale"
     },
@@ -23683,7 +23688,7 @@
     },
     {
       "relation": "WORKS_ON",
-      "weight": 122.0,
+      "weight": 124.0,
       "source": "João Silva",
       "target": "TMS"
     },
@@ -23695,7 +23700,7 @@
     },
     {
       "relation": "WORKS_ON",
-      "weight": 54.0,
+      "weight": 56.0,
       "source": "João Silva",
       "target": "Silo"
     },
@@ -23719,7 +23724,7 @@
     },
     {
       "relation": "AFFILIATED_AS_EXECUTIVE",
-      "weight": 63.0,
+      "weight": 64.0,
       "source": "João Silva Gestor",
       "target": "C.Vale Matriz"
     },
@@ -23731,19 +23736,19 @@
     },
     {
       "relation": "WORKS_ON",
-      "weight": 61.0,
+      "weight": 62.0,
       "source": "João Silva Gestor",
       "target": "TMS"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 63.0,
+      "weight": 64.0,
       "source": "João Silva Gestor",
       "target": "Agrocenter"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 27.0,
+      "weight": 28.0,
       "source": "João Silva Gestor",
       "target": "Silo"
     },
@@ -23755,13 +23760,13 @@
     },
     {
       "relation": "AFFILIATED_AS_STAKEHOLDER",
-      "weight": 63.0,
+      "weight": 64.0,
       "source": "Dra. Camila",
       "target": "Consultoria"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 63.0,
+      "weight": 64.0,
       "source": "Dra. Camila",
       "target": "Sanidade"
     },
@@ -23803,7 +23808,7 @@
     },
     {
       "relation": "MENTIONED",
-      "weight": 116.0,
+      "weight": 120.0,
       "source": "Participante_0",
       "target": "Silo 04"
     },
@@ -23833,7 +23838,7 @@
     },
     {
       "relation": "MENTIONED",
-      "weight": 87.0,
+      "weight": 90.0,
       "source": "Participante_1",
       "target": "Silo 04"
     },
@@ -23869,7 +23874,7 @@
     },
     {
       "relation": "MENTIONED",
-      "weight": 87.0,
+      "weight": 90.0,
       "source": "Participante_2",
       "target": "Silo 04"
     },
@@ -25033,7 +25038,7 @@
     },
     {
       "relation": "AFFILIATED_AS_OWNER",
-      "weight": 167.0,
+      "weight": 174.0,
       "source": "Bruno Conter",
       "target": "Hermes Memory / Homelab"
     },
@@ -25057,7 +25062,7 @@
     },
     {
       "relation": "MENTIONED",
-      "weight": 16.0,
+      "weight": 17.0,
       "source": "Contato Sem Permissao",
       "target": "Silo 3"
     },
@@ -25075,37 +25080,37 @@
     },
     {
       "relation": "MENTIONED",
-      "weight": 15.0,
+      "weight": 16.0,
       "source": "Contato Sem Permissao",
       "target": "João"
     },
     {
       "relation": "SUPERVISES",
-      "weight": 32.0,
+      "weight": 33.0,
       "source": "Contato Ativo Recente",
       "target": "Granja Central"
     },
     {
       "relation": "AFFILIATED_AS_EXECUTIVE",
-      "weight": 26.0,
+      "weight": 28.0,
       "source": "Diretoria Geral",
       "target": "C.Vale"
     },
     {
       "relation": "WORKS_ON",
-      "weight": 26.0,
+      "weight": 28.0,
       "source": "Diretoria Geral",
       "target": "Expansão"
     },
     {
       "relation": "AFFILIATED_AS_UNKNOWN",
-      "weight": 9.0,
+      "weight": 10.0,
       "source": "Produtor Teste Euterpe",
       "target": "C.Vale Cooperativa"
     },
     {
       "relation": "AFFILIATED_AS_UNKNOWN",
-      "weight": 9.0,
+      "weight": 10.0,
       "source": "Veterinario Pipeline Teste",
       "target": "Mtech"
     }

@@ -107,6 +107,19 @@ def test_response_humanizer_polishing_and_canonicalization():
 
 def test_end_to_end_melpomene_query_humanized():
     """Testa a rota completa do Oráculo Melpômene garantindo respostas limpas e humanizadas."""
+    db = SessionLocal()
+    try:
+        if not db.query(ContactRecord).filter(ContactRecord.name == "Fernando Varolo").first():
+            db.add(ContactRecord(
+                id="c-varolo-test",
+                name="Fernando Varolo",
+                phone_number="5544999998877",
+                role="COLLEAGUE",
+            ))
+            db.commit()
+    finally:
+        db.close()
+
     client = TestClient(app)
 
     # Registra mensagem
@@ -127,3 +140,42 @@ def test_end_to_end_melpomene_query_humanized():
 
     assert "[ID:" not in data["answer"]
     assert "sensores" in data["answer"].lower() or "fernando" in data["answer"].lower()
+
+
+def test_local_cognitive_synthesizer_dialogue():
+    """Testa a síntese cognitiva local sem dependência de LLM externo."""
+    from src.ai_gateway.cognitive_synthesizer import local_cognitive_synthesizer
+    from src.ai_gateway.schemas import MemorySourceCitation
+
+    mock_sources = [
+        MemorySourceCitation(
+            message_id="msg-1",
+            speaker="Gracieli Patel",
+            text_snippet="E sem essa peça nada funciona",
+            similarity=0.98,
+        ),
+        MemorySourceCitation(
+            message_id="msg-2",
+            speaker="Gracieli Patel",
+            text_snippet="Ele saiu da empresa e vai demorar",
+            similarity=0.98,
+        ),
+        MemorySourceCitation(
+            message_id="msg-3",
+            speaker="Gracieli Patel",
+            text_snippet="Deixa ver o que vão responder daí te passo",
+            similarity=0.98,
+        ),
+    ]
+
+    result = local_cognitive_synthesizer.synthesize_dialogue(
+        speaker_name="Gracieli Patel",
+        sources=mock_sources,
+        pending_tasks=["Cobrar fornecedor da peça"],
+        related_entities=[],
+    )
+
+    assert "Gracieli Patel" in result
+    assert "Equipamentos" in result or "Operação" in result or "peça" in result
+    assert "Acompanhamento" in result or "Retorno" in result
+    assert "Cobrar fornecedor da peça" in result
