@@ -25,15 +25,15 @@ class GeminiProvider(BaseLLMProvider):
     def _get_api_model_name(self, name: str) -> str:
         """Mapeia nomes de modelo para as tags ativas suportadas na API pública do Gemini."""
         n = (name or "").lower().strip()
-        if "3.7" in n:
-            return "gemini-3.7-flash"
-        if "3.6" in n:
-            return "gemini-3.6-flash"
-        if "3.1" in n or "flash-lite" in n or "lite" in n:
+        if not n:
             return "gemini-3.1-flash-lite"
-        if "flash" in n:
+        # Se for modelo legado conhecido, mapeia para geração suportada
+        if "2.5-flash" in n:
             return "gemini-3.6-flash"
-        return name or "gemini-3.1-flash-lite"
+        if "1.5-flash" in n or "1.5-pro" in n or "1.5" in n:
+            return "gemini-3.1-flash-lite"
+        # Se for um nome direto da API (ex: gemini-3.5-flash-lite, gemini-3.7-flash, gemini-3.1-flash-lite), usa direto
+        return name.strip()
 
     async def generate_text(
         self,

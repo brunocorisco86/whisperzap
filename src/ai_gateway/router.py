@@ -37,9 +37,15 @@ async def revise_transcription(request: ReviseRequest) -> ReviseResponse:
             detail="O campo 'text' não pode estar vazio.",
         )
 
-    context_block = f"Contexto: {request.context}" if request.context else "Contexto: Nenhum contexto adicional."
+    raw_text = request.text.strip()
+    is_long_audio = len(raw_text) >= 300
+    extra_instructions = ""
+    if is_long_audio:
+        extra_instructions = "\n[Instrução Mandatória: Este áudio possui mais de 300 caracteres. Formate o texto revisado e OBRIGATORIAMENTE inclua ao final a seção de destaques executivos: '📌 *Destaques do Áudio:*' em tópicos e '✅ *Ações:*' se houver pendências.]"
+
+    context_block = f"Contexto: {request.context}{extra_instructions}" if request.context else f"Contexto: Mensagem de voz.{extra_instructions}"
     prompt = REVISE_USER_TEMPLATE.format(
-        raw_text=request.text.strip(),
+        raw_text=raw_text,
         context_block=context_block,
     )
 
