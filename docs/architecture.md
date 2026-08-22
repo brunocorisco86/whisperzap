@@ -29,36 +29,48 @@ VOICE ──► TRANSCRIPTION ──► CONTEXT ──► REVISION ──► MEM
 
 ## 🏗️ Diagrama de Microsserviços e Rede
 
+A stack opera como um ecossistema conteinerizado autônomo (12-Factor / Cloud-Native), onde todos os serviços comunicam-se diretamente através de DNS interno na rede bridge `hermes_mesh_network` com latência zero (< 1ms):
+
 ```text
-                               INTERNET
-                                  │
-                                  ▼
-                              WhatsApp
-                                  │
-                                  ▼
-                            WhatsApp API
-                                  │
-                                  ▼
-  ┌───────────────────────────────────────────────────────────────┐
-  │                 REDE PRIVADA TAILSCALE                        │
-  │                                                               │
-  │   ┌────────────────────────┐      ┌───────────────────────┐   │
-  │   │  Raspberry Pi 3B       │      │  VPS (Alpine Linux)   │   │
-  │   │  (Alpine Linux)        │      │                       │   │
-  │   │                        │      │  Caddy Reverse Proxy  │   │
-  │   │   n8n Workflow Engine  ├─────►│    ├─ AI Gateway      │   │
-  │   │                        │      │    ├─ Whisper API     │   │
-  │   └────────────────────────┘      │    ├─ Memory API      │   │
-  │                                   │    ├─ PostgreSQL      │   │
-  │                                   │    ├─ pgvector        │   │
-  │                                   │    └─ NetworkX Graph  │   │
-  │                                   └───────────────────────┘   │
-  └───────────────────────────────────────────────────────────────┘
+                                INTERNET
+                                   │
+                                   ▼
+                               WhatsApp
+                                   │
+                                   ▼
+                      Reverse Proxy (Caddy / Ingress)
+                      Portas :80 / :443 / :8005 / :8085 / :5678
+                                   │
+   ┌───────────────────────────────┴────────────────────────────────┐
+   │             REDE BRIDGE INTERNA (hermes_mesh_network)          │
+   │                                                                │
+   │   ┌───────────────────────────┐    ┌───────────────────────┐   │
+   │   │  Evolution API v2         │    │  n8n Master           │   │
+   │   │  (:8080)                  ├───►│  Orchestrator (:5678) │   │
+   │   │  (WhatsApp Baileys)       │    │                       │   │
+   │   └─────────────┬─────────────┘    └───────────┬───────────┘   │
+   │                 │                              │                   │
+   │                 ▼                              ▼                   │
+   │   ┌───────────────────────────┐    ┌───────────────────────┐   │
+   │   │  Evolution Postgres+Redis │    │  WhisperZap API       │   │
+   │   │  (Persistência & Fila)    │    │  (FastAPI :8000)      │   │
+   │   └─────────────┬─────────────┘    └───────────┬───────────┘   │
+   │                 │                              │                   │
+   │                 ▼                              ▼                   │
+   │                                    ┌───────────────────────┐   │
+   │                                    │  PostgreSQL 16        │   │
+   │                                    │  (pgvector + NetworkX)│   │
+   │                                    └───────────────────────┘   │
+   └────────────────────────────────────────────────────────────────┘
 ```
 
-### 📡 Ambientes Verificados e Aliases SSH:
-- **`ssh peixe` (Raspberry Pi 3B na LAN)**: Alpine Linux aarch64 (`piscicultura`), Docker ativo, PostgreSQL 15 rodando, Tailscale instalado, 382 MB de RAM livres.
-- **`ssh hostinger` (VPS Hostinger na Nuvem)**: Alpine Linux x86_64 (`srv1828523`), Docker ativo, 2.4 GB de RAM livres, Caddy HTTPS.
+### 📡 Portas e Endpoints Oficiais de Produção:
+- **`hermes-caddy`** (`:80`, `:443`): Proxy reverso HTTPS com terminação TLS automática.
+- **`hermes-api`** (`:8005` ➔ `:8000`): Core FastAPI (Whisper + AI Gateway + Memória + `/whatsapp-qr`).
+- **`hermes-evolution-api`** (`:8085` ➔ `:8080`): Conector Baileys do WhatsApp.
+- **`hermes-n8n`** (`:5678`): Motor de fluxos e orquestração de mensagens.
+- **`hermes-db`** (`:5432` interna): Banco de dados relacional e busca vetorial `pgvector`.
+- **`hermes-evolution-postgres` / `redis`** (`:5432`, `:6379` internas): Estado e fila da Evolution API.
 
 ---
 

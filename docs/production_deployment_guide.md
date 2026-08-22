@@ -1,40 +1,35 @@
-# 🚀 Manual de Deploy em Produção — VPS Alpine Linux & Raspberry Pi 3B
+# 🚀 Manual de Deploy em Produção — Cloud-Native & Kubernetes Ready
 
-Este guia orienta o provisionamento, configuração e sustentação em produção do **Hermes Voice Memory** na arquitetura híbrida: **VPS Alpine Linux + Raspberry Pi 3B via Tailscale**.
+Este guia orienta o provisionamento, configuração e sustentação em produção do **Hermes Voice Memory** em qualquer **VPS Linux (Ubuntu, Debian, Alpine, Arch)** ou cluster **Kubernetes (K3s/K8s)**.
 
 ---
 
-## 🏛️ 1. Arquitetura da Infraestrutura
+## 🏛️ 1. Arquitetura da Infraestrutura (Cloud-Agnostic)
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│                 HOMELAB (Raspberry Pi 3B)                  │
+│               QUALQUER SERVIDOR LINUX / VPS                 │
 │                                                             │
-│  - Evolution API / Z-API (WhatsApp Webhook)                │
-│  - n8n Workflows (Orquestração & Crons)                     │
-│  - Tailscale Client (IP: 100.64.0.2)                        │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                               │ 🔒 Túnel Privado Tailscale (WireGuard)
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 VPS PRODUÇÃO (Alpine Linux)                 │
-│                                                             │
-│  - Tailscale Client (IP: 100.64.0.1)                        │
-│  - Caddy Reverse Proxy (HTTPS Automático / Let's Encrypt)   │
-│  - Docker Compose Stack:                                    │
-│      ├── hermes-api (FastAPI, Whisper, AI Gateway, Grafo)   │
-│      └── hermes-db (PostgreSQL 16 + pgvector)               │
+│  - Reverse Proxy (Caddy / Nginx / Ingress HTTPS)            │
+│  - Rede Bridge Interna: hermes_mesh_network (Latência < 1ms)│
+│  - Stack Docker Compose:                                    │
+│      ├── hermes-api (FastAPI, Faster-Whisper, AI Gateway)   │
+│      ├── hermes-db (PostgreSQL 16 + pgvector)               │
+│      ├── hermes-evolution-api (WhatsApp Baileys v2)         │
+│      ├── hermes-n8n (Motor de Orquestração)                 │
+│      ├── hermes-evolution-postgres (Persistência WhatsApp)  │
+│      └── hermes-evolution-redis (Fila de Mensagens)        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📋 2. Requisitos Mínimos
+## 📋 2. Requisitos Mínimos Recomendados
 
-- **VPS**: Alpine Linux 3.19+ (1 vCPU, 2GB RAM, 20GB SSD).
-- **Homelab**: Raspberry Pi 3B rodando Raspberry Pi OS / Alpine / Debian com Docker & n8n.
-- **Rede**: Conta no [Tailscale](https://tailscale.com) (gratuita para homelab).
+- **CPU**: 1 a 2 vCPUs (x86_64 ou ARM64)
+- **Memória RAM**: 2 GB a 4 GB RAM (stack completa opera em ~700MB)
+- **Armazenamento**: 20 GB SSD
+- **Docker**: Engine 24.0+ e Docker Compose v2 (ou K3s/Kubernetes)
 
 ---
 

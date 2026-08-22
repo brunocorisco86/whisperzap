@@ -74,26 +74,27 @@ O Hermes é a solução corporativa definitiva:
 
 ## 🏗️ Arquitetura e Stack Tecnológica
 
-O sistema opera em uma arquitetura distribuída resiliente e de baixo acoplamento:
+O sistema opera em uma arquitetura distribuída, desacoplada e 100% conteinerizada (Cloud-Native / 12-Factor), pronta para deploy em **qualquer VPS Linux ou cluster Kubernetes (K8s/K3s)**:
 
 ```mermaid
 flowchart TD
-    subgraph EdgeLayer["1. Borda & Ingestão (Raspberry Pi / Homelab)"]
-        WA["📱 WhatsApp / Mensagens de Voz"]
-        EVO["⚡ Evolution API v2 (Instância Hermes)"]
-        N8N["🔄 n8n Orchestrator (Filtro de Grupos & Media Webhook)"]
+    subgraph IngestionLayer["1. Ingestão & Conectividade WhatsApp"]
+        WA["📱 WhatsApp / Mensagens de Voz & Texto"]
+        EVO["⚡ Evolution API v2 (Instância WhatsApp / Baileys)"]
+        N8N["🔄 n8n Master Orchestrator (Filtros, Media Download & Rotas)"]
     end
 
-    subgraph APILayer["2. Motor de IA & Core Engine (VPS Hostinger)"]
+    subgraph APILayer["2. Motor de IA & Core Engine (FastAPI)"]
         WHISPER["🎙️ Faster-Whisper (Transcrição em Milissegundos)"]
         BYPASS["🛡️ Funil Semântico & Bypass Lexical (Anti-Poluição)"]
-        AIGATEWAY["🧠 AI Gateway (Gemini 2.5 Flash / Flash Lite)"]
+        AIGATEWAY["🧠 AI Gateway (Gemini 3.1 Flash-Lite / 3.7 Flash)"]
         LEXICAL["📖 Glossário Fonético & Dicionário Técnico"]
     end
 
     subgraph StorageLayer["3. Memória em Camadas & Persistência"]
         PG[("🐘 PostgreSQL 16 + pgvector (Embeddings & SQL)")]
         NX[("🕸️ NetworkX Knowledge Graph (hermes_graph.json)")]
+        REDIS[("⚡ Redis 7 (Filas e Cache de Mensageria)")]
         CONTACTS[("👥 Tabela de Contatos, Papéis & Favoritos")]
     end
 
@@ -106,6 +107,7 @@ flowchart TD
 
     subgraph Interfaces["5. Interfaces & Visualização Executiva"]
         HUB["🖥️ Hermes Web Control Hub (Glassmorphism UI)"]
+        QR_PAGE["📱 /whatsapp-qr (Painel Reativo de Pareamento)"]
         DASH["📊 Analytics & Heatmap 24x7 (Chart.js)"]
         GRAPH_VIZ["🌐 Visualizador Interativo de Grafos (Graphify AST)"]
     end
@@ -127,12 +129,12 @@ flowchart TD
 | **Linguagem & Runtime** | Python 3.12+ / Linux | Desempenho nativo com suporte a tipagem estrita e asyncio |
 | **API Framework** | FastAPI + Uvicorn | Servidor assíncrono de alto throughput com OpenAPI e endpoints RESTful |
 | **Transcrição Local** | Faster-Whisper (CTranslate2) | Transcrição ultra-rápida de áudio (OGG/MP3/WAV/Base64) em CPU/GPU |
-| **AI Gateway** | Google Gemini 2.5 Flash / Lite | Extração de entidades (`NER`), classificação de intenções e RAG Híbrido |
+| **AI Gateway** | Google Gemini 3.1 Flash-Lite / 3.7 Flash | Extração de entidades (`NER`), classificação de intenções e RAG Híbrido |
 | **Banco Relacional & Vetorial** | PostgreSQL 16 + pgvector | Persistência de mensagens, contatos, tarefas e busca semântica por cosseno |
 | **Grafo Relacional** | NetworkX + Graphify | Modelagem de conexões inter-pessoais, detecção de comunidades e clusterização |
-| **Orquestração de Borda** | n8n + Evolution API v2 | Ingestão de webhooks, download de mídia e bloqueio preliminar de grupos |
-| **Interface & Analytics** | Vanilla JS + Glassmorphism CSS + Chart.js | Painel executivo responsivo, sem overhead de frameworks pesados |
-| **Proxy Reverso & SSL** | Caddy v2 | Terminação TLS automática com HTTP/2 e compressão Gzip/Zstandard |
+| **Orquestração & Mensageria** | n8n + Evolution API v2 | Ingestão de webhooks, download de mídia e bloqueio preliminar de grupos |
+| **Interface & Analytics** | Vanilla JS + Glassmorphism CSS + Tailwind | Painel executivo responsivo e página reativa `/whatsapp-qr` |
+| **Proxy Reverso & SSL** | Caddy v2 / K8s Ingress | Terminação TLS automática com HTTP/2 e compressão Gzip/Zstandard |
 
 ---
 
