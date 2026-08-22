@@ -2,7 +2,9 @@
 
 import time
 import logging
+from typing import Optional
 from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel
 from src.ai_gateway.schemas import (
     ReviseRequest,
     ReviseResponse,
@@ -100,4 +102,59 @@ async def extract_semantics(request: SemanticExtractionRequest) -> SemanticExtra
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Falha ao executar extração semântica: {str(exc)}",
         )
+
+
+@router.get(
+    "/models",
+    status_code=status.HTTP_200_OK,
+    summary="Consulta o registro dinâmico de modelos de IA",
+    description="Retorna os modelos ativos por tarefa, histórico de descobertas e recomendações de melhor custo de token.",
+)
+async def get_models_registry():
+    """Consulta os modelos ativos e descobertos pelo ModelRegistry."""
+    from src.ai_gateway.model_registry import model_registry
+    return {
+        "status": "success",
+        "active_models": model_registry.get_all_active_models(),
+        "auto_adopt_best_lite": model_registry.data.auto_adopt_best_lite,
+        "last_discovery_at": model_registry.data.last_discovery_at,
+        "discovered_models": [m.model_dump() for m in model_registry.data.discovered_models],
+        "history": model_registry.data.history,
+    }
+
+
+@router.post(
+    "/models/discover",
+    status_code=status.HTTP_200_OK,
+    summary="Varre e descobre novos modelos de IA disponíveis",
+    description="Consulta a API do Google Gemini, classifica os modelos por custo-benefício e atualiza o registro dinâmico.",
+)
+async def discover_models(auto_adopt: bool = True):
+    """Executa a descoberta de modelos na API do provedor."""
+    from src.ai_gateway.model_registry import model_registry
+    res = await model_registry.discover_gemini_models(auto_adopt=auto_adopt)
+    return res
+
+
+class UpdateActiveModelsPayload(BaseModel):
+    updates: Optional[dict[str, str]] = None
+    auto_adopt: Optional[bool] = None
+
+
+@router.put(
+    "/models/active",
+    status_code=status.HTTP_200_OK,
+    summary="Atualiza dinamicamente os modelos ativos",
+    description="Permite alterar o modelo de qualquer tarefa (revise, extract, summarize, weekly, hermes, default, embedding) em tempo de execução sem reiniciar o container.",
+)
+async def update_active_models(payload: UpdateActiveModelsPayload):
+    """Atualiza modelos ativos dinamicamente."""
+    from src.ai_gateway.model_registry import model_registry
+    target_updates = payload.updates if payload.updates is not None else {}
+    updated = model_registry.update_active_models(updates=target_updates, auto_adopt=payload.auto_adopt)
+    return {
+        "status": "success",
+        "active_models": updated,
+        "auto_adopt_best_lite": model_registry.data.auto_adopt_best_lite,
+    }
 

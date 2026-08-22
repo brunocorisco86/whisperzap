@@ -1,0 +1,15 @@
+{
+  "active_models": {
+    "default": "gemini-3.1-flash-lite",
+    "revise": "gemini-3.1-flash-lite",
+    "extract": "gemini-3.1-flash-lite",
+    "summarize": "gemini-3.1-flash-lite",
+    "weekly": "gemini-3.1-flash-lite",
+    "hermes": "gemini-3.1-flash-lite",
+    "embedding": "gemini-embedding-001"
+  },
+  "auto_adopt_best_lite": true,
+  "last_discovery_at": null,
+  "discovered_models": [],
+  "history": []
+}

@@ -20,22 +20,16 @@ def get_ai_provider(
     provider_override: str | None = None,
     model_override: str | None = None,
 ) -> BaseLLMProvider:
-    """Retorna a instância do provedor e modelo adequado conforme a tarefa."""
+    """Retorna a instância do provedor e modelo adequado conforme a tarefa, com resolução dinâmica via ModelRegistry."""
+    from src.ai_gateway.model_registry import model_registry
+
     provider_name = provider_override or settings.AI_PROVIDER
 
-    # Determina o modelo conforme a tarefa (Model Router)
+    # Determina o modelo dinamicamente via ModelRegistry ou settings
     if model_override:
         model_name = model_override
-    elif task == "revise":
-        model_name = settings.MODEL_REVISE
-    elif task == "extract":
-        model_name = settings.MODEL_EXTRACT
-    elif task == "summarize":
-        model_name = settings.MODEL_SUMMARIZE
-    elif task == "weekly":
-        model_name = settings.MODEL_WEEKLY
     else:
-        model_name = settings.AI_DEFAULT_MODEL
+        model_name = model_registry.get_active_model(task=task, fallback=settings.AI_DEFAULT_MODEL)
 
     if provider_name == "gemini":
         return GeminiProvider(api_key=settings.GEMINI_API_KEY, model_name=model_name)

@@ -49,12 +49,28 @@ async def _background_scheduler_loop():
                     _last_executed_hour["sentiment"] = key
                     try:
                         from src.memory.sentiment_timeline import sentiment_timeline_service
-                        snapshots = sentiment_timeline_service.collect_daily_snapshots(date_str=today_str)
+                        snapshots = sentiment_timeline_service.collect_daily_sentiments(target_date=today_str)
                         logger.info(f"✅ [Cron 18:00] Snapshots de sentimentos consolidados para {len(snapshots)} pessoas.")
                     except Exception as e:
                         logger.error(f"❌ [Cron 18:00] Erro ao consolidar sentimentos: {e}")
 
-            # 3. Rotina Semanal de Domingo às 23:00 -> Agente 'Zeladora' (Faxina no Grafo)
+            # 3. Rotina Semanal de Domingo às 02:00 -> Varredura e Descoberta de Novos Modelos de IA (ModelRegistry)
+            if now.weekday() == 6 and hour == 2 and minute < 5:
+                key = f"model_discovery_{today_str}"
+                if _last_executed_hour.get("model_discovery") != key:
+                    logger.info("🤖 [Cron Domingo 02:00] Iniciando varredura semanal de novos modelos de IA custo-eficientes...")
+                    _last_executed_hour["model_discovery"] = key
+                    try:
+                        from src.ai_gateway.model_registry import model_registry
+                        res = await model_registry.discover_gemini_models(auto_adopt=True)
+                        logger.info(
+                            f"✅ [Cron Domingo 02:00] Descoberta de IA concluída: {res.get('discovered_count')} modelos mapeados. "
+                            f"Modelos ativos: {res.get('active_models')}"
+                        )
+                    except Exception as e:
+                        logger.error(f"❌ [Cron Domingo 02:00] Erro na descoberta semanal de modelos de IA: {e}")
+
+            # 4. Rotina Semanal de Domingo às 23:00 -> Agente 'Zeladora' (Faxina no Grafo)
             if now.weekday() == 6 and hour == 23 and minute < 5:
                 key = f"janitor_{today_str}"
                 if _last_executed_hour.get("janitor") != key:

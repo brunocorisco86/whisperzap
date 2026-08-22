@@ -3750,3 +3750,172 @@ async function handleEuterpeFullPipeline() {
 }
 window.handleEuterpeFullPipeline = handleEuterpeFullPipeline;
 
+// ==========================================
+// 6. Gerenciamento Dinâmico de Modelos de IA (ModelRegistry)
+// ==========================================
+async function openAiModelsModal() {
+  const modal = document.getElementById('modal-ai-models');
+  if (!modal) return;
+  modal.classList.add('active');
+  await loadAiModelsRegistry();
+}
+window.openAiModelsModal = openAiModelsModal;
+
+function closeAiModelsModal() {
+  const modal = document.getElementById('modal-ai-models');
+  if (modal) modal.classList.remove('active');
+}
+window.closeAiModelsModal = closeAiModelsModal;
+
+async function loadAiModelsRegistry() {
+  try {
+    const res = await fetch('/ai/models');
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const active = data.active_models || {};
+    const setVal = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val || '';
+    };
+
+    setVal('model-select-revise', active.revise || 'gemini-3.1-flash-lite');
+    setVal('model-select-extract', active.extract || 'gemini-3.1-flash-lite');
+    setVal('model-select-summarize', active.summarize || 'gemini-3.1-flash-lite');
+    setVal('model-select-weekly', active.weekly || 'gemini-3.1-flash-lite');
+    setVal('model-select-hermes', active.hermes || 'gemini-3.1-flash-lite');
+    setVal('model-select-embedding', active.embedding || 'gemini-embedding-001');
+
+    const chkAuto = document.getElementById('chk-auto-adopt-lite');
+    if (chkAuto) chkAuto.checked = Boolean(data.auto_adopt_best_lite);
+
+    const lblDisc = document.getElementById('ai-models-last-discovery');
+    if (lblDisc) {
+      if (data.last_discovery_at) {
+        const dt = new Date(data.last_discovery_at);
+        lblDisc.textContent = `Última varredura: ${dt.toLocaleDateString()} ${dt.toLocaleTimeString()}`;
+      } else {
+        lblDisc.textContent = 'Nenhuma varredura recente executada.';
+      }
+    }
+
+    renderDiscoveredModelsTags(data.discovered_models || []);
+  } catch (err) {
+    console.error('Erro ao carregar registro de modelos de IA:', err);
+  }
+}
+
+function renderDiscoveredModelsTags(models) {
+  const container = document.getElementById('discovered-models-tags');
+  if (!container) return;
+
+  if (!models || models.length === 0) {
+    container.innerHTML = '<span class="text-muted">Clique em "Varredura de Modelos Agora" para mapear os modelos da API.</span>';
+    return;
+  }
+
+  container.innerHTML = models.map(m => {
+    const isRec = m.is_recommended ? '⭐ ' : '';
+    const tierBadge = m.tier === 'LITE' ? 'badge-success' : (m.tier === 'FLASH' ? 'badge-info' : 'badge-warning');
+    return `
+      <span class="badge ${tierBadge}" style="cursor: pointer; padding: 0.35rem 0.6rem;" onclick="window.applyModelToActiveInputs('${m.name}', '${m.tier}')" title="Score: ${m.cost_efficiency_score} | ${m.description}">
+        ${isRec}<strong>${m.name}</strong> <small>(${m.tier})</small>
+      </span>
+    `;
+  }).join('');
+}
+
+function applyModelToActiveInputs(modelName, tier) {
+  if (tier === 'EMBEDDING') {
+    const el = document.getElementById('model-select-embedding');
+    if (el) el.value = modelName;
+    showToast(`Modelo de embedding alterado para: ${modelName}`);
+  } else if (tier === 'LITE') {
+    const r = document.getElementById('model-select-revise');
+    const e = document.getElementById('model-select-extract');
+    if (r) r.value = modelName;
+    if (e) e.value = modelName;
+    showToast(`Modelo Lite aplicado para Revisão e Extração: ${modelName}`);
+  } else {
+    const s = document.getElementById('model-select-summarize');
+    const w = document.getElementById('model-select-weekly');
+    const h = document.getElementById('model-select-hermes');
+    if (s) s.value = modelName;
+    if (w) w.value = modelName;
+    if (h) h.value = modelName;
+    showToast(`Modelo aplicado para Síntese e RAG: ${modelName}`);
+  }
+}
+window.applyModelToActiveInputs = applyModelToActiveInputs;
+
+async function runAiModelDiscovery() {
+  const btn = document.getElementById('btn-discover-models');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Varrendo API do Gemini...';
+  }
+
+  try {
+    const res = await fetch('/ai/models/discover?auto_adopt=true', { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      showToast(`✨ Varredura concluída: ${data.discovered_count || 0} modelos mapeados!`);
+      await loadAiModelsRegistry();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(`❌ Falha na varredura: ${err.message || res.statusText}`);
+    }
+  } catch (err) {
+    showToast(`❌ Erro ao conectar com API de IA: ${err}`);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🔍 Varredura de Modelos Agora';
+    }
+  }
+}
+window.runAiModelDiscovery = runAiModelDiscovery;
+
+async function saveAiModelsConfig(event) {
+  if (event) event.preventDefault();
+
+  const getVal = id => {
+    const el = document.getElementById(id);
+    return el ? el.value.trim() : '';
+  };
+
+  const chkAuto = document.getElementById('chk-auto-adopt-lite');
+
+  const updates = {
+    revise: getVal('model-select-revise'),
+    extract: getVal('model-select-extract'),
+    summarize: getVal('model-select-summarize'),
+    weekly: getVal('model-select-weekly'),
+    hermes: getVal('model-select-hermes'),
+    embedding: getVal('model-select-embedding'),
+  };
+
+  try {
+    const res = await fetch('/ai/models/active', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updates: updates,
+        auto_adopt: chkAuto ? chkAuto.checked : true,
+      }),
+    });
+
+    if (res.ok) {
+      showToast('💾 Modelos de IA atualizados com sucesso na VPS!');
+      closeAiModelsModal();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(`❌ Erro ao salvar modelos: ${err.detail || res.statusText}`);
+    }
+  } catch (err) {
+    showToast(`❌ Erro de conexão: ${err}`);
+  }
+}
+window.saveAiModelsConfig = saveAiModelsConfig;
+
+
