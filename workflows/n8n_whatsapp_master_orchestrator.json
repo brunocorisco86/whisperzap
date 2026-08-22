@@ -1,4 +1,5 @@
 {
+  "id": "1e112d7c-a7a2-4bb0-80a1-000000000000",
   "name": "Hermes Voice Memory - Orquestrador WhatsApp Unificado (Voz & Q&A Hermes)",
   "nodes": [
     {
@@ -411,7 +412,7 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   }
