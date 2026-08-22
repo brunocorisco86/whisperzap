@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conectar WhatsApp — Hermes Voice Memory</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 25px rgba(34, 197, 94, 0.2); }
+            50% { box-shadow: 0 0 45px rgba(34, 197, 94, 0.45); }
+        }
+        .qr-glow { animation: pulse-glow 3s infinite ease-in-out; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-4 selection:bg-brand-500 selection:text-white">
+    
+    <!-- Header / Branding -->
+    <div class="mb-8 text-center">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-3">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            Evolution API v2 &bull; Hermes Mesh
+        </div>
+        <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+            Hermes Voice Memory
+        </h1>
+        <p class="text-slate-400 text-sm mt-1 max-w-sm mx-auto">
+            Conecte sua conta do WhatsApp para transcrição e inteligência autônoma.
+        </p>
+    </div>
+
+    <!-- Main Card -->
+    <div class="w-full max-w-md bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+        
+        <!-- Background Gradient Glow -->
+        <div class="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -bottom-24 -right-24 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <!-- Connection State Indicator -->
+        <div id="status-badge" class="flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-medium mb-6">
+            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+            <span id="status-text">Verificando status da instância...</span>
+        </div>
+
+        <!-- QR Code Container (Connecting Mode) -->
+        <div id="qr-section" class="flex flex-col items-center">
+            <div class="relative p-3 bg-white rounded-2xl shadow-xl qr-glow mb-6">
+                <img id="qr-image" src="" alt="WhatsApp QR Code" class="w-64 h-64 sm:w-72 sm:h-72 object-contain rounded-xl transition-opacity duration-300 opacity-0" />
+                <div id="qr-spinner" class="absolute inset-0 flex flex-col items-center justify-center bg-white/90 rounded-2xl">
+                    <svg class="w-10 h-10 text-slate-800 animate-spin mb-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                    <p class="text-xs font-bold text-slate-800">Carregando QR Code...</p>
+                </div>
+            </div>
+
+            <!-- Steps Instructions -->
+            <div class="w-full bg-slate-950/60 border border-slate-800/80 rounded-2xl p-4 text-xs space-y-2 text-slate-300">
+                <div class="flex items-center gap-2">
+                    <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0">1</span>
+                    <span>Abra o <b>WhatsApp</b> no seu celular</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0">2</span>
+                    <span>Toque em <b>Aparelhos Conectados</b></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0">3</span>
+                    <span>Toque em <b>Conectar Aparelho</b> e aponte para o QR</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Connected Success Container (Open Mode) -->
+        <div id="connected-section" class="hidden flex-col items-center py-6 text-center">
+            <div class="w-20 h-20 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mb-4 border border-emerald-500/30">
+                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-1">WhatsApp Conectado!</h3>
+            <p id="connected-user" class="text-sm text-emerald-400 font-medium mb-6">Instância: hermes</p>
+            
+            <a href="/" class="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-500/20 block text-center">
+                Acessar Hermes Control Hub
+            </a>
+        </div>
+
+        <!-- Footer Meta -->
+        <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500">
+            <span>Instância: <code class="text-slate-400">hermes</code></span>
+            <span id="refresh-indicator" class="flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Sincronizando em tempo real
+            </span>
+        </div>
+    </div>
+
+    <script>
+        const qrImage = document.getElementById('qr-image');
+        const qrSpinner = document.getElementById('qr-spinner');
+        const statusBadge = document.getElementById('status-badge');
+        const statusText = document.getElementById('status-text');
+        const qrSection = document.getElementById('qr-section');
+        const connectedSection = document.getElementById('connected-section');
+        const connectedUser = document.getElementById('connected-user');
+
+        let lastBase64 = '';
+
+        async function updateStatus() {
+            try {
+                const res = await fetch('/api/whatsapp/status');
+                if (!res.ok) throw new Error('Falha ao obter status');
+                const data = await res.json();
+
+                const state = data.state || (data.instance && data.instance.state) || 'connecting';
+
+                if (state === 'open') {
+                    // Estado Conectado com Sucesso!
+                    qrSection.classList.add('hidden');
+                    connectedSection.classList.remove('hidden');
+                    connectedSection.classList.add('flex');
+
+                    statusBadge.className = 'flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium mb-6';
+                    statusText.textContent = 'WhatsApp Conectado e Ativo';
+
+                    if (data.profileName || data.ownerJid || data.number) {
+                        connectedUser.textContent = `${data.profileName || 'Usuário'} (${data.number || data.ownerJid || 'hermes'})`;
+                    }
+                } else {
+                    // Estado Conectando / Aguardando QR Code
+                    qrSection.classList.remove('hidden');
+                    connectedSection.classList.add('hidden');
+                    connectedSection.classList.remove('flex');
+
+                    statusBadge.className = 'flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-medium mb-6';
+                    statusText.textContent = 'Aguardando leitura do QR Code...';
+
+                    const base64 = data.base64 || (data.qrcode && data.qrcode.base64);
+                    if (base64 && base64 !== lastBase64) {
+                        lastBase64 = base64;
+                        qrImage.src = base64;
+                        qrImage.onload = () => {
+                            qrImage.classList.remove('opacity-0');
+                            qrSpinner.classList.add('hidden');
+                        };
+                    } else if (base64) {
+                        qrSpinner.classList.add('hidden');
+                        qrImage.classList.remove('opacity-0');
+                    }
+                }
+            } catch (err) {
+                console.error('Erro no polling:', err);
+                statusBadge.className = 'flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium mb-6';
+                statusText.textContent = 'Reconectando à Evolution API...';
+            }
+        }
+
+        // Atualização imediata e loop a cada 4 segundos
+        updateStatus();
+        setInterval(updateStatus, 4000);
+    </script>
+</body>
+</html>
