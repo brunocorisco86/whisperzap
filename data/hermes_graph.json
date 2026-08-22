@@ -5,7 +5,7 @@
   "nodes": [
     {
       "category": "PERSON",
-      "mentions": 392,
+      "mentions": 396,
       "role": "UNKNOWN",
       "phone": "",
       "company": "",
@@ -14,7 +14,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 488,
+      "mentions": 494,
       "details": "Contato de trabalho",
       "role": "UNKNOWN",
       "phone": "",
@@ -24,19 +24,19 @@
     },
     {
       "category": "EQUIPMENT",
-      "mentions": 420,
+      "mentions": 422,
       "details": "Armazenamento de ração",
       "id": "Silo 3"
     },
     {
       "category": "LOCATION",
-      "mentions": 808,
+      "mentions": 809,
       "details": "Cooperativa",
       "id": "C.Vale"
     },
     {
       "category": "SYSTEM",
-      "mentions": 400,
+      "mentions": 402,
       "details": "Ficha de Acompanhamento de Lote",
       "id": "FAL"
     },
@@ -306,7 +306,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 42,
+      "mentions": 43,
       "role": "UNKNOWN",
       "phone": "",
       "company": "",
@@ -9171,7 +9171,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 10,
+      "mentions": 11,
       "role": "UNKNOWN",
       "phone": "554499722779",
       "company": "C.Vale",
@@ -23250,18 +23250,18 @@
     },
     {
       "category": "PERSON",
-      "mentions": 254,
+      "mentions": 258,
       "role": "OWNER",
       "phone": "554497604925",
       "company": "Hermes Memory / Homelab",
       "weight": 1.0,
       "can_generate_tasks": false,
-      "last_interaction_at": "2026-08-22T18:39:24.883046",
+      "last_interaction_at": "2026-08-22T18:47:41.816976",
       "id": "Bruno Conter"
     },
     {
       "category": "LOCATION",
-      "mentions": 189,
+      "mentions": 193,
       "id": "Hermes Memory / Homelab"
     },
     {
@@ -23383,30 +23383,35 @@
       "category": "PERSON",
       "mentions": 5,
       "id": "Fernando Varolo"
+    },
+    {
+      "category": "PERSON",
+      "mentions": 1,
+      "id": "Larissa Ajala"
     }
   ],
   "links": [
     {
       "relation": "DELEGATED_TO",
-      "weight": 362.0,
+      "weight": 366.0,
       "source": "Bruno",
       "target": "João"
     },
     {
       "relation": "MENTIONED",
-      "weight": 303.0,
+      "weight": 305.0,
       "source": "Bruno",
       "target": "Silo 3"
     },
     {
       "relation": "MENTIONED",
-      "weight": 274.0,
+      "weight": 275.0,
       "source": "Bruno",
       "target": "C.Vale"
     },
     {
       "relation": "MENTIONED",
-      "weight": 300.0,
+      "weight": 302.0,
       "source": "Bruno",
       "target": "FAL"
     },
@@ -23429,8 +23434,8 @@
       "target": "C.vale"
     },
     {
-      "relation": "CO_OCCURRED",
-      "weight": 386.0,
+      "relation": "ASSIGNED_WITH",
+      "weight": 390.0,
       "source": "João",
       "target": "Silo 3"
     },
@@ -23442,7 +23447,7 @@
     },
     {
       "relation": "ASSIGNED_WITH",
-      "weight": 363.0,
+      "weight": 367.0,
       "source": "João",
       "target": "FAL"
     },
@@ -23460,7 +23465,7 @@
     },
     {
       "relation": "CO_OCCURRED",
-      "weight": 400.0,
+      "weight": 402.0,
       "source": "Silo 3",
       "target": "FAL"
     },
@@ -25038,7 +25043,7 @@
     },
     {
       "relation": "AFFILIATED_AS_OWNER",
-      "weight": 189.0,
+      "weight": 193.0,
       "source": "Bruno Conter",
       "target": "Hermes Memory / Homelab"
     },
