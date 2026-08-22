@@ -452,7 +452,7 @@ class ContactService:
                 db.close()
 
     def get_contact_by_name(self, name: str, db: Session | None = None) -> ContactRecord | None:
-        """Busca contato por nome ou apelido."""
+        """Busca contato por nome ou apelido com suporte a variações e correspondência parcial."""
         if not name or not isinstance(name, str):
             return None
 
@@ -465,9 +465,32 @@ class ContactService:
             name_clean = name.strip()
             if not name_clean:
                 return None
-            return db.query(ContactRecord).filter(
+
+            # 1. Correspondência exata case-insensitive
+            match = db.query(ContactRecord).filter(
                 (ContactRecord.name.ilike(name_clean)) | (ContactRecord.nickname.ilike(name_clean))
             ).first()
+            if match:
+                return match
+
+            # 2. Substring direta (ex: "Larissa Batista" contido em "Larissa Ajala Batista" ou vice-versa)
+            match = db.query(ContactRecord).filter(
+                (ContactRecord.name.ilike(f"%{name_clean}%")) | (ContactRecord.nickname.ilike(f"%{name_clean}%"))
+            ).first()
+            if match:
+                return match
+
+            # 3. Correspondência por tokens de nome (ex: primeiro + último nome)
+            tokens = [t for t in re.findall(r"\w+", name_clean.lower()) if len(t) >= 3]
+            if len(tokens) >= 2:
+                all_contacts = db.query(ContactRecord).all()
+                for c in all_contacts:
+                    c_name_lower = (c.name or "").lower()
+                    c_nick_lower = (c.nickname or "").lower()
+                    if all(t in c_name_lower or t in c_nick_lower for t in tokens[:2]):
+                        return c
+
+            return None
         finally:
             if should_close:
                 db.close()

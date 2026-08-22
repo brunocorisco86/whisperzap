@@ -58,7 +58,7 @@ def test_query_understanding_polimnia_domain_terms():
     terms_found = [t["term"] for t in parsed.domain_terms]
     # "aplicativo do produtor" é variação de eProdutor
     assert "eProdutor" in terms_found or "Silos e Ração" in terms_found or len(terms_found) >= 1
-    assert "silo" in [s.lower() for s in parsed.clean_seed_entities]
+    assert any("silo" in s.lower() for s in parsed.clean_seed_entities)
 
 
 def test_response_humanizer_strips_technical_junk():

@@ -23,15 +23,17 @@ class GeminiProvider(BaseLLMProvider):
         return "gemini"
 
     def _get_api_model_name(self, name: str) -> str:
-        """Mapeia nomes de modelo para as tags suportadas na API pública do Gemini."""
+        """Mapeia nomes de modelo para as tags ativas suportadas na API pública do Gemini."""
         n = (name or "").lower().strip()
-        if "3.1" in n or "flash-lite" in n or "2.5" in n:
-            return "gemini-2.5-flash"
-        if "2.0" in n:
-            return "gemini-2.0-flash"
-        if "1.5" in n:
-            return "gemini-1.5-flash"
-        return name
+        if "3.7" in n:
+            return "gemini-3.7-flash"
+        if "3.6" in n:
+            return "gemini-3.6-flash"
+        if "3.1" in n or "flash-lite" in n or "lite" in n:
+            return "gemini-3.1-flash-lite"
+        if "flash" in n:
+            return "gemini-3.6-flash"
+        return name or "gemini-3.1-flash-lite"
 
     async def generate_text(
         self,
@@ -67,13 +69,21 @@ class GeminiProvider(BaseLLMProvider):
                 "parts": [{"text": system_instruction}]
             }
 
+        fallback_candidates = [
+            m for m in ["gemini-3.1-flash-lite", "gemini-3.6-flash", "gemini-flash-latest"]
+            if m != target_model
+        ]
+
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(url, json=payload)
-            # Se der 404 no modelo, tenta fallback para gemini-1.5-flash
-            if response.status_code == 404 and target_model != "gemini-1.5-flash":
-                fallback_url = f"{self.BASE_URL}/gemini-1.5-flash:generateContent?key={self.api_key}"
-                logger.warning(f"Modelo {target_model} retornou 404. Tentando fallback para gemini-1.5-flash.")
-                response = await client.post(fallback_url, json=payload)
+            # Se der 404 no modelo, tenta fallback para modelos estáveis conhecidos
+            if response.status_code == 404:
+                for alt_model in fallback_candidates:
+                    fallback_url = f"{self.BASE_URL}/{alt_model}:generateContent?key={self.api_key}"
+                    logger.warning(f"Modelo {target_model} retornou 404. Tentando fallback para {alt_model}.")
+                    response = await client.post(fallback_url, json=payload)
+                    if response.status_code == 200:
+                        break
 
             if response.status_code != 200:
                 logger.error(f"Erro na API do Gemini: {response.status_code} - {response.text}")
@@ -88,27 +98,28 @@ class GeminiProvider(BaseLLMProvider):
                 raise ValueError("Resposta vazia ou inválida retornada pelo Gemini.") from exc
 
     async def generate_embedding(self, text: str) -> list[float]:
-        """Gera embedding vetorial usando a API do Gemini text-embedding-004."""
+        """Gera embedding vetorial usando a API do Gemini (gemini-embedding-001 ou fallback)."""
         if not self.api_key or self.api_key.startswith("sua_chave"):
             return await super().generate_embedding(text)
 
-        url = f"{self.BASE_URL}/text-embedding-004:embedContent?key={self.api_key}"
-        payload = {
-            "model": "models/text-embedding-004",
-            "content": {
-                "parts": [{"text": text}]
+        for model_cand in ["gemini-embedding-001", "gemini-embedding-2", "text-embedding-004"]:
+            url = f"{self.BASE_URL}/{model_cand}:embedContent?key={self.api_key}"
+            payload = {
+                "model": f"models/{model_cand}",
+                "content": {
+                    "parts": [{"text": text}]
+                }
             }
-        }
 
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(url, json=payload)
-                if response.status_code == 200:
-                    data = response.json()
-                    return data["embedding"]["values"]
-                logger.warning(f"Erro ao gerar embedding no Gemini ({response.status_code}): {response.text}")
-        except Exception as e:
-            logger.error(f"Exceção ao chamar embedding Gemini: {e}")
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(url, json=payload)
+                    if response.status_code == 200:
+                        data = response.json()
+                        return data["embedding"]["values"]
+                    logger.warning(f"Embedding model {model_cand} retornou status {response.status_code}: {response.text[:120]}")
+            except Exception as e:
+                logger.error(f"Exceção ao chamar embedding Gemini ({model_cand}): {e}")
 
         # Fallback determinístico
         return await super().generate_embedding(text)

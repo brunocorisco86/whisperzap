@@ -454,21 +454,25 @@ class GraphJanitorService:
                         task.assignee = "Bruno Conter"
                     continue
 
-                # Verifica se a tarefa é atribuída a um contato com cartão
+                # Verifica se a tarefa é válida:
+                # 1. Atribuída ao Dono ou Contato com Cartão
+                # 2. OU vinculada a uma mensagem válida (não marcada para exclusão)
                 is_valid_task = False
                 if assignee_raw:
                     if assignee_digits and (assignee_digits in valid_phones or any(len(assignee_digits) >= 8 and assignee_digits.endswith(suf) for suf in valid_suffixes)):
                         is_valid_task = True
                     elif assignee_clean in valid_names or assignee_norm in valid_names:
                         is_valid_task = True
-                else:
-                    # Se não tem assignee explícito, checa se a mensagem de origem é válida ou do Dono
-                    if task.message:
+
+                if not is_valid_task and task.message:
+                    # Se a mensagem de origem não foi marcada para deleção, a tarefa é legítima
+                    if task.message not in messages_to_delete:
                         m_spk = str(task.message.speaker or "").strip()
-                        if is_owner_interaction(m_spk, task.message.meta_info) or normalize_text(m_spk) in valid_names:
+                        if is_owner_interaction(m_spk, task.message.meta_info) or normalize_text(m_spk) in valid_names or task.message.speaker in valid_names:
                             is_valid_task = True
-                    else:
-                        is_valid_task = False
+                        elif task.message.speaker:
+                            # Contato associado ou dono
+                            is_valid_task = True
 
                 if not is_valid_task:
                     tasks_to_delete.append(task)

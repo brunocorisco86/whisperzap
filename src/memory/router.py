@@ -509,6 +509,7 @@ async def clean_knowledge_graph(
     min_edge_weight: float = Query(default=1.0, description="Peso mínimo para manter arestas no grafo"),
     prune_isolated: bool = Query(default=True, description="Remove nós isolados (grau 0 e menções <= 1)"),
     deduplicate_aliases: bool = Query(default=True, description="Desambigua e mescla nós quase-idênticos (aliases)"),
+    db: Session = Depends(get_db),
 ):
     """Executa a rotina de higienização do Grafo de Conhecimento, protegendo contatos oficiais e podando ruídos."""
     from src.memory.janitor import graph_janitor_service
@@ -517,6 +518,7 @@ async def clean_knowledge_graph(
         min_edge_weight=min_edge_weight,
         prune_isolated=prune_isolated,
         deduplicate_aliases=deduplicate_aliases,
+        db=db,
     )
 
 

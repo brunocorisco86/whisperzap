@@ -50,7 +50,7 @@ class Settings(BaseSettings):
 
     # Embeddings & Busca Vetorial
     EMBEDDING_PROVIDER: Literal["gemini", "openrouter", "mock"] = "gemini"
-    EMBEDDING_MODEL: str = "text-embedding-004"
+    EMBEDDING_MODEL: str = "gemini-embedding-001"
 
     # Grafo de Conhecimento e Dicionário Léxico
     DATA_DIR: str = "data"

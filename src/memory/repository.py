@@ -194,7 +194,7 @@ class MemoryRepository:
             if is_owner_interaction(data.speaker, data.meta_info):
                 allow_tasks_for_speaker = True
             else:
-                from src.contacts.models import ContactRecord
+                from src.contacts.service import contact_service
                 speaker_val = (data.speaker or "").strip()
                 phone_val = ""
                 if isinstance(data.meta_info, dict):
@@ -202,20 +202,11 @@ class MemoryRepository:
                 if not phone_val:
                     phone_val = speaker_val
 
-                import re
-                digits = re.sub(r"\D", "", phone_val.split("@")[0]) if phone_val else ""
-
                 contact_match = None
-                if digits and len(digits) >= 8:
-                    contact_match = db.query(ContactRecord).filter(
-                        (ContactRecord.phone_number == digits)
-                        | (ContactRecord.phone_number.like(f"%{digits[-8:]}%"))
-                    ).first()
+                if phone_val:
+                    contact_match = contact_service.get_contact_by_phone(phone_val, db=db)
                 if not contact_match and speaker_val:
-                    contact_match = db.query(ContactRecord).filter(
-                        (ContactRecord.name.ilike(speaker_val))
-                        | (ContactRecord.nickname.ilike(speaker_val))
-                    ).first()
+                    contact_match = contact_service.get_contact_by_name(speaker_val, db=db)
 
                 if contact_match and bool(getattr(contact_match, "can_generate_tasks", False)):
                     allow_tasks_for_speaker = True
