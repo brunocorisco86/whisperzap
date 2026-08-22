@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: whisperzap
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: whisperzap-config
+  namespace: whisperzap
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  AI_PROVIDER: "gemini"
+  WHISPER_MODEL: "base"
+  WHISPER_DEVICE: "cpu"
+  WHISPER_COMPUTE_TYPE: "int8"
+  POSTGRES_HOST: "whisperzap-db"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "hermes_voice_memory"
+  HERMES_API_URL: "http://whisperzap-api:8000"
+  WHATSAPP_API_ENDPOINT: "http://evolution-api:8080/message/sendText/hermes"
+  WHATSAPP_MEDIA_ENDPOINT: "http://evolution-api:8080/chat/getBase64FromMediaMessage/hermes"
+  N8N_PORT: "5678"
+  N8N_PROTOCOL: "http"
+  GENERIC_TIMEZONE: "America/Sao_Paulo"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: whisperzap-secrets
+  namespace: whisperzap
+type: Opaque
+stringData:
+  GEMINI_API_KEY: "sua_chave_gemini_aqui"
+  OPENROUTER_API_KEY: "sua_chave_openrouter_aqui"
+  POSTGRES_PASSWORD: "postgres_prod_password"
+  EVOLUTION_POSTGRES_PASSWORD: "evolution_password"
+  WHATSAPP_API_TOKEN: "8c114ae397eb273edfe82e05728be8b4e17cc25649d7e26df40c438c67c368b0"

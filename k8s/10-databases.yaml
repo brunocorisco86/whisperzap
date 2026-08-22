@@ -1,0 +1,157 @@
+# ==============================================================================
+# PostgreSQL + pgvector para o Core do WhisperZap
+# ==============================================================================
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: whisperzap-db
+  namespace: whisperzap
+spec:
+  serviceName: whisperzap-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: whisperzap-db
+  template:
+    metadata:
+      labels:
+        app: whisperzap-db
+    spec:
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg16
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: whisperzap-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: whisperzap-secrets
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: whisperzap-db-data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: whisperzap-db-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: whisperzap-db
+  namespace: whisperzap
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: whisperzap-db
+---
+# ==============================================================================
+# PostgreSQL para a Evolution API v2
+# ==============================================================================
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: evolution-db
+  namespace: whisperzap
+spec:
+  serviceName: evolution-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: evolution-db
+  template:
+    metadata:
+      labels:
+        app: evolution-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_DB
+              value: "evolution_db"
+            - name: POSTGRES_USER
+              value: "evolution_user"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: whisperzap-secrets
+                  key: EVOLUTION_POSTGRES_PASSWORD
+          volumeMounts:
+            - name: evolution-db-data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: evolution-db-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: evolution-db
+  namespace: whisperzap
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: evolution-db
+---
+# ==============================================================================
+# Redis para a Evolution API
+# ==============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: evolution-redis
+  namespace: whisperzap
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: evolution-redis
+  template:
+    metadata:
+      labels:
+        app: evolution-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+              name: redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: evolution-redis
+  namespace: whisperzap
+spec:
+  ports:
+    - port: 6379
+      targetPort: 6379
+  selector:
+    app: evolution-redis

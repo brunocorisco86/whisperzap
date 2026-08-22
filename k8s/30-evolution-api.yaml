@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: evolution-api
+  namespace: whisperzap
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: evolution-api
+  template:
+    metadata:
+      labels:
+        app: evolution-api
+    spec:
+      containers:
+        - name: evolution-api
+          image: evoapicloud/evolution-api:latest
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: SERVER_TYPE
+              value: "http"
+            - name: SERVER_PORT
+              value: "8080"
+            - name: SERVER_URL
+              value: "http://localhost:8080"
+            - name: AUTHENTICATION_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: whisperzap-secrets
+                  key: WHATSAPP_API_TOKEN
+            - name: DATABASE_ENABLED
+              value: "true"
+            - name: DATABASE_PROVIDER
+              value: "postgresql"
+            - name: DATABASE_CONNECTION_URI
+              value: "postgresql://evolution_user:$(EVOLUTION_POSTGRES_PASSWORD)@evolution-db:5432/evolution_db?schema=evolution_api"
+            - name: EVOLUTION_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: whisperzap-secrets
+                  key: EVOLUTION_POSTGRES_PASSWORD
+            - name: DATABASE_CONNECTION_CLIENT_NAME
+              value: "hermes_evolution"
+            - name: DATABASE_SAVE_DATA_INSTANCE
+              value: "true"
+            - name: DATABASE_SAVE_DATA_NEW_MESSAGE
+              value: "true"
+            - name: DATABASE_SAVE_DATA_CONTACTS
+              value: "true"
+            - name: REDIS_ENABLED
+              value: "true"
+            - name: REDIS_URI
+              value: "redis://evolution-redis:6379"
+            - name: CACHE_REDIS_ENABLED
+              value: "true"
+            - name: CACHE_REDIS_URI
+              value: "redis://evolution-redis:6379"
+            - name: LOG_LEVEL
+              value: "ERROR,WARN,INFO"
+            - name: CONFIG_SESSION_PHONE_CLIENT
+              value: "Hermes Voice Memory"
+          volumeMounts:
+            - name: evolution-instances
+              mountPath: /evolution/instances
+      volumes:
+        - name: evolution-instances
+          persistentVolumeClaim:
+            claimName: evolution-instances-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: evolution-instances-pvc
+  namespace: whisperzap
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: evolution-api
+  namespace: whisperzap
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http
+  selector:
+    app: evolution-api

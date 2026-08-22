@@ -1,0 +1,112 @@
+services:
+  # ==============================================================================
+  # PostgreSQL dedicado para a Evolution API v2
+  # ==============================================================================
+  evolution-postgres:
+    image: postgres:16-alpine
+    container_name: hermes-evolution-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: evolution_user
+      POSTGRES_PASSWORD: evolution_password
+      POSTGRES_DB: evolution_db
+    volumes:
+      - evolution_postgres_data:/var/lib/postgresql/data
+    networks:
+      - hermes_mesh_network
+
+  # ==============================================================================
+  # Redis (Cache e fila para a Evolution API)
+  # ==============================================================================
+  evolution-redis:
+    image: redis:7-alpine
+    container_name: hermes-evolution-redis
+    restart: unless-stopped
+    volumes:
+      - evolution_redis_data:/data
+    networks:
+      - hermes_mesh_network
+
+  # ==============================================================================
+  # Evolution API v2 (Conector Oficial WhatsApp via QR Code)
+  # ==============================================================================
+  evolution-api:
+    image: evoapicloud/evolution-api:latest
+    container_name: hermes-evolution-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_TYPE: http
+      SERVER_PORT: 8080
+      SERVER_URL: http://localhost:8080
+      AUTHENTICATION_API_KEY: ${WHATSAPP_API_TOKEN:-8c114ae397eb273edfe82e05728be8b4e17cc25649d7e26df40c438c67c368b0}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution_user:evolution_password@evolution-postgres:5432/evolution_db?schema=evolution_api
+      DATABASE_CONNECTION_CLIENT_NAME: hermes_evolution
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "true"
+      DATABASE_SAVE_DATA_CONTACTS: "true"
+      REDIS_ENABLED: "true"
+      REDIS_URI: redis://evolution-redis:6379
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://evolution-redis:6379
+      LOG_LEVEL: ERROR,WARN,INFO
+      CONFIG_SESSION_PHONE_CLIENT: "Hermes Voice Memory"
+    depends_on:
+      - evolution-postgres
+      - evolution-redis
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks:
+      - hermes_mesh_network
+
+  # ==============================================================================
+  # n8n (Motor Visual de Automação & Workflows)
+  # ==============================================================================
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: hermes-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_HOST: 0.0.0.0
+      N8N_LISTEN_ADDRESS: 0.0.0.0
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      NODE_ENV: production
+      N8N_EDITOR_BASE_URL: http://179.197.73.80:5678/
+      N8N_WEBHOOK_URL: http://179.197.73.80:5678/
+      WEBHOOK_URL: http://179.197.73.80:5678/
+      GENERIC_TIMEZONE: America/Sao_Paulo
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      N8N_SECURE_COOKIE: "false"
+      HERMES_API_URL: http://hermes-api:8000
+      WHATSAPP_API_ENDPOINT: http://hermes-evolution-api:8080/message/sendText/hermes
+      WHATSAPP_MEDIA_ENDPOINT: http://hermes-evolution-api:8080/chat/getBase64FromMediaMessage/hermes
+      WHATSAPP_API_TOKEN: ${WHATSAPP_API_TOKEN:-8c114ae397eb273edfe82e05728be8b4e17cc25649d7e26df40c438c67c368b0}
+      ADMIN_WHATSAPP_NUMBER: ${ADMIN_WHATSAPP_NUMBER:-5544999999999}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      - evolution-api
+    networks:
+      - hermes_mesh_network
+
+volumes:
+  evolution_postgres_data:
+    name: hermes_evolution_postgres_data
+  evolution_instances:
+    name: hermes_evolution_instances
+  evolution_redis_data:
+    name: hermes_evolution_redis_data
+  n8n_data:
+    name: hermes_n8n_data
+
+networks:
+  hermes_mesh_network:
+    external: true

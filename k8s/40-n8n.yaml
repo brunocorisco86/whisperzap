@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n8n
+  namespace: whisperzap
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: n8n
+  template:
+    metadata:
+      labels:
+        app: n8n
+    spec:
+      containers:
+        - name: n8n
+          image: n8nio/n8n:latest
+          ports:
+            - containerPort: 5678
+              name: http
+          envFrom:
+            - configMapRef:
+                name: whisperzap-config
+            - secretRef:
+                name: whisperzap-secrets
+          env:
+            - name: N8N_HOST
+              value: "0.0.0.0"
+            - name: N8N_LISTEN_ADDRESS
+              value: "0.0.0.0"
+            - name: NODE_ENV
+              value: "production"
+            - name: N8N_SECURE_COOKIE
+              value: "false"
+            - name: N8N_BLOCK_ENV_ACCESS_IN_NODE
+              value: "false"
+          volumeMounts:
+            - name: n8n-data
+              mountPath: /home/node/.n8n
+      volumes:
+        - name: n8n-data
+          persistentVolumeClaim:
+            claimName: n8n-data-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: n8n-data-pvc
+  namespace: whisperzap
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: n8n
+  namespace: whisperzap
+spec:
+  ports:
+    - port: 5678
+      targetPort: 5678
+      name: http
+  selector:
+    app: n8n

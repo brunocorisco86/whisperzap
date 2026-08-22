@@ -1,0 +1,38 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: whisperzap-ingress
+  namespace: whisperzap
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+spec:
+  tls:
+    - hosts:
+        - whisperzap.homelab.local
+      secretName: whisperzap-tls
+  rules:
+    - host: whisperzap.homelab.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: whisperzap-api
+                port:
+                  number: 8000
+          - path: /n8n
+            pathType: Prefix
+            backend:
+              service:
+                name: n8n
+                port:
+                  number: 5678
+          - path: /evolution
+            pathType: Prefix
+            backend:
+              service:
+                name: evolution-api
+                port:
+                  number: 8080
