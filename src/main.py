@@ -1,6 +1,9 @@
+import os
+import time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Response, status
+from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from src.config import settings
 from src.ai_gateway.router import router as ai_router
 from src.transcriber.router import router as transcriber_router
@@ -9,10 +12,10 @@ from src.memory.router import router as memory_router
 from src.contacts.router import router as contacts_router
 from src.analytics.router import router as analytics_router
 from src.web.router import router as web_router, STATIC_DIR
+from src.audit.router import router as audit_router
+from src.audit.service import log_event
 from src.memory.database import init_db
 from src.scheduler.cron_service import start_scheduler, stop_scheduler
-from fastapi.staticfiles import StaticFiles
-import os
 
 
 @asynccontextmanager
@@ -32,6 +35,47 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def audit_logging_middleware(request: Request, call_next):
+    """Middleware de auditoria estruturada e telemetria de latência."""
+    start_time = time.time()
+    path = request.url.path
+    try:
+        response = await call_next(request)
+        duration_ms = (time.time() - start_time) * 1000
+
+        # Filtra ruídos de polling estático e docs
+        if not path.startswith("/static") and path != "/health" and not path.startswith("/docs") and not path.startswith("/openapi"):
+            status_str = "SUCCESS" if response.status_code < 400 else "ERROR"
+            module = "WEB" if path.startswith("/api/auth") or path == "/" or path == "/whatsapp-qr" else (
+                "TRANSCRIBER" if "transcribe" in path else (
+                    "AI_GATEWAY" if "ai" in path else (
+                        "MEMORY" if "memory" in path or "messages" in path or "tasks" in path else "SYSTEM"
+                    )
+                )
+            )
+            log_event(
+                module=module,
+                action=f"{request.method} {path}",
+                speaker=request.client.host if request.client else "unknown",
+                status=status_str,
+                duration_ms=duration_ms,
+                details={"status_code": response.status_code, "client_ip": request.client.host if request.client else None},
+            )
+        return response
+    except Exception as exc:
+        duration_ms = (time.time() - start_time) * 1000
+        log_event(
+            module="SYSTEM",
+            action=f"{request.method} {path}",
+            speaker=request.client.host if request.client else "unknown",
+            status="ERROR",
+            duration_ms=duration_ms,
+            error_message=str(exc),
+        )
+        raise exc
 
 
 # Configuração de CORS para requisições do n8n / frontend / webhooks
@@ -55,6 +99,7 @@ app.include_router(dictionary_router)
 app.include_router(memory_router)
 app.include_router(contacts_router)
 app.include_router(analytics_router)
+app.include_router(audit_router)
 
 
 

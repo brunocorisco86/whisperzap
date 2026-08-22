@@ -300,3 +300,43 @@ class LexicalHarvestResult(BaseModel):
     rejected_terms_count: int
     promoted_terms: list[str] = []
     details: list[dict] = []
+
+
+class AuditLogRecord(Base):
+    """Tabela de logs de auditoria e observabilidade do sistema."""
+
+    __tablename__ = "audit_logs"
+
+    id = Column(String(36), primary_key=True)
+    created_at = Column(DateTime, default=utc_now, index=True)
+    module = Column(String(50), nullable=False, index=True)
+    action = Column(String(100), nullable=False, index=True)
+    speaker = Column(String(100), nullable=True, index=True)
+    status = Column(String(20), default="SUCCESS", index=True)
+    duration_ms = Column(Float, default=0.0)
+    details = Column(JSON, default=dict)
+    error_message = Column(Text, nullable=True)
+
+
+class AuditLogCreate(BaseModel):
+    module: str
+    action: str
+    speaker: Optional[str] = None
+    status: str = "SUCCESS"
+    duration_ms: float = 0.0
+    details: dict = Field(default_factory=dict)
+    error_message: Optional[str] = None
+
+
+class AuditLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    created_at: datetime
+    module: str
+    action: str
+    speaker: Optional[str] = None
+    status: str
+    duration_ms: float
+    details: dict
+    error_message: Optional[str] = None
