@@ -12,7 +12,8 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
       "position": [100, 300],
-      "id": "1e112d7c-a7a2-4bb0-80a1-000000000001"
+      "id": "1e112d7c-a7a2-4bb0-80a1-000000000001",
+      "webhookId": "1e112d7c-a7a2-4bb0-80a1-000000000001"
     },
     {
       "parameters": {

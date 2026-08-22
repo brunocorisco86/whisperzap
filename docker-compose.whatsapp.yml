@@ -78,11 +78,13 @@ services:
       N8N_PROTOCOL: http
       NODE_ENV: production
       N8N_EDITOR_BASE_URL: http://179.197.73.80:5678/
-      N8N_WEBHOOK_URL: http://179.197.73.80:5678/
-      WEBHOOK_URL: http://179.197.73.80:5678/
+      N8N_WEBHOOK_URL: http://hermes-n8n:5678/
+      WEBHOOK_URL: http://hermes-n8n:5678/
       GENERIC_TIMEZONE: America/Sao_Paulo
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
       N8N_SECURE_COOKIE: "false"
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "false"
+      N8N_DIAGNOSTICS_ENABLED: "false"
       HERMES_API_URL: http://hermes-api:8000
       WHATSAPP_API_ENDPOINT: http://hermes-evolution-api:8080/message/sendText/hermes
       WHATSAPP_MEDIA_ENDPOINT: http://hermes-evolution-api:8080/chat/getBase64FromMediaMessage/hermes
