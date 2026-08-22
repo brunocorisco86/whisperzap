@@ -85,6 +85,9 @@ services:
       N8N_SECURE_COOKIE: "false"
       N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "false"
       N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: "admin"
+      N8N_BASIC_AUTH_PASSWORD: "blurbang"
       HERMES_API_URL: http://hermes-api:8000
       WHATSAPP_API_ENDPOINT: http://hermes-evolution-api:8080/message/sendText/hermes
       WHATSAPP_MEDIA_ENDPOINT: http://hermes-evolution-api:8080/chat/getBase64FromMediaMessage/hermes
