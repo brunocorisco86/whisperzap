@@ -492,7 +492,8 @@ class MemoryRepository:
             from src.ai_gateway.schemas import MemorySourceCitation, HermesQueryResponse
             from src.memory.semantic_cache import semantic_cache
             from src.memory.query_understanding import hermes_query_understanding
-            from src.memory.timezone_utils import format_brt
+            from src.memory.timezone_utils import BRASILIA_TZ, format_brt, get_now_brt, to_local_tz
+            from datetime import datetime, time, timedelta, timezone
             from sqlalchemy import or_
 
             # Checagem de Cache Semântico Local (Zero Tokens)
@@ -503,26 +504,95 @@ class MemoryRepository:
             # 1. Análise Semântica e Morfossintática com spaCy + Polímnia
             parsed = hermes_query_understanding.analyze_query(query, db=db)
 
+            # Janelas temporais em horário oficial de Brasília (UTC-3)
+            now_brt = get_now_brt()
+            today_date = now_brt.date()
+            start_of_today = datetime.combine(today_date, time.min, tzinfo=BRASILIA_TZ).astimezone(timezone.utc)
+            end_of_today = datetime.combine(today_date, time.max, tzinfo=BRASILIA_TZ).astimezone(timezone.utc)
+
+            yesterday_date = today_date - timedelta(days=1)
+            start_of_yesterday = datetime.combine(yesterday_date, time.min, tzinfo=BRASILIA_TZ).astimezone(timezone.utc)
+            end_of_yesterday = datetime.combine(yesterday_date, time.max, tzinfo=BRASILIA_TZ).astimezone(timezone.utc)
+
             seen_ids = set()
             sources: list[MemorySourceCitation] = []
+            temporal_notes: list[str] = []
 
             # 2. Priorização por Interlocutor Identificado Dinamicamente
             if parsed.target_speaker_full_name or parsed.target_speaker:
                 spk_filter = (parsed.target_speaker_full_name or parsed.target_speaker).split()[0]
-                target_messages = (
-                    db.query(MessageRecord)
-                    .filter(MessageRecord.speaker.ilike(f"%{spk_filter}%"))
-                    .order_by(MessageRecord.created_at.desc())
-                    .limit(10)
-                    .all()
-                )
+                spk_name_label = parsed.target_speaker_full_name or parsed.target_speaker
+
+                if parsed.is_today:
+                    # Filtra estritamente o dia de hoje
+                    target_messages = (
+                        db.query(MessageRecord)
+                        .filter(
+                            MessageRecord.speaker.ilike(f"%{spk_filter}%"),
+                            MessageRecord.created_at >= start_of_today,
+                            MessageRecord.created_at <= end_of_today,
+                        )
+                        .order_by(MessageRecord.created_at.desc())
+                        .all()
+                    )
+                    if not target_messages:
+                        # Busca a última mensagem do histórico geral para contextualização
+                        last_msg = (
+                            db.query(MessageRecord)
+                            .filter(MessageRecord.speaker.ilike(f"%{spk_filter}%"))
+                            .order_by(MessageRecord.created_at.desc())
+                            .first()
+                        )
+                        if last_msg:
+                            last_date_str = format_brt(last_msg.created_at)
+                            last_text = (last_msg.revised_text or last_msg.summary or "")[:120]
+                            temporal_notes.append(
+                                f"Nota Temporal: Nenhuma mensagem registrada com {spk_name_label} hoje ({format_brt(now_brt, '%d/%m/%Y')}). "
+                                f"Última conversa registrada no histórico ocorreu em {last_date_str}: \"{last_text}\""
+                            )
+                elif parsed.is_yesterday:
+                    # Filtra estritamente o dia de ontem
+                    target_messages = (
+                        db.query(MessageRecord)
+                        .filter(
+                            MessageRecord.speaker.ilike(f"%{spk_filter}%"),
+                            MessageRecord.created_at >= start_of_yesterday,
+                            MessageRecord.created_at <= end_of_yesterday,
+                        )
+                        .order_by(MessageRecord.created_at.desc())
+                        .all()
+                    )
+                    if not target_messages:
+                        last_msg = (
+                            db.query(MessageRecord)
+                            .filter(MessageRecord.speaker.ilike(f"%{spk_filter}%"))
+                            .order_by(MessageRecord.created_at.desc())
+                            .first()
+                        )
+                        if last_msg:
+                            last_date_str = format_brt(last_msg.created_at)
+                            last_text = (last_msg.revised_text or last_msg.summary or "")[:120]
+                            temporal_notes.append(
+                                f"Nota Temporal: Nenhuma mensagem registrada com {spk_name_label} ontem ({format_brt(start_of_yesterday, '%d/%m/%Y')}). "
+                                f"Última conversa registrada no histórico ocorreu em {last_date_str}: \"{last_text}\""
+                            )
+                else:
+                    # Sem restrição de dia específico: pega as mensagens mais recentes
+                    target_messages = (
+                        db.query(MessageRecord)
+                        .filter(MessageRecord.speaker.ilike(f"%{spk_filter}%"))
+                        .order_by(MessageRecord.created_at.desc())
+                        .limit(10)
+                        .all()
+                    )
+
                 for tm in target_messages:
                     seen_ids.add(tm.id)
                     snippet = tm.revised_text or tm.raw_text or tm.summary or ""
                     sources.append(
                         MemorySourceCitation(
                             message_id=tm.id,
-                            speaker=tm.speaker or parsed.target_speaker_full_name or parsed.target_speaker,
+                            speaker=tm.speaker or spk_name_label,
                             text_snippet=snippet,
                             similarity=0.98,
                             created_at=format_brt(tm.created_at) if tm.created_at else None,
@@ -530,10 +600,13 @@ class MemoryRepository:
                     )
 
             # 3. Busca Semântica Vetorial (se necessário complementar)
-            if len(sources) < top_k:
+            # Se for diálogo de interlocutor com filtro de hoje/ontem e sem mensagens encontradas, não puxa mensagens vetoriais de terceiros
+            skip_vector = (parsed.intent == "INTERLOCUTOR_DIALOGUE" and (parsed.is_today or parsed.is_yesterday) and len(sources) == 0)
+
+            if len(sources) < top_k and not skip_vector:
                 search_results = await self.search_memories(
                     query=query,
-                    top_k=top_k,
+                    top_k=top_k * 2 if (parsed.is_today or parsed.is_yesterday) else top_k,
                     min_similarity=min_similarity,
                     db=db,
                 )
@@ -546,6 +619,16 @@ class MemoryRepository:
                             if first_norm not in spk_norm and first_norm not in (sr.text or "").lower():
                                 continue
 
+                        # Aplica filtro de data se for today ou yesterday
+                        if parsed.is_today and sr.created_at:
+                            sr_utc = sr.created_at if getattr(sr.created_at, "tzinfo", None) else sr.created_at.replace(tzinfo=timezone.utc)
+                            if not (start_of_today <= sr_utc <= end_of_today):
+                                continue
+                        elif parsed.is_yesterday and sr.created_at:
+                            sr_utc = sr.created_at if getattr(sr.created_at, "tzinfo", None) else sr.created_at.replace(tzinfo=timezone.utc)
+                            if not (start_of_yesterday <= sr_utc <= end_of_yesterday):
+                                continue
+
                         seen_ids.add(sr.message_id)
                         sources.append(
                             MemorySourceCitation(
@@ -556,6 +639,8 @@ class MemoryRepository:
                                 created_at=format_brt(sr.created_at) if sr.created_at else None,
                             )
                         )
+                        if len(sources) >= top_k:
+                            break
 
             # Se a busca envolve temporalidade recente ou diálogo, ordena por ordem cronológica recente
             if parsed.is_recent or parsed.intent == "INTERLOCUTOR_DIALOGUE":
@@ -590,6 +675,10 @@ class MemoryRepository:
                         if matched_c.company:
                             c_parts.append(f"Empresa: {matched_c.company}")
                         related_entities.append(" | ".join(c_parts))
+
+            # 4.4 Adiciona notas de temporalidade
+            if temporal_notes:
+                related_entities.extend(temporal_notes)
 
             # 5. Busca de tarefas pendentes relacionadas
             pending_tasks_objs = self.list_tasks(status="PENDING", db=db)

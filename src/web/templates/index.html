@@ -755,6 +755,162 @@
             <p>Persistência & RAG</p>
           </div>
         </div>
+      <!-- Euterpe Environments & Configuration Hub -->
+      <div class="card mt-4" id="euterpe-environments-panel">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 1rem;">
+          <div>
+            <h2 style="font-family: var(--font-display); font-size: 1.3rem; display: flex; align-items: center; gap: 0.6rem; color: #a78bfa;">
+              🎛️ Euterpe — Central de Ambientes & Consoles de Configuração
+            </h2>
+            <p class="text-muted" style="font-size: 0.85rem; margin-top: 0.25rem;">
+              Acesso direto, documentação e monitoramento de consoles dos serviços orquestrados (Evolution API, n8n, FastAPI Swagger, PostgreSQL, Auditoria e WhatsApp).
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <span class="badge badge-success" style="font-size: 0.75rem; padding: 0.35rem 0.65rem;">
+              🟢 Microsserviços Conectados
+            </span>
+          </div>
+        </div>
+
+        <div class="env-hub-grid" style="padding: 1.25rem;">
+          
+          <!-- Card: Evolution API -->
+          <div class="env-card">
+            <div class="env-card-header">
+              <div class="env-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">🟢</div>
+              <div class="env-header-text">
+                <h3 class="env-title">Evolution API</h3>
+                <span class="env-badge badge-active">Porta 8085 / 8080</span>
+              </div>
+            </div>
+            <p class="env-desc">Engine WhatsApp Baileys para recepção de áudios, mensagens, envio de alertas e controle de instâncias.</p>
+            <div class="env-meta">
+              <span><strong>Instância:</strong> whisperzap</span>
+              <span><strong>Ambiente:</strong> Produção (VPS)</span>
+            </div>
+            <div class="env-actions">
+              <a href="/whatsapp-qr" target="_blank" class="btn btn-primary btn-sm env-btn" title="Abrir interface de pareamento do WhatsApp com QR Code">
+                📱 Scanner WhatsApp QR
+              </a>
+              <a href="http://179.197.73.80:8085/docs" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm env-btn" title="Abrir Swagger da Evolution API">
+                📖 Swagger Docs
+              </a>
+            </div>
+          </div>
+
+          <!-- Card: n8n Workflow Automation -->
+          <div class="env-card">
+            <div class="env-card-header">
+              <div class="env-icon" style="background: rgba(234, 88, 12, 0.15); color: #f97316; border: 1px solid rgba(234, 88, 12, 0.3);">⚡</div>
+              <div class="env-header-text">
+                <h3 class="env-title">n8n Orchestrator</h3>
+                <span class="env-badge badge-active">Porta 5678</span>
+              </div>
+            </div>
+            <p class="env-desc">Orquestrador de fluxos visuais, webhooks de áudio, integração com Evolution API e cron jobs agendados.</p>
+            <div class="env-meta">
+              <span><strong>Workflow Mestre:</strong> WhatsApp Voice Hub</span>
+              <span><strong>Automações:</strong> Ativas</span>
+            </div>
+            <div class="env-actions">
+              <a href="http://179.197.73.80:5678" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm env-btn" style="border-color: #f97316; color: #fdba74;" title="Acessar painel web do n8n">
+                🚀 Acessar Console n8n
+              </a>
+            </div>
+          </div>
+
+          <!-- Card: FastAPI OpenAPI / Swagger Documentation -->
+          <div class="env-card">
+            <div class="env-card-header">
+              <div class="env-icon" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3);">📘</div>
+              <div class="env-header-text">
+                <h3 class="env-title">Hermes API Docs</h3>
+                <span class="env-badge badge-active">FastAPI /docs</span>
+              </div>
+            </div>
+            <p class="env-desc">Documentação interativa Swagger UI e ReDoc com todos os endpoints de memória, contatos, tarefas e AI Gateway.</p>
+            <div class="env-meta">
+              <span><strong>OpenAPI:</strong> 3.1.0</span>
+              <span><strong>Versão API:</strong> v0.2.0</span>
+            </div>
+            <div class="env-actions">
+              <a href="/docs" target="_blank" class="btn btn-secondary btn-sm env-btn" title="Abrir Swagger UI interativo">
+                📑 Swagger UI
+              </a>
+              <a href="/redoc" target="_blank" class="btn btn-secondary btn-sm env-btn" title="Abrir documentação ReDoc">
+                📚 ReDoc
+              </a>
+            </div>
+          </div>
+
+          <!-- Card: AI Model Registry & Routing -->
+          <div class="env-card">
+            <div class="env-card-header">
+              <div class="env-icon" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3);">🧠</div>
+              <div class="env-header-text">
+                <h3 class="env-title">AI Gateway & Model Registry</h3>
+                <span class="env-badge badge-active">Gemini 3.1 Flash-Lite</span>
+              </div>
+            </div>
+            <p class="env-desc">Gestor inteligente de LLMs, fallbacks automáticos, extração de entidades, síntese de memórias e orquestração de prompts.</p>
+            <div class="env-meta">
+              <span><strong>Fallback:</strong> Gemini 3.6 / OpenRouter</span>
+              <span><strong>Tokens:</strong> Otimizado</span>
+            </div>
+            <div class="env-actions">
+              <a href="/api/v1/ai/models" target="_blank" class="btn btn-secondary btn-sm env-btn" title="Visualizar catálogo de modelos registrados">
+                📋 Registro de Modelos
+              </a>
+            </div>
+          </div>
+
+          <!-- Card: Structured Audit Logger -->
+          <div class="env-card">
+            <div class="env-card-header">
+              <div class="env-icon" style="background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.3);">🛡️</div>
+              <div class="env-header-text">
+                <h3 class="env-title">Auditoria & Logs Estruturados</h3>
+                <span class="env-badge badge-active">JSON Rotativo</span>
+              </div>
+            </div>
+            <p class="env-desc">Rastreamento de auditoria e segurança em tempo real com retenção rotativa de logs e métricas de latência.</p>
+            <div class="env-meta">
+              <span><strong>Retenção:</strong> 30 dias</span>
+              <span><strong>Rotação:</strong> 10MB</span>
+            </div>
+            <div class="env-actions">
+              <a href="/api/audit/logs?limit=50" target="_blank" class="btn btn-secondary btn-sm env-btn" title="Consultar logs de auditoria recentes em JSON">
+                🔍 Ver Logs de Auditoria
+              </a>
+              <a href="/api/audit/stats" target="_blank" class="btn btn-secondary btn-sm env-btn" title="Ver métricas de auditoria">
+                📊 Estatísticas
+              </a>
+            </div>
+          </div>
+
+          <!-- Card: PostgreSQL 16 + pgvector Database -->
+          <div class="env-card">
+            <div class="env-card-header">
+              <div class="env-icon" style="background: rgba(14, 165, 233, 0.15); color: #0ea5e9; border: 1px solid rgba(14, 165, 233, 0.3);">🗄️</div>
+              <div class="env-header-text">
+                <h3 class="env-title">PostgreSQL 16 + pgvector</h3>
+                <span class="env-badge badge-active">Porta 5432</span>
+              </div>
+            </div>
+            <p class="env-desc">Banco de dados relacional e vetorial com suporte a índices HNSW para recuperação semântica rápida (GraphRAG).</p>
+            <div class="env-meta">
+              <span><strong>Extensão:</strong> vector</span>
+              <span><strong>Dimensões:</strong> 768 / 1536</span>
+            </div>
+            <div class="env-actions">
+              <a href="/api/v1/memory/health" target="_blank" class="btn btn-secondary btn-sm env-btn" title="Verificar integridade do banco e memórias">
+                🩺 Health Check DB
+              </a>
+            </div>
+          </div>
+
+        </div>
       </div>
 
       <!-- Euterpe Contact Sync & Maintenance Console -->

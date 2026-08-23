@@ -61,6 +61,9 @@ def test_euterpe_ui_and_terminal_elements():
     # Verifica index.html
     res_html = client.get("/")
     assert res_html.status_code == 200
+    assert "euterpe-environments-panel" in res_html.text
+    assert "Evolution API" in res_html.text
+    assert "n8n Orchestrator" in res_html.text
     assert "euterpe-sync-panel" in res_html.text
     assert "btn-euterpe-pipeline" in res_html.text
     assert "euterpe-terminal-logs" in res_html.text
@@ -79,3 +82,6 @@ def test_euterpe_ui_and_terminal_elements():
     res_css = client.get("/static/css/style.css")
     assert res_css.status_code == 200
     assert ".euterpe-terminal-screen" in res_css.text
+    assert ".env-hub-grid" in res_css.text
+    assert ".env-card" in res_css.text
+

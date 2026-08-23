@@ -25,10 +25,32 @@ class LocalCognitiveSynthesizer:
         sources: List[Any],
         pending_tasks: List[str],
         related_entities: List[str],
+        parsed_query: Optional[Any] = None,
     ) -> str:
         """Sintetiza conversas de um interlocutor específico em tópicos temáticos executivos."""
+        is_today = bool(parsed_query and getattr(parsed_query, "is_today", False))
+        is_yesterday = bool(parsed_query and getattr(parsed_query, "is_yesterday", False))
+
+        # Procura nota de última interação temporal em related_entities
+        temporal_note = next((e for e in related_entities if "Última conversa registrada" in e or "última interação" in e.lower() or "Nota Temporal:" in e), None)
+
         if not sources:
-            return f"Não foram encontradas conversas ou mensagens recentes registradas de **{speaker_name}**."
+            if is_today:
+                base_msg = f"Você não conversou com **{speaker_name}** hoje."
+                if temporal_note:
+                    clean_note = temporal_note.replace("Nota Temporal:", "").strip()
+                    base_msg += f"\n\nℹ️ {clean_note}"
+            elif is_yesterday:
+                base_msg = f"Você não conversou com **{speaker_name}** ontem."
+                if temporal_note:
+                    clean_note = temporal_note.replace("Nota Temporal:", "").strip()
+                    base_msg += f"\n\nℹ️ {clean_note}"
+            else:
+                base_msg = f"Não foram encontradas conversas ou mensagens recentes registradas de **{speaker_name}**."
+
+            if pending_tasks:
+                base_msg += "\n\n📋 **Tarefas Relacionadas no Sistema:**\n" + "\n".join(f"• {t}" for t in pending_tasks[:3])
+            return base_msg
 
         # Agrupamento temático de mensagens usando spaCy e palavras-chave
         operation_points = []
@@ -58,7 +80,12 @@ class LocalCognitiveSynthesizer:
             else:
                 other_points.append(snippet)
 
-        lines = [f"Recentemente, **{speaker_name}** conversou com você sobre os seguintes pontos principais:"]
+        if is_today:
+            lines = [f"Hoje, **{speaker_name}** conversou com você sobre os seguintes pontos principais:"]
+        elif is_yesterday:
+            lines = [f"Ontem, **{speaker_name}** conversou com você sobre os seguintes pontos principais:"]
+        else:
+            lines = [f"Nas conversas registradas, **{speaker_name}** abordou os seguintes pontos principais:"]
 
         # Tópico 1: Operação e Equipamentos
         if operation_points:
@@ -123,6 +150,7 @@ class LocalCognitiveSynthesizer:
                 sources=sources,
                 pending_tasks=pending_tasks,
                 related_entities=related_entities,
+                parsed_query=parsed_query,
             )
         elif parsed_query and parsed_query.target_speaker:
             return self.synthesize_dialogue(
@@ -130,9 +158,14 @@ class LocalCognitiveSynthesizer:
                 sources=sources,
                 pending_tasks=pending_tasks,
                 related_entities=related_entities,
+                parsed_query=parsed_query,
             )
 
         if not sources and not pending_tasks:
+            if parsed_query and getattr(parsed_query, "is_today", False):
+                return "Não foram localizadas memórias ou conversas registradas hoje no banco de dados."
+            if parsed_query and getattr(parsed_query, "is_yesterday", False):
+                return "Não foram localizadas memórias ou conversas registradas ontem no banco de dados."
             return "Não foram localizadas memórias ou registros diretamente relacionados a esta consulta no banco de dados."
 
         lines = ["Com base nas informações consolidadas no assistente Hermes:"]

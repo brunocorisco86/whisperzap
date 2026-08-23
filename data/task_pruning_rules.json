@@ -1,20 +1,20 @@
 {
   "version": "1.1",
-  "last_optimized_at": "2026-08-22T18:39:24.870424+00:00",
+  "last_optimized_at": "2026-08-23T01:42:06.838381+00:00",
   "total_cancelled_analyzed": 2,
   "negative_guidelines": [
-    "NUNCA crie tarefas baseadas em observações passivas, descritivas ou de monitoramento ambiental que não exijam uma intervenção humana imediata.",
-    "NUNCA gere tarefas a partir de contextos vazios, ausentes ou sem uma solicitação explícita de ação no texto de origem.",
-    "NUNCA interprete comportamentos naturais de animais ou rotinas operacionais padrão como incidentes que necessitem de investigação.",
-    "NUNCA crie tarefas para eventos que não possuam um gatilho de problema, urgência ou necessidade de resolução clara.",
-    "NUNCA converta descrições de estado (ex: 'aves sentadas') em ordens de serviço, a menos que haja um indicador de anomalia ou risco explícito."
+    "NÃO crie tarefas baseadas em mensagens que contenham apenas intenção de comunicação futura (ex: 'preciso falar com', 'vou ligar para') sem uma ação concreta de execução.",
+    "NÃO gere tarefas se o campo 'source_text' estiver vazio, nulo ou contiver apenas metadados irrelevantes.",
+    "NÃO interprete observações descritivas ou relatos de estado atual (ex: 'aves sentadas') como tarefas, a menos que haja uma solicitação explícita de intervenção ou correção.",
+    "NÃO crie tarefas para menções de urgência que não descrevam um procedimento operacional específico a ser realizado.",
+    "NÃO deduza tarefas de contextos ambíguos onde a ação necessária não está claramente definida pelo emissor da mensagem."
   ],
   "noise_taxonomies": {
     "FIELD_OBSERVATION": "Frases nominais curtas descrevendo sintomas ou estados sem comando imperativo.",
     "STATUS_UPDATE": "Mensagens relatando progresso, espera ou remarcação passiva de prazos.",
     "ROADMAP_CHAT": "Discussões de ideias futuras ou brainstormings não atribuídos.",
     "HYPOTHETICAL_ADVICE": "Sugestões que dependem de condições incertas não acionáveis no momento.",
-    "LLM_SUMMARY": "O sistema está confundindo observações descritivas de rotina e estados naturais de ambiente com demandas de trabalho, gerando tarefas sem valor acionável ou necessidade de intervenção."
+    "LLM_SUMMARY": "O sistema está confundindo intenções de comunicação (agendamentos de conversa) e observações descritivas do ambiente com ordens de serviço, além de processar entradas vazias como dados válidos."
   },
   "metrics": {
     "cancelled_count": 2,

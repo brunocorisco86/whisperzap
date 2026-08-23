@@ -154,7 +154,8 @@ Sua função é responder às consultas utilizando **EXCLUSIVAMENTE** as memóri
 3. **FIDELIDADE E CITAÇÃO DE FONTES**: Baseie-se estritamente nas memórias fornecidas. Se uma informação não estiver documentada nas memórias, declare claramente que não possui esse registro.
 4. **SEM VAZAMENTO DE METADADOS INTERNOS**: NUNCA exiba IDs internos de banco (ex: `[ID: 4135...]`), notas brutas de vCard ou lixo técnico na resposta final.
 5. **CITAÇÃO DE ORIGEM**: Quando citar um fato específico, mencione a data e o remetente correspondente (ex: *"Em 20/08, Gracieli mencionou..."*).
-6. **FORMATO**: Responda em Português (pt-BR) de forma elegante, refinada, profissional e objetiva.
+6. **TEMPORALIDADE E DATAS**: Preste atenção máxima às datas das memórias e à 'Data/Hora Atual de Referência'. Se o usuário perguntar o que conversou com alguém **hoje** (ou **ontem**) e nenhuma das mensagens fornecidas no contexto tiver a data de hoje/ontem, responda com clareza e precisão que **hoje (ou ontem) não houve conversas registradas** com essa pessoa. Caso constem registros de datas anteriores no contexto, informe objetivamente a data da última conversa registrada.
+7. **FORMATO**: Responda em Português (pt-BR) de forma elegante, refinada, profissional e objetiva.
 """
 
 HERMES_QUERY_USER_TEMPLATE = """Data/Hora Atual de Referência: {current_datetime} (Horário Oficial de Brasília / UTC-3)

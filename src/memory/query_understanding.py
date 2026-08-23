@@ -47,6 +47,8 @@ class ParsedHermesQuery:
     clean_seed_entities: List[str] = field(default_factory=list)
     is_recent: bool = False
     is_today: bool = False
+    is_yesterday: bool = False
+    time_filter_mode: Optional[str] = None  # "today", "yesterday", "recent", None
     action_focus: Optional[str] = None
 
 
@@ -67,8 +69,17 @@ class HermesQueryUnderstanding:
         raw_tokens = [w for w in re.findall(r"\w+", raw_query.lower()) if len(w) >= 2]
         clean_tokens = [w for w in raw_tokens if w not in CONVERSATIONAL_STOPWORDS and len(w) >= 3]
 
-        is_today = any(t in ("hoje", "atual") for t in raw_tokens)
-        is_recent = is_today or any(t in ("recente", "recentemente", "ultimamente", "agora", "ontem") for t in raw_tokens)
+        is_today = any(t in ("hoje", "atual") for t in raw_tokens) or ("de hoje" in raw_query.lower())
+        is_yesterday = ("ontem" in raw_tokens) or ("de ontem" in raw_query.lower())
+        is_recent = is_today or is_yesterday or any(t in ("recente", "recentemente", "ultimamente", "agora") for t in raw_tokens)
+
+        time_filter_mode = None
+        if is_today:
+            time_filter_mode = "today"
+        elif is_yesterday:
+            time_filter_mode = "yesterday"
+        elif is_recent:
+            time_filter_mode = "recent"
 
         # 2. Análise Morfossintática com spaCy
         spacy_persons: List[str] = []
@@ -182,22 +193,25 @@ class HermesQueryUnderstanding:
             intent = "GENERAL"
 
         # 6. Sementes Limpas para GraphRAG
-        clean_seeds: Set[str] = set()
+        clean_seeds_list: List[str] = []
         if matched_full_name:
-            clean_seeds.add(matched_full_name)
+            clean_seeds_list.append(matched_full_name)
         elif matched_speaker:
-            clean_seeds.add(matched_speaker)
+            clean_seeds_list.append(matched_speaker)
 
         for dt in matched_domain_terms:
-            clean_seeds.add(dt["term"])
+            if dt["term"] not in clean_seeds_list:
+                clean_seeds_list.append(dt["term"])
 
         for org in spacy_orgs_and_misc:
-            if org.lower() not in CONVERSATIONAL_STOPWORDS:
-                clean_seeds.add(org)
+            if org.lower() not in CONVERSATIONAL_STOPWORDS and org not in clean_seeds_list:
+                clean_seeds_list.append(org)
 
         for tok in clean_tokens:
             if tok not in CONVERSATIONAL_STOPWORDS and len(tok) >= 4:
-                clean_seeds.add(tok.capitalize())
+                cap_tok = tok.capitalize()
+                if cap_tok not in clean_seeds_list:
+                    clean_seeds_list.append(cap_tok)
 
         return ParsedHermesQuery(
             raw_query=raw_query,
@@ -205,9 +219,11 @@ class HermesQueryUnderstanding:
             target_speaker=matched_speaker,
             target_speaker_full_name=matched_full_name,
             domain_terms=matched_domain_terms,
-            clean_seed_entities=list(clean_seeds)[:6],
+            clean_seed_entities=clean_seeds_list[:10],
             is_recent=is_recent,
             is_today=is_today,
+            is_yesterday=is_yesterday,
+            time_filter_mode=time_filter_mode,
         )
 
 
