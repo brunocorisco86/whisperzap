@@ -123,38 +123,43 @@ class HermesAgentService:
             processing_time_ms=elapsed_ms,
         )
 
+    @staticmethod
+    def _normalize_action_item(item: dict | Any) -> dict | Any:
+        if not isinstance(item, dict):
+            return item
+        d = dict(item)
+        p = str(d.get("priority", "MEDIUM")).upper().strip()
+        if p in ("CRITICAL", "ALTA", "URGENTE", "IMMEDIATE", "URGENT"):
+            d["priority"] = "URGENT"
+        elif p in ("HIGH", "ALTA"):
+            d["priority"] = "HIGH"
+        elif p in ("LOW", "BAIXA"):
+            d["priority"] = "LOW"
+        else:
+            d["priority"] = "MEDIUM"
+        return d
+
     async def generate_daily_summary(
         self,
         target_date: str,
         messages: list[dict],
         tasks: list[dict],
     ) -> DailySummaryResponse:
-        """Gera o resumo executivo diário e o plano para o dia seguinte."""
+        """Gera o resumo executivo diário e o plano de ação para o dia seguinte."""
         start_time = time.perf_counter()
 
-        # Formata bloco de mensagens
-        if messages:
-            msg_lines = []
-            for m in messages:
-                speaker = m.get("speaker", "user")
-                intent = m.get("intent", "NOTE")
-                summary = m.get("summary") or m.get("revised_text", "")
-                msg_lines.append(f"- [{speaker}] ({intent}): {summary}")
-            messages_block = "\n".join(msg_lines)
-        else:
-            messages_block = "Nenhuma mensagem gravada neste dia."
+        # Extração de pendências reais
+        pending_tasks = [t for t in tasks if t.get("status") == "PENDING"]
+        unique_pending = list({t["title"]: t for t in pending_tasks}.keys())
 
-        # Formata bloco de tarefas
-        if tasks:
-            tsk_lines = []
-            for t in tasks:
-                status = t.get("status", "PENDING")
-                priority = t.get("priority", "MEDIUM")
-                assignee = f" (Responsável: {t.get('assignee')})" if t.get("assignee") else ""
-                tsk_lines.append(f"- [{status} - {priority}] {t.get('title')}{assignee}")
-            tasks_block = "\n".join(tsk_lines)
-        else:
-            tasks_block = "Nenhuma tarefa registrada no período."
+        # Monta prompt estruturado
+        messages_block = "\n".join(
+            [f"- [{m.get('speaker', 'Desconhecido')}]: {m.get('revised_text', m.get('raw_text', ''))}" for m in messages]
+        ) if messages else "Nenhuma mensagem gravada hoje."
+
+        tasks_block = "\n".join(
+            [f"- [{t.get('priority', 'MEDIUM')}] {t.get('title')} (Resp: {t.get('assignee', 'Não atribuído')})" for t in tasks]
+        ) if tasks else "Nenhuma tarefa registrada hoje."
 
         prompt = DAILY_SUMMARY_USER_TEMPLATE.format(
             target_date=target_date,
@@ -170,23 +175,13 @@ class HermesAgentService:
             )
             parsed = extract_json_payload(raw_response)
         except Exception as e:
-            logger.warning(f"Aviso no Resumo Diário da IA ({e}). Gerando síntese estruturada resiliente.")
-            from src.reports.daily import deduplicate_list
-
-            raw_events = [(m.get("summary") or m.get("revised_text") or "")[:80] for m in messages]
-            raw_done = [t.get("title", "") for t in tasks if t.get("status") == "DONE"]
-            raw_pending = [t.get("title", "") for t in tasks if t.get("status") == "PENDING"]
-
-            unique_events = deduplicate_list(raw_events)
-            unique_done = deduplicate_list(raw_done)
-            unique_pending = deduplicate_list(raw_pending)
-
+            logger.warning(f"Fallback no Resumo Diário devido a erro no LLM: {e}")
             parsed = {
-                "executive_summary": f"Resumo do dia {target_date} consolidado com {len(messages)} mensagens.",
-                "key_events": unique_events[:5],
+                "executive_summary": f"Resumo automático das atividades do dia {target_date}. Total de {len(messages)} mensagens registradas.",
+                "key_events": [],
                 "decisions": [],
                 "issues_and_blockers": [],
-                "completed_tasks": unique_done[:5],
+                "completed_tasks": [t["title"] for t in tasks if t.get("status") == "DONE"][:5],
                 "pending_tasks": unique_pending[:5],
                 "plan_for_tomorrow": [
                     {
@@ -201,7 +196,7 @@ class HermesAgentService:
             }
 
         plan_items = [
-            DailyActionItem(**item) if isinstance(item, dict) else item
+            DailyActionItem(**self._normalize_action_item(item)) if isinstance(item, dict) else item
             for item in parsed.get("plan_for_tomorrow", [])
         ]
 
@@ -298,7 +293,7 @@ class HermesAgentService:
             }
 
         sunday_plan = [
-            DailyActionItem(**item) if isinstance(item, dict) else item
+            DailyActionItem(**self._normalize_action_item(item)) if isinstance(item, dict) else item
             for item in parsed.get("sunday_strategic_plan", [])
         ]
 

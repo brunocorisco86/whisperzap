@@ -722,7 +722,7 @@
       <!-- Topology Diagram Box -->
       <div class="card mt-4">
         <div class="card-header">
-          <h2>🗺️ Euterpe — Mapa de Harmonia e Fluxo de Dados</h2>
+          <h2>🗺️ Euterpe — Mapa de Harmonia e Fluxo de Dados (Monólito Nativo)</h2>
         </div>
         <div class="topology-flow">
           <div class="flow-step">
@@ -734,27 +734,29 @@
           <div class="flow-step">
             <span class="step-num">2</span>
             <strong>Evolution API</strong>
-            <p>Raspberry Pi :8080</p>
+            <p>WhatsApp Baileys :8085</p>
           </div>
           <div class="flow-arrow">➔</div>
           <div class="flow-step">
             <span class="step-num">3</span>
-            <strong>n8n Orquestrador</strong>
-            <p>Raspberry Pi :5678</p>
+            <strong>Hermes Webhook Nativo</strong>
+            <p>FastAPI in-process :8000</p>
           </div>
           <div class="flow-arrow">➔</div>
           <div class="flow-step">
             <span class="step-num">4</span>
-            <strong>Hermes API + Whisper</strong>
-            <p>VPS Hostinger :8005</p>
+            <strong>Whisper + Gemini</strong>
+            <p>Transcrição & IA</p>
           </div>
           <div class="flow-arrow">➔</div>
           <div class="flow-step">
             <span class="step-num">5</span>
             <strong>Grafo & pgvector</strong>
-            <p>Persistência & RAG</p>
+            <p>Persistência RAG Híbrido</p>
           </div>
         </div>
+      </div>
+
       <!-- Euterpe Environments & Configuration Hub -->
       <div class="card mt-4" id="euterpe-environments-panel">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 1rem;">
@@ -763,7 +765,7 @@
               🎛️ Euterpe — Central de Ambientes & Consoles de Configuração
             </h2>
             <p class="text-muted" style="font-size: 0.85rem; margin-top: 0.25rem;">
-              Acesso direto, documentação e monitoramento de consoles dos serviços orquestrados (Evolution API, n8n, FastAPI Swagger, PostgreSQL, Auditoria e WhatsApp).
+              Acesso direto, documentação e monitoramento de consoles dos serviços orquestrados (Evolution API, Webhook Nativo, n8n, FastAPI Swagger, PostgreSQL, Auditoria e WhatsApp).
             </p>
           </div>
           <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -775,7 +777,7 @@
 
         <div class="env-hub-grid" style="padding: 1.25rem;">
           
-          <!-- Card: Evolution API -->
+          <!-- Card: Evolution API & Manager -->
           <div class="env-card">
             <div class="env-card-header">
               <div class="env-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">🟢</div>
@@ -799,19 +801,40 @@
             </div>
           </div>
 
+          <!-- Card: Native Webhook & WhatsApp Engine -->
+          <div class="env-card">
+            <div class="env-card-header">
+              <div class="env-icon" style="background: rgba(14, 165, 233, 0.15); color: #0ea5e9; border: 1px solid rgba(14, 165, 233, 0.3);">⚡</div>
+              <div class="env-header-text">
+                <h3 class="env-title">Webhook Nativo (Monólito)</h3>
+                <span class="env-badge badge-active">FastAPI /api/v1/whatsapp</span>
+              </div>
+            </div>
+            <p class="env-desc">Motor in-process em Python para processamento direto de áudios WhatsApp, Whisper, AI Gateway e persistência sem intermediários.</p>
+            <div class="env-meta">
+              <span><strong>Endpoint:</strong> /api/v1/whatsapp/webhook</span>
+              <span><strong>Latência:</strong> In-Process (~0ms overhead)</span>
+            </div>
+            <div class="env-actions">
+              <a href="/docs#/WhatsApp%20%26%20Webhooks" target="_blank" class="btn btn-secondary btn-sm env-btn" title="Ver documentação dos endpoints nativos do WhatsApp">
+                📑 Endpoints WhatsApp
+              </a>
+            </div>
+          </div>
+
           <!-- Card: n8n Workflow Automation -->
           <div class="env-card">
             <div class="env-card-header">
-              <div class="env-icon" style="background: rgba(234, 88, 12, 0.15); color: #f97316; border: 1px solid rgba(234, 88, 12, 0.3);">⚡</div>
+              <div class="env-icon" style="background: rgba(234, 88, 12, 0.15); color: #f97316; border: 1px solid rgba(234, 88, 12, 0.3);">🧩</div>
               <div class="env-header-text">
                 <h3 class="env-title">n8n Orchestrator</h3>
-                <span class="env-badge badge-active">Porta 5678</span>
+                <span class="env-badge badge-active">Porta 5678 (Opcional)</span>
               </div>
             </div>
-            <p class="env-desc">Orquestrador de fluxos visuais, webhooks de áudio, integração com Evolution API e cron jobs agendados.</p>
+            <p class="env-desc">Orquestrador visual para fluxos complexos, integrações externas customizadas e automações adicionais.</p>
             <div class="env-meta">
-              <span><strong>Workflow Mestre:</strong> WhatsApp Voice Hub</span>
-              <span><strong>Automações:</strong> Ativas</span>
+              <span><strong>Status:</strong> Standalone / Opcional</span>
+              <span><strong>Console:</strong> Web UI :5678</span>
             </div>
             <div class="env-actions">
               <a href="http://179.197.73.80:5678" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm env-btn" style="border-color: #f97316; color: #fdba74;" title="Acessar painel web do n8n">

@@ -5,7 +5,7 @@
   "nodes": [
     {
       "category": "PERSON",
-      "mentions": 400,
+      "mentions": 404,
       "role": "UNKNOWN",
       "phone": "",
       "company": "",
@@ -14,7 +14,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 502,
+      "mentions": 510,
       "details": "Contato de trabalho",
       "role": "UNKNOWN",
       "phone": "",
@@ -24,19 +24,19 @@
     },
     {
       "category": "EQUIPMENT",
-      "mentions": 425,
+      "mentions": 428,
       "details": "Armazenamento de ração",
       "id": "Silo 3"
     },
     {
       "category": "LOCATION",
-      "mentions": 818,
+      "mentions": 819,
       "details": "Cooperativa",
       "id": "C.Vale"
     },
     {
       "category": "SYSTEM",
-      "mentions": 404,
+      "mentions": 406,
       "details": "Ficha de Acompanhamento de Lote",
       "id": "FAL"
     },
@@ -52,7 +52,7 @@
     },
     {
       "category": "LOCATION",
-      "mentions": 109,
+      "mentions": 110,
       "details": "Mtech Systems",
       "id": "Mtech"
     },
@@ -306,17 +306,17 @@
     },
     {
       "category": "PERSON",
-      "mentions": 46,
+      "mentions": 49,
       "role": "UNKNOWN",
       "phone": "",
       "company": "",
       "weight": 0.4,
-      "details": "Remetente da solicitação",
+      "details": "Remetente da mensagem",
       "id": "Ailton"
     },
     {
-      "category": "CONCEPT",
-      "mentions": 6,
+      "category": "EQUIPMENT",
+      "mentions": 7,
       "details": "Local de trabalho de interesse",
       "id": "Aviário"
     },
@@ -3124,8 +3124,8 @@
     },
     {
       "category": "SYSTEM",
-      "mentions": 3,
-      "details": "Plataforma digital de relacionamento e gestão para produtores integrados",
+      "mentions": 4,
+      "details": "Plataforma digital de relacionamento e gestão para produtores",
       "id": "eProdutor"
     },
     {
@@ -9172,7 +9172,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 14,
+      "mentions": 17,
       "role": "UNKNOWN",
       "phone": "554499722779",
       "company": "C.Vale",
@@ -23252,18 +23252,18 @@
     },
     {
       "category": "PERSON",
-      "mentions": 268,
+      "mentions": 276,
       "role": "OWNER",
       "phone": "554497604925",
       "company": "Hermes Memory / Homelab",
       "weight": 1.0,
       "can_generate_tasks": false,
-      "last_interaction_at": null,
+      "last_interaction_at": "2026-08-23T02:20:34.140163",
       "id": "Bruno Conter"
     },
     {
       "category": "LOCATION",
-      "mentions": 201,
+      "mentions": 207,
       "id": "Hermes Memory / Homelab"
     },
     {
@@ -23279,25 +23279,25 @@
     },
     {
       "category": "PERSON",
-      "mentions": 144,
+      "mentions": 148,
       "role": "COLLEAGUE",
       "phone": "5544999990002",
       "company": null,
       "weight": 0.7,
       "can_generate_tasks": true,
-      "last_interaction_at": "2026-08-23T01:41:57.564707",
+      "last_interaction_at": "2026-08-23T02:20:27.001901",
       "id": "Contato Sem Permissao"
     },
     {
       "category": "PERSON",
-      "mentions": 36,
-      "last_interaction_at": "2026-06-24T01:41:58.003303+00:00",
+      "mentions": 37,
+      "last_interaction_at": "2026-06-24T02:20:27.458264+00:00",
       "id": "Contato Inativo Antigo"
     },
     {
       "category": "PERSON",
-      "mentions": 36,
-      "last_interaction_at": "2026-08-21T01:41:58.003303+00:00",
+      "mentions": 37,
+      "last_interaction_at": "2026-08-21T02:20:27.458264+00:00",
       "id": "Contato Ativo Recente"
     },
     {
@@ -23346,7 +23346,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 17,
+      "mentions": 18,
       "role": "UNKNOWN",
       "phone": "5544991234567",
       "company": "C.Vale Cooperativa",
@@ -23357,12 +23357,12 @@
     },
     {
       "category": "LOCATION",
-      "mentions": 17,
+      "mentions": 18,
       "id": "C.Vale Cooperativa"
     },
     {
       "category": "PERSON",
-      "mentions": 17,
+      "mentions": 18,
       "role": "UNKNOWN",
       "phone": "5544998887766",
       "company": "Mtech",
@@ -23378,12 +23378,12 @@
     },
     {
       "category": "PERSON",
-      "mentions": 12,
+      "mentions": 15,
       "id": "Lucas Gerente"
     },
     {
       "category": "PERSON",
-      "mentions": 6,
+      "mentions": 7,
       "id": "Fernando Varolo"
     },
     {
@@ -23405,25 +23405,25 @@
   "links": [
     {
       "relation": "DELEGATED_TO",
-      "weight": 370.0,
+      "weight": 374.0,
       "source": "Bruno",
       "target": "João"
     },
     {
       "relation": "MENTIONED",
-      "weight": 307.0,
+      "weight": 309.0,
       "source": "Bruno",
       "target": "Silo 3"
     },
     {
       "relation": "MENTIONED",
-      "weight": 276.0,
+      "weight": 277.0,
       "source": "Bruno",
       "target": "C.Vale"
     },
     {
       "relation": "MENTIONED",
-      "weight": 304.0,
+      "weight": 306.0,
       "source": "Bruno",
       "target": "FAL"
     },
@@ -23447,7 +23447,7 @@
     },
     {
       "relation": "CO_OCCURRED",
-      "weight": 395.0,
+      "weight": 400.0,
       "source": "João",
       "target": "Silo 3"
     },
@@ -23459,7 +23459,7 @@
     },
     {
       "relation": "ASSIGNED_WITH",
-      "weight": 371.0,
+      "weight": 375.0,
       "source": "João",
       "target": "FAL"
     },
@@ -23477,7 +23477,7 @@
     },
     {
       "relation": "CO_OCCURRED",
-      "weight": 404.0,
+      "weight": 406.0,
       "source": "Silo 3",
       "target": "FAL"
     },
@@ -23909,7 +23909,7 @@
     },
     {
       "relation": "WORKS_ON",
-      "weight": 17.0,
+      "weight": 20.0,
       "source": "Ailton",
       "target": "Aviário"
     },
@@ -24160,8 +24160,8 @@
       "target": "eProdutor"
     },
     {
-      "relation": "HAS_PROBLEM",
-      "weight": 1.0,
+      "relation": "DEPENDS_ON",
+      "weight": 2.0,
       "source": "eProdutor",
       "target": "soft delete"
     },
@@ -25061,7 +25061,7 @@
     },
     {
       "relation": "AFFILIATED_AS_OWNER",
-      "weight": 201.0,
+      "weight": 207.0,
       "source": "Bruno Conter",
       "target": "Hermes Memory / Homelab"
     },
@@ -25085,7 +25085,7 @@
     },
     {
       "relation": "MENTIONED",
-      "weight": 20.0,
+      "weight": 21.0,
       "source": "Contato Sem Permissao",
       "target": "Silo 3"
     },
@@ -25103,13 +25103,13 @@
     },
     {
       "relation": "MENTIONED",
-      "weight": 19.0,
+      "weight": 20.0,
       "source": "Contato Sem Permissao",
       "target": "João"
     },
     {
       "relation": "SUPERVISES",
-      "weight": 36.0,
+      "weight": 37.0,
       "source": "Contato Ativo Recente",
       "target": "Granja Central"
     },
@@ -25127,25 +25127,25 @@
     },
     {
       "relation": "AFFILIATED_AS_UNKNOWN",
-      "weight": 17.0,
+      "weight": 18.0,
       "source": "Produtor Teste Euterpe",
       "target": "C.Vale Cooperativa"
     },
     {
       "relation": "AFFILIATED_AS_UNKNOWN",
-      "weight": 17.0,
+      "weight": 18.0,
       "source": "Veterinario Pipeline Teste",
       "target": "Mtech"
     },
     {
       "relation": "CO_OCCURRED",
-      "weight": 2.0,
+      "weight": 4.0,
       "source": "Lucas Gerente",
       "target": "eProdutor"
     },
     {
       "relation": "DEPENDS_ON",
-      "weight": 1.0,
+      "weight": 2.0,
       "source": "Peça Crítico",
       "target": "Colaborador Ausente"
     }
