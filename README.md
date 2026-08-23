@@ -80,8 +80,8 @@ O sistema opera em uma arquitetura distribuída, desacoplada e 100% conteineriza
 flowchart TD
     subgraph IngestionLayer["1. Ingestão & Conectividade WhatsApp"]
         WA["📱 WhatsApp / Mensagens de Voz & Texto"]
-        EVO["⚡ Evolution API v2 (Instância WhatsApp / Baileys)"]
-        N8N["🔄 n8n Master Orchestrator (Filtros, Media Download & Rotas)"]
+        EVO["⚡ Evolution API v2 (Baileys Engine)"]
+        WEBHOOK["⚡ Webhook Nativo em Python (FastAPI / In-Process)"]
     end
 
     subgraph APILayer["2. Motor de IA & Core Engine (FastAPI)"]
@@ -92,7 +92,7 @@ flowchart TD
     end
 
     subgraph StorageLayer["3. Memória em Camadas & Persistência"]
-        PG[("🐘 PostgreSQL 16 + pgvector (Embeddings & SQL)")]
+        PG[("🐘 PostgreSQL 16 + pgvector (Embeddings & SQL Único)")]
         NX[("🕸️ NetworkX Knowledge Graph (hermes_graph.json)")]
         REDIS[("⚡ Redis 7 (Filas e Cache de Mensageria)")]
         CONTACTS[("👥 Tabela de Contatos, Papéis & Favoritos")]
@@ -102,19 +102,19 @@ flowchart TD
         JANITOR["🧹 Zeladora (Graph Janitor - Faxina Semanal)"]
         HARVESTER["🎣 Pescador Léxico (Harvester Diário)"]
         SENTIMENT["🌡️ Consolidador Emocional (Timeline de Humor)"]
-        HERMES_RAG["🧠 Hermes RAG Híbrido (Q&A Contextual)"]
+        HERMES_RAG["🧠 Hermes / Mnemosine RAG Híbrido (Q&A Contextual)"]
     end
 
     subgraph Interfaces["5. Interfaces & Visualização Executiva"]
-        HUB["🖥️ Hermes Web Control Hub (Glassmorphism UI)"]
+        HUB["🖥️ Control Hub (Glassmorphism UI)"]
         QR_PAGE["📱 /whatsapp-qr (Painel Reativo de Pareamento)"]
         DASH["📊 Analytics & Heatmap 24x7 (Chart.js)"]
         GRAPH_VIZ["🌐 Visualizador Interativo de Grafos (Graphify AST)"]
     end
 
     WA --> EVO
-    EVO --> N8N
-    N8N --> WHISPER
+    EVO --> WEBHOOK
+    WEBHOOK --> WHISPER
     WHISPER --> BYPASS
     BYPASS --> AIGATEWAY
     LEXICAL --> AIGATEWAY
@@ -130,9 +130,9 @@ flowchart TD
 | **API Framework** | FastAPI + Uvicorn | Servidor assíncrono de alto throughput com OpenAPI e endpoints RESTful |
 | **Transcrição Local** | Faster-Whisper (CTranslate2) | Transcrição ultra-rápida de áudio (OGG/MP3/WAV/Base64) em CPU/GPU |
 | **AI Gateway** | Google Gemini 3.1 Flash-Lite / 3.7 Flash | Extração de entidades (`NER`), classificação de intenções e RAG Híbrido |
-| **Banco Relacional & Vetorial** | PostgreSQL 16 + pgvector | Persistência de mensagens, contatos, tarefas e busca semântica por cosseno |
+| **Banco Relacional & Vetorial** | PostgreSQL 16 + pgvector | Persistência unificada de mensagens, contatos, tarefas e embeddings |
 | **Grafo Relacional** | NetworkX + Graphify | Modelagem de conexões inter-pessoais, detecção de comunidades e clusterização |
-| **Orquestração & Mensageria** | n8n + Evolution API v2 | Ingestão de webhooks, download de mídia e bloqueio preliminar de grupos |
+| **Orquestração & Mensageria** | Webhook Nativo Python + Evolution API v2 | Ingestão in-process, download de mídia, zero latência e sem intermediários |
 | **Interface & Analytics** | Vanilla JS + Glassmorphism CSS + Tailwind | Painel executivo responsivo e página reativa `/whatsapp-qr` |
 | **Proxy Reverso & SSL** | Caddy v2 / K8s Ingress | Terminação TLS automática com HTTP/2 e compressão Gzip/Zstandard |
 
