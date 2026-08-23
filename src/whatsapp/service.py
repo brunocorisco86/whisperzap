@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from src.config import settings
 from src.transcriber.service import whisper_service
 from src.ai_gateway.providers import get_ai_provider
-from src.ai_gateway.prompts import REVISE_USER_TEMPLATE
+from src.ai_gateway.prompts import REVISE_USER_TEMPLATE, REVISE_SYSTEM_PROMPT
 from src.ai_gateway.bypass import is_owner_interaction
 from src.memory.repository import memory_repository
 from src.memory.models import MessageCreate, TaskRecord
@@ -271,6 +271,7 @@ class WhatsAppService:
                     )
                     revised_text = await provider.generate_text(
                         prompt=prompt,
+                        system_instruction=REVISE_SYSTEM_PROMPT,
                         temperature=0.1,
                     )
                 except Exception as e:
