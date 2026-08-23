@@ -23252,7 +23252,7 @@
     },
     {
       "category": "PERSON",
-      "mentions": 284,
+      "mentions": 288,
       "role": "OWNER",
       "phone": "554497604925",
       "company": "Hermes Memory / Homelab",
@@ -23264,7 +23264,7 @@
     },
     {
       "category": "LOCATION",
-      "mentions": 209,
+      "mentions": 210,
       "id": "Hermes Memory / Homelab"
     },
     {
@@ -23415,7 +23415,7 @@
     },
     {
       "category": "CONCEPT",
-      "mentions": 1,
+      "mentions": 2,
       "details": "Entidade externa de suprimentos",
       "id": "Fornecedor de Ração"
     }
@@ -25079,7 +25079,7 @@
     },
     {
       "relation": "AFFILIATED_AS_OWNER",
-      "weight": 209.0,
+      "weight": 210.0,
       "source": "Bruno Conter",
       "target": "Hermes Memory / Homelab"
     },
@@ -25115,7 +25115,7 @@
     },
     {
       "relation": "RESPONSIBLE_FOR",
-      "weight": 4.0,
+      "weight": 8.0,
       "source": "Bruno Conter",
       "target": "Fornecedor de Ração"
     },
