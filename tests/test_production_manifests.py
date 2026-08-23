@@ -38,6 +38,23 @@ def test_docker_compose_structure():
     assert "hermes-network" in content
 
 
+def test_monolith_compose_structure():
+    """Valida se o docker-compose.monolith.yml consolida banco único, webhook e Caddy sem n8n."""
+    root_dir = Path(__file__).parent.parent
+    monolith_file = root_dir / "docker-compose.monolith.yml"
+
+    assert monolith_file.exists(), "docker-compose.monolith.yml não encontrado"
+    content = monolith_file.read_text(encoding="utf-8")
+
+    assert "hermes-db:" in content
+    assert "hermes-redis:" in content
+    assert "hermes-evolution-api:" in content
+    assert "hermes-api:" in content
+    assert "hermes-caddy:" in content
+    assert "WEBHOOK_GLOBAL_URL: http://hermes-api:8000/api/v1/whatsapp/webhook" in content
+    assert "hermes-n8n" not in content
+
+
 def test_caddyfile_structure():
     """Valida se o Caddyfile está configurado para proxy reverso da API com cabeçalhos de segurança."""
     root_dir = Path(__file__).parent.parent

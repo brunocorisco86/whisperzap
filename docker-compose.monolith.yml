@@ -1,0 +1,161 @@
+# ==============================================================================
+# Docker Compose — Hermes Monolith Appliance (Produção Enxuta VPS & SaaS)
+# ==============================================================================
+# Consolida todos os serviços essenciais (FastAPI + Whisper + Webhook Nativo +
+# Evolution API + PostgreSQL 16 pgvector + Redis + Caddy) eliminando n8n e
+# bancos duplicados para atingir consumo mínimo de RAM (~400MB).
+# ==============================================================================
+
+services:
+  # ==============================================================================
+  # 1. Banco de Dados Unificado (PostgreSQL 16 + pgvector)
+  # ==============================================================================
+  hermes-db:
+    image: pgvector/pgvector:pg16
+    container_name: hermes-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-hermes_voice_memory}
+    volumes:
+      - hermes_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-hermes_voice_memory}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hermes_monolith_network
+
+  # ==============================================================================
+  # 2. Redis (Cache e Filas para a Evolution API)
+  # ==============================================================================
+  hermes-redis:
+    image: redis:7-alpine
+    container_name: hermes-redis
+    restart: unless-stopped
+    volumes:
+      - hermes_redis_data:/data
+    networks:
+      - hermes_monolith_network
+
+  # ==============================================================================
+  # 3. Evolution API v2 (WhatsApp Baileys Engine com Webhook Nativo)
+  # ==============================================================================
+  hermes-evolution-api:
+    image: evoapicloud/evolution-api:latest
+    container_name: hermes-evolution-api
+    restart: unless-stopped
+    ports:
+      - "8085:8080"
+    environment:
+      SERVER_TYPE: http
+      SERVER_PORT: 8080
+      SERVER_URL: http://localhost:8080
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-8c114ae397eb273edfe82e05728be8b4e17cc25649d7e26df40c438c67c368b0}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_dev_password}@hermes-db:5432/${POSTGRES_DB:-hermes_voice_memory}?schema=evolution_api
+      DATABASE_CONNECTION_CLIENT_NAME: hermes_evolution
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "true"
+      DATABASE_SAVE_DATA_CONTACTS: "true"
+      REDIS_ENABLED: "true"
+      REDIS_URI: redis://hermes-redis:6379
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://hermes-redis:6379
+      LOG_LEVEL: ERROR,WARN,INFO
+      CONFIG_SESSION_PHONE_CLIENT: "Hermes Voice Memory"
+      # Webhook Global apontando diretamente para o endpoint nativo do FastAPI
+      WEBHOOK_GLOBAL_URL: http://hermes-api:8000/api/v1/whatsapp/webhook
+      WEBHOOK_GLOBAL_ENABLED: "true"
+      WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS: "false"
+      WEBHOOK_EVENTS_MESSAGES_UPSERT: "true"
+    depends_on:
+      hermes-db:
+        condition: service_healthy
+      hermes-redis:
+        condition: service_started
+    volumes:
+      - hermes_evolution_instances:/evolution/instances
+    networks:
+      - hermes_monolith_network
+
+  # ==============================================================================
+  # 4. Hermes Core API (FastAPI + Whisper + AI Gateway + UI Dashboard)
+  # ==============================================================================
+  hermes-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: whisperzap-hermes-api:latest
+    container_name: hermes-api
+    restart: unless-stopped
+    ports:
+      - "8005:8000"
+    environment:
+      ENVIRONMENT: production
+      LOG_LEVEL: INFO
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_dev_password}@hermes-db:5432/${POSTGRES_DB:-hermes_voice_memory}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      AI_PROVIDER: ${AI_PROVIDER:-gemini}
+      AI_DEFAULT_MODEL: ${AI_DEFAULT_MODEL:-gemini-3.1-flash-lite}
+      EVOLUTION_API_URL: http://hermes-evolution-api:8080
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-8c114ae397eb273edfe82e05728be8b4e17cc25649d7e26df40c438c67c368b0}
+      EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-hermes}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-blurbang}
+      DASHBOARD_AUTH_ENABLED: "true"
+    depends_on:
+      hermes-db:
+        condition: service_healthy
+      hermes-evolution-api:
+        condition: service_started
+    volumes:
+      - hermes_app_data:/app/data
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+    networks:
+      - hermes_monolith_network
+
+  # ==============================================================================
+  # 5. Caddy (Reverse Proxy com HTTPS Automático)
+  # ==============================================================================
+  hermes-caddy:
+    image: caddy:2-alpine
+    container_name: hermes-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      HERMES_DOMAIN: ${HERMES_DOMAIN:-:80}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@homelab.local}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - hermes-api
+    networks:
+      - hermes_monolith_network
+
+volumes:
+  hermes_db_data:
+    name: hermes_monolith_db_data
+  hermes_redis_data:
+    name: hermes_monolith_redis_data
+  hermes_evolution_instances:
+    name: hermes_monolith_evolution_instances
+  hermes_app_data:
+    name: hermes_monolith_app_data
+  caddy_data:
+    name: hermes_monolith_caddy_data
+  caddy_config:
+    name: hermes_monolith_caddy_config
+
+networks:
+  hermes_monolith_network:
+    name: hermes_monolith_network
+    driver: bridge

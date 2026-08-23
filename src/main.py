@@ -13,6 +13,7 @@ from src.contacts.router import router as contacts_router
 from src.analytics.router import router as analytics_router
 from src.web.router import router as web_router, STATIC_DIR
 from src.audit.router import router as audit_router
+from src.whatsapp.router import router as whatsapp_router
 from src.audit.service import log_event
 from src.memory.database import init_db
 from src.scheduler.cron_service import start_scheduler, stop_scheduler
@@ -100,6 +101,7 @@ app.include_router(memory_router)
 app.include_router(contacts_router)
 app.include_router(analytics_router)
 app.include_router(audit_router)
+app.include_router(whatsapp_router)
 
 
 
