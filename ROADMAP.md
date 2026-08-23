@@ -202,26 +202,27 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [CONCLUÍDO]
 
 ---
 
-## 🏗️ Fase 8: Monólito Hermes Unificado (Appliance Pessoal de Baixo Consumo) [EM PLANEJAMENTO]
+## 🏗️ Fase 8: Monólito Hermes Unificado (Appliance Pessoal de Baixo Consumo) [CONCLUÍDO]
 
 **Objetivo Central:** Consolidar a stack da VPS em um monólito enxuto e hiper-rápido, eliminando dependências externas desnecessárias (n8n, múltiplos daemons PostgreSQL) e reduzindo a pegada de RAM para menos de ~400 MB.
 
-- [ ] **8.1 Unificação do Banco de Dados PostgreSQL 16 + pgvector**:
-  - Migrar a persistência da Evolution API para o banco principal `hermes-db` utilizando o schema isolado `evolution_api`.
-  - Desativar o contêiner redundante `hermes-evolution-postgres` (economia imediata de ~100 MB RAM).
-- [ ] **8.2 Webhook Nativo WhatsApp no FastAPI (Substituição Completa do n8n)**:
-  - Implementar o endpoint `POST /api/v1/webhook/evolution` em Python.
-  - Orquestração in-process: Recepção do webhook Baileys ➔ Download do áudio em memória ➔ Transcrição rápida (Whisper) ➔ AI Gateway (Gemini 3.1 Flash-Lite) ➔ Persistência no Postgres/Grafo ➔ Resposta de volta no WhatsApp via REST da Evolution.
-  - Fila assíncrona com `asyncio.Queue` / Background Tasks para absorver rajadas de áudio sem travar a API.
-- [ ] **8.3 Scheduler Interno Integrado (APScheduler em Python)**:
+- [x] **8.1 Unificação do Banco de Dados PostgreSQL 16 + pgvector**:
+  - Migrada a persistência da Evolution API para a instância principal `hermes-db` (banco `evolution_db` e schema `evolution_api` com 29.875 mensagens restauradas).
+  - Desativado o contêiner redundante `hermes-evolution-postgres` (economia de ~100 MB RAM).
+- [x] **8.2 Webhook Nativo WhatsApp no FastAPI (Substituição Completa do n8n)**:
+  - Implementado o endpoint `POST /api/v1/whatsapp/webhook` em Python.
+  - Orquestração in-process: Recepção do webhook Baileys ➔ Download do áudio ➔ Transcrição rápida (Whisper) ➔ AI Gateway (Gemini 3.1 Flash-Lite) ➔ Persistência no Postgres/Grafo ➔ Resposta de volta no WhatsApp via REST da Evolution.
+  - Captura Inteligente de Notas e Tarefas Pessoais (*Self-Memos*) e Persona calibrada no tom ágil e perspicaz (estilo Zagreus / Peter Parker).
+- [x] **8.3 Scheduler Interno Integrado (APScheduler em Python)**:
   - Consolidar todos os crons que rodavam no n8n diretamente no `src/scheduler/cron_service.py`:
-    - Relatório Diário de Fechamento (21:00);
-    - Análise Estratégica Semanal de Domingo (20:00);
+    - Relatório Diário com envio automático no WhatsApp (18:00);
+    - Análise Estratégica Semanal de Domingo com envio no WhatsApp (20:00);
     - Pescador Léxico (19:00);
+    - Descoberta Semanal de Modelos de IA (Domingo 02:00);
     - Faxina da Zeladora no Grafo (Domingo 23:00).
-- [ ] **8.4 Compose Monolítico Funcional Pessoal (`docker-compose.monolith.yml`)**:
-  - Stack enxuta com apenas 3 serviços: `hermes-app` (FastAPI + UI + Whisper), `hermes-evolution-api` e `hermes-db` (Postgres 16 + pgvector), expostos via Caddy SSL.
-  - Testes de carga e validação de áudios reais na VPS com monitoramento de RAM.
+- [x] **8.4 Compose Monolítico Funcional Pessoal (`docker-compose.monolith.yml`)**:
+  - Stack enxuta consolidada: `hermes-api`, `hermes-evolution-api`, `hermes-redis`, `hermes-db` e `hermes-caddy`.
+  - Testes unitários, de integração e validação real com mensagens e áudios na VPS.
 
 ---
 
