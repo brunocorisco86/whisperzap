@@ -200,6 +200,50 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [CONCLUÍDO]
 - [x] Endpoints `POST /api/v1/memory/graph/clean` e `GET /api/v1/memory/graph/janitor/logs`.
 - [x] Suíte de testes automatizados [`tests/test_graph_janitor.py`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/tests/test_graph_janitor.py).
 
+---
+
+## 🏗️ Fase 8: Monólito Hermes Unificado (Appliance Pessoal de Baixo Consumo) [EM PLANEJAMENTO]
+
+**Objetivo Central:** Consolidar a stack da VPS em um monólito enxuto e hiper-rápido, eliminando dependências externas desnecessárias (n8n, múltiplos daemons PostgreSQL) e reduzindo a pegada de RAM para menos de ~400 MB.
+
+- [ ] **8.1 Unificação do Banco de Dados PostgreSQL 16 + pgvector**:
+  - Migrar a persistência da Evolution API para o banco principal `hermes-db` utilizando o schema isolado `evolution_api`.
+  - Desativar o contêiner redundante `hermes-evolution-postgres` (economia imediata de ~100 MB RAM).
+- [ ] **8.2 Webhook Nativo WhatsApp no FastAPI (Substituição Completa do n8n)**:
+  - Implementar o endpoint `POST /api/v1/webhook/evolution` em Python.
+  - Orquestração in-process: Recepção do webhook Baileys ➔ Download do áudio em memória ➔ Transcrição rápida (Whisper) ➔ AI Gateway (Gemini 3.1 Flash-Lite) ➔ Persistência no Postgres/Grafo ➔ Resposta de volta no WhatsApp via REST da Evolution.
+  - Fila assíncrona com `asyncio.Queue` / Background Tasks para absorver rajadas de áudio sem travar a API.
+- [ ] **8.3 Scheduler Interno Integrado (APScheduler em Python)**:
+  - Consolidar todos os crons que rodavam no n8n diretamente no `src/scheduler/cron_service.py`:
+    - Relatório Diário de Fechamento (21:00);
+    - Análise Estratégica Semanal de Domingo (20:00);
+    - Pescador Léxico (19:00);
+    - Faxina da Zeladora no Grafo (Domingo 23:00).
+- [ ] **8.4 Compose Monolítico Funcional Pessoal (`docker-compose.monolith.yml`)**:
+  - Stack enxuta com apenas 3 serviços: `hermes-app` (FastAPI + UI + Whisper), `hermes-evolution-api` e `hermes-db` (Postgres 16 + pgvector), expostos via Caddy SSL.
+  - Testes de carga e validação de áudios reais na VPS com monitoramento de RAM.
+
+---
+
+## 🚀 Fase 9: Empacotamento SaaS Multi-Tenant & Provisionamento de Clientes [FUTURO]
+
+**Objetivo Central:** Transformar o Monólito Hermes em um produto SaaS B2B onde cada cliente contratante recebe sua própria instância isolada ("Single-Tenant Appliance") com subdomínio próprio, sem risco de vazamento de dados.
+
+- [ ] **9.1 Parametrização e Isolamento por Tenant (`.env.tenant`)**:
+  - Variáveis configuráveis por cliente: `TENANT_ID`, `TENANT_NAME`, `WHATSAPP_INSTANCE`, `LLM_API_KEY`, `DASHBOARD_PASSWORD`, `DATABASE_SCHEMA`.
+  - Estrutura de volumes isolados no disco: `/data/tenants/{tenant_id}/` (banco de dados, áudios, grafo).
+- [ ] **9.2 Personalização White-Label no Control Hub**:
+  - Suporte a logo personalizado da empresa cliente, nome do assistente (ex: "Assistente Granja Patel") e cores customizadas no cabeçalho.
+- [ ] **9.3 Script de Provisionamento Automático de Clientes (`scripts/create_tenant.sh`)**:
+  - Script CLI com um comando para criar novos clientes:
+    - Cria diretórios e gera `.env` do cliente;
+    - Registra subdomínio com HTTPS automático no Caddy (`cliente.seusaas.com`);
+    - Inicializa os contêineres do cliente em portas dinâmicas ou rede isolada;
+    - Gera o QR Code de ativação do WhatsApp para o cliente escanear.
+- [ ] **9.4 Cockpit Master de Administração (Admin Hub)**:
+  - Painel administrativo central para visualizar todos os tenants ativos, status de conexão do WhatsApp de cada cliente, saúde dos contêineres e consumo total de tokens LLM.
+
+
 
 
 
