@@ -16,7 +16,6 @@ import httpx
 from sqlalchemy.orm import Session
 
 from src.config import settings
-from src.contacts.service import get_evolution_working_proxy, invalidate_evolution_proxy_cache
 from src.transcriber.service import whisper_service
 from src.ai_gateway.providers import get_ai_provider
 from src.ai_gateway.prompts import REVISE_USER_TEMPLATE
@@ -70,9 +69,7 @@ class WhatsAppService:
             "text": text.strip(),
         }
 
-        proxy = await get_evolution_working_proxy()
-        base_url = proxy.rstrip("/") if proxy else self.api_url
-        target_url = f"{base_url}/message/sendText/{self.instance}"
+        target_url = f"{self.api_url}/message/sendText/{self.instance}"
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -82,7 +79,6 @@ class WhatsAppService:
                     return True
                 logger.error(f"Erro ao enviar mensagem WhatsApp ({resp.status_code}): {resp.text}")
         except Exception as exc:
-            invalidate_evolution_proxy_cache()
             logger.error(f"Exceção ao enviar mensagem WhatsApp para {clean_number}: {exc}")
 
         return False
@@ -109,9 +105,7 @@ class WhatsAppService:
             "convertToMp4": False,
         }
 
-        proxy = await get_evolution_working_proxy()
-        base_url = proxy.rstrip("/") if proxy else self.api_url
-        target_url = f"{base_url}/chat/getBase64FromMediaMessage/{self.instance}"
+        target_url = f"{self.api_url}/chat/getBase64FromMediaMessage/{self.instance}"
 
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
@@ -123,7 +117,6 @@ class WhatsAppService:
                         return base64_val
                 logger.warning(f"Falha ao obter mídia base64 ({resp.status_code}): {resp.text[:150]}")
         except Exception as exc:
-            invalidate_evolution_proxy_cache()
             logger.error(f"Exceção ao baixar mídia base64 ({message_id}): {exc}")
 
         return None
@@ -205,6 +198,12 @@ class WhatsAppService:
             logger.debug(f"Mídia ignorada ({info['key_id']}).")
             return {"status": "ignored", "reason": "ignorable_media_type"}
 
+        # 3. Prevenção de loop de eco de respostas geradas pelo próprio bot
+        raw_text = info["text"]
+        if raw_text.startswith("🎙️ *Transcrição:*") or raw_text.startswith("🎙️ Transcrição:") or raw_text.startswith("Salve,"):
+            logger.debug("Mensagem do bot descartada para evitar eco.")
+            return {"status": "ignored", "reason": "bot_echo_response"}
+
         should_close = False
         if db is None:
             db = SessionLocal()
@@ -239,7 +238,7 @@ class WhatsAppService:
 
                 try:
                     # 1. Transcrição Whisper com priming e prosódia
-                    raw_text, lang, prob, duration, segments, prosody = await whisper_service.transcribe_audio(
+                    raw_text_audio, lang, prob, duration, segments, prosody = await whisper_service.transcribe_audio(
                         audio_path_or_file=tmp_path,
                         language="pt",
                         speaker=info["push_name"],
@@ -251,16 +250,16 @@ class WhatsAppService:
                         except Exception:
                             pass
 
-                if not raw_text or not raw_text.strip():
+                if not raw_text_audio or not raw_text_audio.strip():
                     logger.warning("Áudio sem fala identificável.")
                     return {"status": "processed", "type": "audio", "text": "", "reason": "empty_transcription"}
 
                 # 2. Revisão Contextual via AI Gateway
-                revised_text = raw_text
+                revised_text = raw_text_audio
                 try:
                     provider = get_ai_provider(task="revise")
                     prompt = REVISE_USER_TEMPLATE.format(
-                        raw_text=raw_text.strip(),
+                        raw_text=raw_text_audio.strip(),
                         context_block=f"Contexto: Mensagem de voz de {info['push_name']}.",
                     )
                     revised_text = await provider.generate_text(
@@ -270,11 +269,9 @@ class WhatsAppService:
                 except Exception as e:
                     logger.warning(f"Fallback para texto bruto devido a erro no AI Gateway: {e}")
 
-                # 3. Envia Transcrição de volta no WhatsApp
-                # Envia apenas se não foi mensagem enviada pelo próprio bot
-                if not info["from_me"]:
-                    reply_text = f"🎙️ *Transcrição:* {revised_text.strip()}"
-                    await self.send_text_message(number=info["phone_number"], text=reply_text)
+                # 3. Envia Transcrição de volta no WhatsApp do remetente
+                reply_text = f"🎙️ *Transcrição:* {revised_text.strip()}"
+                await self.send_text_message(number=info["phone_number"], text=reply_text)
 
                 # 4. Salva na Memória e Grafo
                 prosody_data = None
@@ -283,7 +280,7 @@ class WhatsAppService:
 
                 msg_in = MessageCreate(
                     speaker=info["push_name"],
-                    raw_text=raw_text,
+                    raw_text=raw_text_audio,
                     revised_text=revised_text,
                     audio_filename=f"{info['key_id']}.ogg",
                     audio_duration_s=float(duration or 0.0),
@@ -307,7 +304,6 @@ class WhatsAppService:
                 }
 
             # ===================== FLUXO DE TEXTO =====================
-            raw_text = info["text"]
             if not raw_text:
                 return {"status": "ignored", "reason": "empty_text"}
 
@@ -328,8 +324,8 @@ class WhatsAppService:
                 )
                 answer_text = answer_resp.answer
 
-                if not info["from_me"]:
-                    await self.send_text_message(number=info["phone_number"], text=answer_text)
+                # Envia resposta interativa de volta no WhatsApp
+                await self.send_text_message(number=info["phone_number"], text=answer_text)
 
                 return {
                     "status": "success",
