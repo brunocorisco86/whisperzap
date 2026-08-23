@@ -41,20 +41,58 @@ async def _background_scheduler_loop():
                     except Exception as e:
                         logger.error(f"❌ [Cron 19:00] Erro ao executar Lexical Harvester: {e}")
 
-            # 2. Rotina das 18:00 -> Consolidação de Sentimentos Diários
+            # 2. Rotina das 18:00 -> Consolidação de Sentimentos e Disparo do Resumo Diário via WhatsApp
             if hour == 18 and minute < 5:
-                key = f"sentiment_{today_str}"
-                if _last_executed_hour.get("sentiment") != key:
-                    logger.info("🌡️ [Cron 18:00] Iniciando consolidação diária de sentimentos...")
-                    _last_executed_hour["sentiment"] = key
+                key = f"daily_report_{today_str}"
+                if _last_executed_hour.get("daily_report") != key:
+                    logger.info("📋 [Cron 18:00] Iniciando consolidação e disparo do Resumo Diário...")
+                    _last_executed_hour["daily_report"] = key
                     try:
                         from src.memory.sentiment_timeline import sentiment_timeline_service
-                        snapshots = sentiment_timeline_service.collect_daily_sentiments(target_date=today_str)
-                        logger.info(f"✅ [Cron 18:00] Snapshots de sentimentos consolidados para {len(snapshots)} pessoas.")
-                    except Exception as e:
-                        logger.error(f"❌ [Cron 18:00] Erro ao consolidar sentimentos: {e}")
+                        from src.reports.daily import daily_report_service
+                        from src.whatsapp.service import whatsapp_service
+                        from src.config import settings
+                        from src.memory.database import SessionLocal
 
-            # 3. Rotina Semanal de Domingo às 02:00 -> Varredura e Descoberta de Novos Modelos de IA (ModelRegistry)
+                        # Consolida sentimentos
+                        sentiment_timeline_service.collect_daily_sentiments(target_date=today_str)
+
+                        # Gera resumo executivo diário
+                        with SessionLocal() as db:
+                            rep = await daily_report_service.generate_daily_report(target_date=today_str, db=db)
+                            if rep and rep.whatsapp_text and settings.USER_PHONE_NUMBER:
+                                await whatsapp_service.send_text_message(
+                                    number=settings.USER_PHONE_NUMBER,
+                                    text=rep.whatsapp_text,
+                                )
+                                logger.info(f"✅ [Cron 18:00] Resumo Diário enviado para {settings.USER_PHONE_NUMBER}.")
+                    except Exception as e:
+                        logger.error(f"❌ [Cron 18:00] Erro ao consolidar/enviar Resumo Diário: {e}")
+
+            # 3. Rotina Semanal de Domingo às 20:00 -> Disparo do Relatório Semanal via WhatsApp
+            if now.weekday() == 6 and hour == 20 and minute < 5:
+                key = f"weekly_report_{today_str}"
+                if _last_executed_hour.get("weekly_report") != key:
+                    logger.info("📊 [Cron Domingo 20:00] Iniciando consolidação e disparo do Relatório Semanal...")
+                    _last_executed_hour["weekly_report"] = key
+                    try:
+                        from src.reports.weekly import weekly_report_service
+                        from src.whatsapp.service import whatsapp_service
+                        from src.config import settings
+                        from src.memory.database import SessionLocal
+
+                        with SessionLocal() as db:
+                            w_rep = await weekly_report_service.generate_weekly_report(target_date=today_str, db=db)
+                            if w_rep and w_rep.whatsapp_text and settings.USER_PHONE_NUMBER:
+                                await whatsapp_service.send_text_message(
+                                    number=settings.USER_PHONE_NUMBER,
+                                    text=w_rep.whatsapp_text,
+                                )
+                                logger.info(f"✅ [Cron Domingo 20:00] Relatório Semanal enviado para {settings.USER_PHONE_NUMBER}.")
+                    except Exception as e:
+                        logger.error(f"❌ [Cron Domingo 20:00] Erro ao gerar/enviar Relatório Semanal: {e}")
+
+            # 4. Rotina Semanal de Domingo às 02:00 -> Varredura e Descoberta de Novos Modelos de IA (ModelRegistry)
             if now.weekday() == 6 and hour == 2 and minute < 5:
                 key = f"model_discovery_{today_str}"
                 if _last_executed_hour.get("model_discovery") != key:
