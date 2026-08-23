@@ -23252,18 +23252,19 @@
     },
     {
       "category": "PERSON",
-      "mentions": 276,
+      "mentions": 280,
       "role": "OWNER",
       "phone": "554497604925",
       "company": "Hermes Memory / Homelab",
       "weight": 1.0,
       "can_generate_tasks": false,
-      "last_interaction_at": "2026-08-23T02:20:34.140163",
+      "last_interaction_at": null,
+      "details": "Remetente da nota",
       "id": "Bruno Conter"
     },
     {
       "category": "LOCATION",
-      "mentions": 207,
+      "mentions": 208,
       "id": "Hermes Memory / Homelab"
     },
     {
@@ -23400,6 +23401,17 @@
       "category": "CONCEPT",
       "mentions": 1,
       "id": "soft delete"
+    },
+    {
+      "category": "CONCEPT",
+      "mentions": 1,
+      "details": "Entidade externa de suprimentos",
+      "id": "Fornecedor de ração"
+    },
+    {
+      "category": "CONCEPT",
+      "mentions": 1,
+      "id": "Ligar para o fornecedor de ração"
     }
   ],
   "links": [
@@ -25061,7 +25073,7 @@
     },
     {
       "relation": "AFFILIATED_AS_OWNER",
-      "weight": 207.0,
+      "weight": 208.0,
       "source": "Bruno Conter",
       "target": "Hermes Memory / Homelab"
     },
@@ -25082,6 +25094,18 @@
       "weight": 1.0,
       "source": "Bruno Conter",
       "target": "FAL"
+    },
+    {
+      "relation": "ASSIGNED_WITH",
+      "weight": 3.0,
+      "source": "Bruno Conter",
+      "target": "Fornecedor de ração"
+    },
+    {
+      "relation": "RESPONSIBLE_FOR",
+      "weight": 1.0,
+      "source": "Bruno Conter",
+      "target": "Ligar para o fornecedor de ração"
     },
     {
       "relation": "MENTIONED",

@@ -214,6 +214,47 @@ async def test_process_webhook_audio_flow_mocked():
         mock_send.assert_called_once()
 
 
+@pytest.mark.asyncio
+async def test_process_webhook_self_memo_voice_with_tasks():
+    """Testa a funcionalidade de Nota Pessoal (Self-Memo) gravada para si mesmo com extração de tarefas."""
+    dummy_base64 = "T2dnUwACAAAAAAAAAAA="
+
+    self_memo_payload = {
+        "data": {
+            "key": {"id": "self_memo_01", "remoteJid": "554497604925@s.whatsapp.net", "fromMe": True},
+            "pushName": "Bruno Conter",
+            "messageType": "audioMessage",
+            "message": {"audioMessage": {"seconds": 8}},
+        }
+    }
+
+    with patch.object(whatsapp_service, "get_media_base64", new_callable=AsyncMock) as mock_media, \
+         patch.object(whatsapp_service, "send_text_message", new_callable=AsyncMock) as mock_send, \
+         patch("src.transcriber.service.whisper_service.transcribe_audio", new_callable=AsyncMock) as mock_transcribe:
+
+        mock_media.return_value = dummy_base64
+        from src.transcriber.prosody_analyzer import ProsodyAnalyzer
+        mock_transcribe.return_value = (
+            "lembrar de ligar para o fornecedor de racao amanha cedo",
+            "pt",
+            0.99,
+            8.0,
+            [],
+            ProsodyAnalyzer.analyze_speech_prosody(8.0, [], "lembrar de ligar para o fornecedor de racao amanha cedo"),
+        )
+        mock_send.return_value = True
+
+        res = await whatsapp_service.process_webhook_event(self_memo_payload)
+
+        assert res["status"] == "success"
+        assert res["type"] == "audio"
+        assert res["is_self_memo"] is True
+        assert "Nota Pessoal" in res["speaker"]
+        mock_send.assert_called_once()
+        sent_text = mock_send.call_args[1]["text"]
+        assert "Nota Pessoal Gravada" in sent_text
+
+
 def test_whatsapp_router_endpoints():
     """Testa os endpoints HTTP do router FastAPI /api/v1/whatsapp."""
     # 1. Envio de texto

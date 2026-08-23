@@ -1,7 +1,8 @@
 """Serviço Nativo de Integração e Webhooks do WhatsApp / Evolution API.
 
 Permite que o Hermes Voice Memory processe diretamente eventos da Evolution API
-(áudios, transcrições, revisões contextuais, comandos '?' do Hermes Agent e persistência)
+(áudios, transcrições, revisões contextuais, comandos '?' do Hermes Agent,
+captura inteligente de notas e tarefas pessoais e persistência no Grafo)
 eliminando a necessidade de intermediários como o n8n no Monólito.
 """
 
@@ -19,8 +20,9 @@ from src.config import settings
 from src.transcriber.service import whisper_service
 from src.ai_gateway.providers import get_ai_provider
 from src.ai_gateway.prompts import REVISE_USER_TEMPLATE
+from src.ai_gateway.bypass import is_owner_interaction
 from src.memory.repository import memory_repository
-from src.memory.models import MessageCreate
+from src.memory.models import MessageCreate, TaskRecord
 from src.ai_gateway.agent import hermes_agent_service
 from src.memory.database import SessionLocal
 
@@ -181,8 +183,9 @@ class WhatsAppService:
     ) -> Dict[str, Any]:
         """Orquestra o fluxo de ponta a ponta nativamente em Python:
         1. Filtra grupos e mídias vazias;
-        2. Se áudio: Baixa Base64 -> Whisper -> AI Revise -> Responde WhatsApp -> Salva Memória;
-        3. Se texto: Trata perguntas '?' do Hermes Agent ou salva memória com bypass.
+        2. Detecta se é captura pessoal do proprietário (Self-Memo) para tarefas/notas;
+        3. Se áudio: Baixa Base64 -> Whisper -> AI Revise -> Salva Memória/Tarefas -> Responde WhatsApp;
+        4. Se texto: Trata perguntas '?' do Hermes Agent ou salva memória/tarefas com bypass.
         """
         info = self.extract_message_info(payload)
         if not info:
@@ -200,9 +203,13 @@ class WhatsAppService:
 
         # 3. Prevenção de loop de eco de respostas geradas pelo próprio bot
         raw_text = info["text"]
-        if raw_text.startswith("🎙️ *Transcrição:*") or raw_text.startswith("🎙️ Transcrição:") or raw_text.startswith("Salve,"):
+        if raw_text.startswith("🎙️ *Transcrição:*") or raw_text.startswith("🎙️ *Nota Pessoal") or raw_text.startswith("Salve,") or raw_text.startswith("📋 *Tarefas Capturadas:*"):
             logger.debug("Mensagem do bot descartada para evitar eco.")
             return {"status": "ignored", "reason": "bot_echo_response"}
+
+        # 4. Detecção de Self-Memo (Áudios ou Notas para si mesmo / Proprietário)
+        is_self_memo = info["from_me"] or is_owner_interaction(info["push_name"], info["raw_data"])
+        speaker_label = f"{info['push_name']} (Nota Pessoal)" if (is_self_memo and info["from_me"]) else info["push_name"]
 
         should_close = False
         if db is None:
@@ -212,7 +219,7 @@ class WhatsAppService:
         try:
             # ===================== FLUXO DE ÁUDIO =====================
             if info["has_audio"]:
-                logger.info(f"🎙️ Processando áudio WhatsApp de {info['push_name']} ({info['phone_number']})...")
+                logger.info(f"🎙️ Processando áudio WhatsApp de {info['push_name']} ({info['phone_number']}) [Self-Memo: {is_self_memo}]...")
 
                 base64_str = await self.get_media_base64(
                     message_id=info["key_id"],
@@ -241,7 +248,7 @@ class WhatsAppService:
                     raw_text_audio, lang, prob, duration, segments, prosody = await whisper_service.transcribe_audio(
                         audio_path_or_file=tmp_path,
                         language="pt",
-                        speaker=info["push_name"],
+                        speaker=speaker_label,
                     )
                 finally:
                     if os.path.exists(tmp_path):
@@ -260,7 +267,7 @@ class WhatsAppService:
                     provider = get_ai_provider(task="revise")
                     prompt = REVISE_USER_TEMPLATE.format(
                         raw_text=raw_text_audio.strip(),
-                        context_block=f"Contexto: Mensagem de voz de {info['push_name']}.",
+                        context_block=f"Contexto: Mensagem de voz de {speaker_label}.",
                     )
                     revised_text = await provider.generate_text(
                         prompt=prompt,
@@ -269,17 +276,13 @@ class WhatsAppService:
                 except Exception as e:
                     logger.warning(f"Fallback para texto bruto devido a erro no AI Gateway: {e}")
 
-                # 3. Envia Transcrição de volta no WhatsApp do remetente
-                reply_text = f"🎙️ *Transcrição:* {revised_text.strip()}"
-                await self.send_text_message(number=info["phone_number"], text=reply_text)
-
-                # 4. Salva na Memória e Grafo
+                # 3. Salva na Memória e Grafo (executa extração de tarefas e entidades)
                 prosody_data = None
                 if prosody:
                     prosody_data = prosody.model_dump() if hasattr(prosody, "model_dump") else (prosody.dict() if hasattr(prosody, "dict") else dict(prosody))
 
                 msg_in = MessageCreate(
-                    speaker=info["push_name"],
+                    speaker=speaker_label,
                     raw_text=raw_text_audio,
                     revised_text=revised_text,
                     audio_filename=f"{info['key_id']}.ogg",
@@ -288,6 +291,7 @@ class WhatsAppService:
                     meta_info={
                         "source": "whatsapp",
                         "message_type": "audio",
+                        "is_self_memo": is_self_memo,
                         "remoteJid": info["remote_jid"],
                         "pushName": info["push_name"],
                         "key_id": info["key_id"],
@@ -295,12 +299,42 @@ class WhatsAppService:
                 )
                 saved_msg = await memory_repository.save_message(data=msg_in, db=db)
 
+                # 4. Formata e Envia Feedback no WhatsApp
+                if is_self_memo:
+                    created_tasks = []
+                    if saved_msg:
+                        created_tasks = db.query(TaskRecord).filter(TaskRecord.message_id == saved_msg.id).all()
+
+                    reply_lines = [f"🎙️ *Nota Pessoal Gravada:*", f'"{revised_text.strip()}"']
+                    if created_tasks:
+                        reply_lines.append("")
+                        reply_lines.append("📋 *Tarefas Capturadas:*")
+                        for t in created_tasks:
+                            due_str = f" (📅 {t.due_date})" if t.due_date else ""
+                            prio_badge = f"[{t.priority}]" if t.priority else ""
+                            reply_lines.append(f"• 📌 *{prio_badge}* {t.title}{due_str}")
+                    elif getattr(saved_msg, "intent", None) == "IDEA":
+                        reply_lines.append("")
+                        reply_lines.append("💡 *Classificação:* 🧠 Ideia / Insight Estratégico (salvo no Grafo)")
+                    elif getattr(saved_msg, "intent", None) == "DECISION":
+                        reply_lines.append("")
+                        reply_lines.append("⚖️ *Classificação:* Decisão Registrada (salvo no Grafo)")
+                    else:
+                        reply_lines.append("")
+                        reply_lines.append("📝 *Classificação:* Nota Pessoal (Memória & Grafo)")
+                    reply_text = "\n".join(reply_lines)
+                else:
+                    reply_text = f"🎙️ *Transcrição:* {revised_text.strip()}"
+
+                await self.send_text_message(number=info["phone_number"], text=reply_text)
+
                 return {
                     "status": "success",
                     "type": "audio",
+                    "is_self_memo": is_self_memo,
                     "message_id": saved_msg.id if saved_msg else None,
                     "text": revised_text,
-                    "speaker": info["push_name"],
+                    "speaker": speaker_label,
                 }
 
             # ===================== FLUXO DE TEXTO =====================
@@ -342,14 +376,15 @@ class WhatsAppService:
                 or len(clean_t.split()) <= 2
             )
 
-            # 3. Salva Mensagem de Texto na Memória
+            # 3. Salva Mensagem de Texto na Memória e Grafo
             msg_in = MessageCreate(
-                speaker=info["push_name"],
+                speaker=speaker_label,
                 raw_text=raw_text,
                 revised_text=raw_text,
                 meta_info={
                     "source": "whatsapp",
                     "message_type": "text",
+                    "is_self_memo": is_self_memo,
                     "bypass_ai": bypass_ai,
                     "remoteJid": info["remote_jid"],
                     "pushName": info["push_name"],
@@ -358,9 +393,21 @@ class WhatsAppService:
             )
             saved_msg = await memory_repository.save_message(data=msg_in, db=db)
 
+            # 4. Se for nota de texto pessoal (não trivial) e gerou tarefas, confirma por WhatsApp
+            if is_self_memo and not bypass_ai and saved_msg:
+                created_tasks = db.query(TaskRecord).filter(TaskRecord.message_id == saved_msg.id).all()
+                if created_tasks:
+                    reply_lines = ["📋 *Tarefas Capturadas a partir do Texto:*"]
+                    for t in created_tasks:
+                        due_str = f" (📅 {t.due_date})" if t.due_date else ""
+                        prio_badge = f"[{t.priority}]" if t.priority else ""
+                        reply_lines.append(f"• 📌 *{prio_badge}* {t.title}{due_str}")
+                    await self.send_text_message(number=info["phone_number"], text="\n".join(reply_lines))
+
             return {
                 "status": "success",
                 "type": "text",
+                "is_self_memo": is_self_memo,
                 "message_id": saved_msg.id if saved_msg else None,
                 "bypass_ai": bypass_ai,
             }
