@@ -226,22 +226,44 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [CONCLUÍDO]
 
 ---
 
-## 🚀 Fase 9: Empacotamento SaaS Multi-Tenant & Provisionamento de Clientes [FUTURO]
+## 🏛️ Fase 9: Rebranding & Harmonização Mitológica: A Soberania de Mnemosine [PLANEJADO]
 
-**Objetivo Central:** Transformar o Monólito Hermes em um produto SaaS B2B onde cada cliente contratante recebe sua própria instância isolada ("Single-Tenant Appliance") com subdomínio próprio, sem risco de vazamento de dados.
+**Objetivo Central:** Elevar a identidade arquitetural do ecossistema para **Mnemosine** (a Titã da Memória e mãe das Musas: Euterpe, Melpômene, Polímnia, Clio, etc.), eliminando ambiguidades com o contêiner `nousresearch/hermes-agent` e unificando o naming de código, contêineres e interface.
 
-- [ ] **9.1 Parametrização e Isolamento por Tenant (`.env.tenant`)**:
+- [ ] **9.1 Harmonização de Persona & Prompts de IA (`src/ai_gateway/`)**:
+  - Atualizar os prompts e identidade para **Mnemosine**: a mente guardiã da memória e das Musas, mantendo o tom perspicaz, ágil e espirituoso (Zagreus/Peter Parker).
+  - Suporte a comandos nativos `?` e `/mnemosine` no WhatsApp e API.
+  - Manter Hermes explicitamente definido como o subsistema de mensageria/courier (transporte de dados entre WhatsApp e Mnemosine).
+- [ ] **9.2 Harmonização da Interface Web & Control Hub (`src/web/`)**:
+  - Atualização do título, favicon, logo e cartões da Central de Ambientes para **Mnemosine Voice Memory**.
+  - Harmonização visual do mapa de Musas no módulo Euterpe.
+- [ ] **9.3 Naming de Contêineres e Compose (`docker-compose.monolith.yml`)**:
+  - Transição de nomes de contêineres: `mnemosine-api`, `mnemosine-db`, `mnemosine-redis`, `mnemosine-evolution-api`, `mnemosine-caddy`.
+  - Atualização das redes Docker e volumes sem interrupção de dados.
+- [ ] **9.4 Desambiguação de Configurações & Variáveis (`src/config.py`)**:
+  - Atualização de variáveis de ambiente com aliases de retrocompatibilidade (`MNEMOSINE_*` e `HERMES_*` compatíveis).
+  - Isolamento seguro para permitir futura integração com o `hermes_agent` da NousResearch sem conflitos de portas ou rotas.
+- [ ] **9.5 Governança, Testes e Documentação Oficial**:
+  - Atualização de `README.md`, grafos e testes unitários.
+
+---
+
+## 🚀 Fase 10: Empacotamento SaaS Multi-Tenant & Provisionamento de Clientes [FUTURO]
+
+**Objetivo Central:** Transformar o Monólito Mnemosine em um produto SaaS B2B onde cada cliente contratante recebe sua própria instância isolada ("Single-Tenant Appliance") com subdomínio próprio, sem risco de vazamento de dados.
+
+- [ ] **10.1 Parametrização e Isolamento por Tenant (`.env.tenant`)**:
   - Variáveis configuráveis por cliente: `TENANT_ID`, `TENANT_NAME`, `WHATSAPP_INSTANCE`, `LLM_API_KEY`, `DASHBOARD_PASSWORD`, `DATABASE_SCHEMA`.
   - Estrutura de volumes isolados no disco: `/data/tenants/{tenant_id}/` (banco de dados, áudios, grafo).
-- [ ] **9.2 Personalização White-Label no Control Hub**:
+- [ ] **10.2 Personalização White-Label no Control Hub**:
   - Suporte a logo personalizado da empresa cliente, nome do assistente (ex: "Assistente Granja Patel") e cores customizadas no cabeçalho.
-- [ ] **9.3 Script de Provisionamento Automático de Clientes (`scripts/create_tenant.sh`)**:
+- [ ] **10.3 Script de Provisionamento Automático de Clientes (`scripts/create_tenant.sh`)**:
   - Script CLI com um comando para criar novos clientes:
     - Cria diretórios e gera `.env` do cliente;
     - Registra subdomínio com HTTPS automático no Caddy (`cliente.seusaas.com`);
     - Inicializa os contêineres do cliente em portas dinâmicas ou rede isolada;
     - Gera o QR Code de ativação do WhatsApp para o cliente escanear.
-- [ ] **9.4 Cockpit Master de Administração (Admin Hub)**:
+- [ ] **10.4 Cockpit Master de Administração (Admin Hub)**:
   - Painel administrativo central para visualizar todos os tenants ativos, status de conexão do WhatsApp de cada cliente, saúde dos contêineres e consumo total de tokens LLM.
 
 
