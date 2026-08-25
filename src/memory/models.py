@@ -138,6 +138,17 @@ class LexicalCandidateRecord(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
 
+class WebhookKeyRecord(Base):
+    """Tabela de controle atômico e idempotência de webhooks (distribuído entre workers/containers)."""
+
+    __tablename__ = "webhook_keys"
+
+    key_id = Column(String(128), primary_key=True, index=True)
+    created_at = Column(DateTime, default=utc_now, index=True)
+    status = Column(String(32), default="PROCESSING")
+
+
+
 # ===================== Schemas Pydantic da API =====================
 
 

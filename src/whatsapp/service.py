@@ -70,23 +70,40 @@ class WhatsAppService:
 
         self._clean_old_keys()
 
+        # 1. Checagem rápida no cache em memória do processo
         with self._keys_lock:
             if key_id in self._processed_keys:
                 return True
-            # Reserva o key_id como em processamento
-            self._processed_keys[key_id] = time.time()
 
+        # 2. Persistência e lock atômico no banco de dados (distribuído entre workers/containers)
         if db is not None:
             try:
-                from src.memory.models import MessageRecord
-                exists = db.query(MessageRecord.id).filter(
-                    MessageRecord.meta_info.op("->>")("key_id") == key_id
-                ).first()
-                if exists:
+                from src.memory.models import WebhookKeyRecord, MessageRecord
+                # Verifica se já existe em WebhookKeyRecord
+                exists_key = db.query(WebhookKeyRecord.key_id).filter(WebhookKeyRecord.key_id == key_id).first()
+                if exists_key:
+                    with self._keys_lock:
+                        self._processed_keys[key_id] = time.time()
                     return True
-            except Exception as exc:
-                logger.debug(f"Erro ao consultar duplicata no banco de dados: {exc}")
 
+                # Tenta inserir atomicamente o lock
+                lock_rec = WebhookKeyRecord(key_id=key_id, status="PROCESSING")
+                db.add(lock_rec)
+                db.commit()
+
+                with self._keys_lock:
+                    self._processed_keys[key_id] = time.time()
+                return False
+            except Exception as exc:
+                db.rollback()
+                logger.debug(f"Chave duplicada ou erro de concorrência detectado no banco ({key_id}): {exc}")
+                with self._keys_lock:
+                    self._processed_keys[key_id] = time.time()
+                return True
+
+        # Fallback apenas em memória caso não haja DB
+        with self._keys_lock:
+            self._processed_keys[key_id] = time.time()
         return False
 
     async def send_text_message(self, number: str, text: str) -> bool:
