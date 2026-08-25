@@ -31,15 +31,39 @@ async def evolution_webhook(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Recebe e processa eventos do WhatsApp da Evolution API de forma nativa e assíncrona."""
+    """Recebe e processa eventos do WhatsApp da Evolution API de forma assíncrona, com resposta imediata e deduplicação."""
     try:
         payload = await request.json()
     except Exception:
         return {"status": "error", "message": "JSON body inválido"}
 
-    # Processamento direto
-    result = await whatsapp_service.process_webhook_event(payload=payload, db=db)
-    return result
+    # 1. Triagem preliminar de metadados
+    info = whatsapp_service.extract_message_info(payload)
+    if not info:
+        return {"status": "ignored", "reason": "unhandled_event_or_invalid_payload"}
+
+    # 2. Descarte rápido de grupos e broadcast
+    if info["is_group"]:
+        return {"status": "ignored", "reason": "group_or_broadcast"}
+
+    # 3. Descarte de figurinhas e reações sem texto
+    if info["is_ignorable"]:
+        return {"status": "ignored", "reason": "ignorable_media_type"}
+
+    # 4. Prevenção de loop de eco de respostas do bot
+    raw_text = info["text"]
+    if raw_text.startswith("🎙️ *Transcrição:*") or raw_text.startswith("🎙️ *Nota Pessoal") or raw_text.startswith("Salve,") or raw_text.startswith("📋 *Tarefas Capturadas:*"):
+        return {"status": "ignored", "reason": "bot_echo_response"}
+
+    # 5. Deduplicação atômica em memória e persistência
+    key_id = info["key_id"]
+    if whatsapp_service.is_key_duplicate_or_processing(key_id=key_id, db=db):
+        logger.info(f"⏭️ Webhook duplicado ignorado para key_id={key_id}")
+        return {"status": "ignored", "reason": "duplicate_key_id", "key_id": key_id}
+
+    # 6. Agendamento em background (Evolution API recebe 200 OK em <50ms sem timeout)
+    background_tasks.add_task(whatsapp_service.process_webhook_event_task, payload=payload, info=info)
+    return {"status": "queued", "key_id": key_id}
 
 
 @router.post(

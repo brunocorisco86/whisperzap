@@ -47,7 +47,7 @@
       "eprodutor"
     ],
     "expansion": "Aplicativo eProdutor C.Vale",
-    "category": "SISTEMAS_ERP",
+    "category": "AGRONEGOCIO_COOP",
     "description": "Plataforma digital de relacionamento e gestão para produtores integrados da C.Vale.",
     "id": "3dd119a9",
     "created_at": "2026-08-14T22:47:18.174150"
@@ -117,21 +117,21 @@
   {
     "term": "TMS",
     "phonetic_variations": [
-      "t.m.s.",
-      "t em s",
-      "tms",
-      "t m s",
-      "sistema tms",
-      "tem esse",
       "t em esse",
-      "têmessi",
+      "t.m.s.",
+      "tem esse",
+      "t m s",
+      "tms",
+      "roteirizador",
+      "t em s",
       "têemeésse",
-      "temesse",
-      "roteirizador"
+      "têmessi",
+      "sistema tms",
+      "temesse"
     ],
     "expansion": "Transportation Management System",
-    "category": "LOGISTICA_SILOS",
-    "description": "Sistema de gestão de transporte utilizado para a logística de ração e insumos.",
+    "category": "LOGISTICA",
+    "description": "Sistema de gestão de transporte utilizado para alocação de cargas e logística de ração.",
     "id": "2f3a4b56",
     "created_at": "2026-08-15T01:06:00.000000"
   },

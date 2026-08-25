@@ -9,9 +9,11 @@ eliminando a necessidade de intermediários como o n8n no Monólito.
 import os
 import re
 import uuid
+import time
 import base64
 import logging
 import tempfile
+from threading import Lock
 from typing import Any, Dict, Optional, Tuple
 import httpx
 from sqlalchemy.orm import Session
@@ -50,6 +52,42 @@ class WhatsAppService:
         self.api_url = settings.EVOLUTION_API_URL.rstrip("/")
         self.api_key = settings.EVOLUTION_API_KEY
         self.instance = settings.EVOLUTION_INSTANCE
+        self._processed_keys: Dict[str, float] = {}
+        self._keys_lock = Lock()
+
+    def _clean_old_keys(self, ttl_seconds: float = 3600.0) -> None:
+        """Remove identificadores de mensagens mais antigos que o TTL."""
+        now = time.time()
+        with self._keys_lock:
+            expired = [k for k, ts in self._processed_keys.items() if now - ts > ttl_seconds]
+            for k in expired:
+                del self._processed_keys[k]
+
+    def is_key_duplicate_or_processing(self, key_id: str, db: Optional[Session] = None) -> bool:
+        """Verifica de forma atômica se uma mensagem/áudio com o mesmo key_id já foi processado ou está em processamento."""
+        if not key_id or key_id.startswith("msg_"):
+            return False
+
+        self._clean_old_keys()
+
+        with self._keys_lock:
+            if key_id in self._processed_keys:
+                return True
+            # Reserva o key_id como em processamento
+            self._processed_keys[key_id] = time.time()
+
+        if db is not None:
+            try:
+                from src.memory.models import MessageRecord
+                exists = db.query(MessageRecord.id).filter(
+                    MessageRecord.meta_info.op("->>")("key_id") == key_id
+                ).first()
+                if exists:
+                    return True
+            except Exception as exc:
+                logger.debug(f"Erro ao consultar duplicata no banco de dados: {exc}")
+
+        return False
 
     async def send_text_message(self, number: str, text: str) -> bool:
         """Envia mensagem de texto para um número no WhatsApp via Evolution API."""
@@ -128,6 +166,12 @@ class WhatsAppService:
         # Se vier encapsulado em { "body": { ... } }
         payload = raw_payload.get("body") if isinstance(raw_payload.get("body"), dict) else raw_payload
 
+        # Ignora eventos que não representam nova mensagem (ex: updates de status, presence, etc.)
+        event_name = str(raw_payload.get("event") or payload.get("event") or "").strip().lower()
+        if event_name and not any(ev in event_name for ev in ["messages.upsert", "messages_upsert", "send.message", "send_message", "message"]):
+            logger.debug(f"Evento WhatsApp ignorado ({event_name}).")
+            return None
+
         # Se for evento messages.upsert / messages.update
         data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
 
@@ -135,7 +179,10 @@ class WhatsAppService:
         remote_jid = key.get("remoteJid") or data.get("remoteJid") or ""
         key_id = key.get("id") or data.get("id") or f"msg_{uuid.uuid4().hex[:8]}"
         from_me = bool(key.get("fromMe", False))
-        push_name = data.get("pushName") or payload.get("sender", {}).get("pushName") or "Desconhecido"
+
+        sender_raw = payload.get("sender")
+        sender_push = sender_raw.get("pushName") if isinstance(sender_raw, dict) else None
+        push_name = data.get("pushName") or sender_push or "Desconhecido"
         is_group = bool(data.get("isGroup") or key.get("participant") or "@g.us" in remote_jid or "@broadcast" in remote_jid)
 
         msg_obj = data.get("message") or {}
@@ -176,10 +223,25 @@ class WhatsAppService:
             "raw_data": data,
         }
 
+    async def process_webhook_event_task(
+        self,
+        payload: Dict[str, Any],
+        info: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Processa evento de webhook em background com sessão própria do banco de dados."""
+        db = SessionLocal()
+        try:
+            await self.process_webhook_event(payload=payload, db=db, pre_extracted_info=info)
+        except Exception as exc:
+            logger.error(f"Erro no processamento assíncrono do webhook WhatsApp: {exc}", exc_info=True)
+        finally:
+            db.close()
+
     async def process_webhook_event(
         self,
         payload: Dict[str, Any],
         db: Optional[Session] = None,
+        pre_extracted_info: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Orquestra o fluxo de ponta a ponta nativamente em Python:
         1. Filtra grupos e mídias vazias;
@@ -187,7 +249,7 @@ class WhatsAppService:
         3. Se áudio: Baixa Base64 -> Whisper -> AI Revise -> Salva Memória/Tarefas -> Responde WhatsApp;
         4. Se texto: Trata perguntas '?' do Hermes Agent ou salva memória/tarefas com bypass.
         """
-        info = self.extract_message_info(payload)
+        info = pre_extracted_info or self.extract_message_info(payload)
         if not info:
             return {"status": "ignored", "reason": "invalid_payload"}
 

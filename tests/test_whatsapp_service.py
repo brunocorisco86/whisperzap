@@ -1,5 +1,6 @@
 """Testes unitários e de integração para o serviço nativo WhatsApp / Evolution API."""
 
+import uuid
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
@@ -256,7 +257,7 @@ async def test_process_webhook_self_memo_voice_with_tasks():
 
 
 def test_whatsapp_router_endpoints():
-    """Testa os endpoints HTTP do router FastAPI /api/v1/whatsapp."""
+    """Testa os endpoints HTTP do router FastAPI /api/v1/whatsapp com enfileiramento e deduplicação."""
     # 1. Envio de texto
     with patch.object(whatsapp_service, "send_text_message", new_callable=AsyncMock) as mock_send:
         mock_send.return_value = True
@@ -264,9 +265,33 @@ def test_whatsapp_router_endpoints():
         assert res_send.status_code == 200
         assert res_send.json()["success"] is True
 
-    # 2. Webhook HTTP POST
-    with patch.object(whatsapp_service, "process_webhook_event", new_callable=AsyncMock) as mock_proc:
-        mock_proc.return_value = {"status": "success", "type": "text"}
-        res_hook = client.post("/api/v1/whatsapp/webhook", json={"data": {"text": "Teste"}})
+    # 2. Webhook HTTP POST com enfileiramento assíncrono (200 OK imediato)
+    sample_payload = {
+        "event": "messages.upsert",
+        "data": {
+            "key": {"id": "unique_msg_100", "remoteJid": "554499112233@s.whatsapp.net", "fromMe": False},
+            "pushName": "Carlos Teste",
+            "message": {"conversation": "Mensagem teste de fila"},
+        },
+    }
+    with patch.object(whatsapp_service, "process_webhook_event_task", new_callable=AsyncMock):
+        res_hook = client.post("/api/v1/whatsapp/webhook", json=sample_payload)
         assert res_hook.status_code == 200
-        assert res_hook.json()["status"] == "success"
+        assert res_hook.json()["status"] == "queued"
+        assert res_hook.json()["key_id"] == "unique_msg_100"
+
+        # 3. Segunda tentativa do mesmo key_id deve ser ignorada como duplicata
+        res_duplicate = client.post("/api/v1/whatsapp/webhook", json=sample_payload)
+        assert res_duplicate.status_code == 200
+        assert res_duplicate.json()["status"] == "ignored"
+        assert res_duplicate.json()["reason"] == "duplicate_key_id"
+
+
+def test_whatsapp_service_deduplication():
+    """Testa o mecanismo de deduplicação atômica de key_id."""
+    key = f"test_dedup_{uuid.uuid4().hex}"
+    # Primeira verificação: não é duplicado e registra
+    assert whatsapp_service.is_key_duplicate_or_processing(key) is False
+    # Segunda verificação imediata: deve retornar True (duplicado)
+    assert whatsapp_service.is_key_duplicate_or_processing(key) is True
+
