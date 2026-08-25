@@ -354,8 +354,9 @@
             <label for="analytics-period">📅 Período:</label>
             <select id="analytics-period" class="form-select">
               <option value="today">Hoje (Hoje)</option>
+              <option value="3d" selected>Últimos 3 dias (3D) — Rápido</option>
               <option value="7d">Últimos 7 dias (7D)</option>
-              <option value="30d" selected>Últimos 30 dias (30D)</option>
+              <option value="30d">Últimos 30 dias (30D)</option>
               <option value="month">Mês Atual (Mês)</option>
               <option value="all">Todo o Histórico (Tudo)</option>
             </select>
@@ -584,8 +585,11 @@
     <section id="tab-sentiment" class="tab-content">
       <div class="section-toolbar">
         <div class="filter-group">
-          <button class="btn btn-primary btn-sm" id="btn-erato-view-all">
-            🌟 Todos (Últimos 30 Dias)
+          <button class="btn btn-primary btn-sm" id="btn-erato-view-3d">
+            🌟 Últimos 3 Dias (Padrão)
+          </button>
+          <button class="btn btn-secondary btn-sm" id="btn-erato-view-all">
+            🗓️ Últimos 30 Dias
           </button>
           <label style="font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem;">
             📅 Data:
@@ -614,7 +618,7 @@
       <!-- Overview do Dia / Período (Termômetro Social) -->
       <div style="margin-bottom: 1.5rem;">
         <h3 style="font-size: 1.1rem; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem;">
-          🌡️ Termômetro das Interações <span id="sentiment-day-badge" class="badge badge-executive">Últimos 30 Dias</span>
+          🌡️ Termômetro das Interações <span id="sentiment-day-badge" class="badge badge-executive">Últimos 3 Dias</span>
         </h3>
         <div class="contacts-grid" id="sentiment-daily-container">
           <!-- Rendered via JS -->

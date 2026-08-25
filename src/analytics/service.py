@@ -11,7 +11,12 @@ from sqlalchemy import func
 
 from src.memory.task_sentiment_analyzer import get_spacy_nlp
 from src.memory.timezone_utils import BRASILIA_TZ, get_now_brt, to_local_tz
-from src.ai_gateway.bypass import is_owner_interaction, is_group_message, normalize_text
+from src.ai_gateway.bypass import (
+    is_owner_interaction,
+    is_group_message,
+    normalize_text,
+    is_automated_service_message,
+)
 
 from src.analytics.schemas import (
     AnalyticsDashboardResponse,
@@ -137,7 +142,7 @@ class AnalyticsService:
 
     def get_dashboard_metrics(
         self,
-        period: str = "30d",
+        period: str = "3d",
         group_by: str = "day",
         db: Session | None = None,
     ) -> AnalyticsDashboardResponse:
@@ -235,12 +240,18 @@ class AnalyticsService:
     def _resolve_date_ranges(self, period: str, now: datetime) -> Tuple[datetime, datetime, datetime, datetime]:
         """Calcula o intervalo de datas no fuso de Brasília (UTC-3) e converte para UTC para as queries SQL."""
         now_brt = to_local_tz(now) or get_now_brt()
-        period_clean = (period or "30d").lower()
+        period_clean = (period or "3d").lower()
 
         if period_clean == "today":
             start_brt = datetime(now_brt.year, now_brt.month, now_brt.day, 0, 0, 0, tzinfo=BRASILIA_TZ)
             end_brt = now_brt
             delta = timedelta(days=1)
+            prev_start_brt = start_brt - delta
+            prev_end_brt = start_brt
+        elif period_clean in ("3d", "3days", "3_dias"):
+            start_brt = datetime(now_brt.year, now_brt.month, now_brt.day, 0, 0, 0, tzinfo=BRASILIA_TZ) - timedelta(days=2)
+            end_brt = now_brt
+            delta = timedelta(days=3)
             prev_start_brt = start_brt - delta
             prev_end_brt = start_brt
         elif period_clean == "7d":
@@ -611,8 +622,11 @@ class AnalyticsService:
                 "avatar_url": None,
                 "total": 0,
                 "audios": 0,
+                "texts": 0,
                 "total_duration": 0.0,
                 "tasks": 0,
+                "automated_count": 0,
+                "is_favorite": False,
                 "sentiments": [],
                 "scores": [],
             }
@@ -633,6 +647,7 @@ class AnalyticsService:
                 sd["role"] = contact.role.value if hasattr(contact.role, "value") else str(contact.role or "UNKNOWN")
                 sd["phone_number"] = contact.phone_number
                 sd["avatar_url"] = contact.avatar_url
+                sd["is_favorite"] = bool(getattr(contact, "is_favorite", False))
             else:
                 if not sd["display_name"]:
                     meta_p = (m.meta_info or {}).get("pushName")
@@ -642,6 +657,14 @@ class AnalyticsService:
             if m.audio_duration_s:
                 sd["audios"] += 1
                 sd["total_duration"] += m.audio_duration_s
+            else:
+                sd["texts"] += 1
+
+            # Detecta mensagens de autoatendimento / SAC dinamicamente
+            msg_text = (m.raw_text or m.revised_text or "").strip()
+            if is_automated_service_message(msg_text):
+                sd["automated_count"] += 1
+
             if m.sentiment:
                 sd["sentiments"].append(m.sentiment)
             if m.sentiment_score is not None:
@@ -653,7 +676,7 @@ class AnalyticsService:
             if can_id and can_id in sender_data:
                 sender_data[can_id]["tasks"] += 1
 
-        top_list = []
+        top_candidates = []
         for can_id, data in sender_data.items():
             if data["total"] == 0:
                 continue
@@ -663,23 +686,47 @@ class AnalyticsService:
                 dom_sentiment = Counter(data["sentiments"]).most_common(1)[0][0]
             avg_score = sum(data["scores"]) / len(data["scores"]) if data["scores"] else 0.0
 
-            top_list.append(
-                TopSenderMetric(
-                    speaker=data["display_name"],
-                    role=data["role"],
-                    phone_number=data["phone_number"],
-                    avatar_url=data["avatar_url"],
-                    total_messages=data["total"],
-                    audio_count=data["audios"],
-                    total_duration_s=round(data["total_duration"], 1),
-                    tasks_count=data["tasks"],
-                    dominant_sentiment=dom_sentiment,
-                    avg_sentiment_score=round(avg_score, 2),
-                )
+            # Score Dinâmico de Engajamento Humano:
+            # - Áudios e minutos falados têm alta prioridade;
+            # - Tarefas geradas demonstram acionabilidade e relevância;
+            # - Contatos favoritos recebem boost;
+            # - Remetentes 100% mecânicos/SAC com zero áudios e zero tarefas são penalizados no ranking executivo.
+            is_pure_bot = (
+                data["audios"] == 0
+                and data["tasks"] == 0
+                and data["automated_count"] >= max(1, int(data["total"] * 0.6))
             )
 
-        top_list.sort(key=lambda x: x.total_messages, reverse=True)
-        return top_list[:10]
+            engagement_score = (
+                (data["audios"] * 5.0)
+                + ((data["total_duration"] / 60.0) * 2.0)
+                + (data["tasks"] * 3.0)
+                + ((data["total"] - data["automated_count"]) * 0.5)
+                + (15.0 if data.get("is_favorite") else 0.0)
+                - (100.0 if is_pure_bot else 0.0)
+            )
+
+            metric = TopSenderMetric(
+                speaker=data["display_name"],
+                role=data["role"],
+                phone_number=data["phone_number"],
+                avatar_url=data["avatar_url"],
+                total_messages=data["total"],
+                audio_count=data["audios"],
+                total_duration_s=round(data["total_duration"], 1),
+                tasks_count=data["tasks"],
+                dominant_sentiment=dom_sentiment,
+                avg_sentiment_score=round(avg_score, 2),
+            )
+            top_candidates.append((engagement_score, metric))
+
+        # Ordena prioritariamente pelo Score de Engajamento Humano, minutos de voz e volume
+        top_candidates.sort(
+            key=lambda item: (item[0], item[1].audio_count, item[1].total_duration_s, item[1].total_messages),
+            reverse=True,
+        )
+
+        return [item[1] for item in top_candidates[:10]]
 
     def _generate_wordmap(self, messages: List[MessageRecord]) -> List[WordFrequencyItem]:
         """Gera frequência de termos estratégicos e sintagmas nominais compostos utilizando spaCy NLP."""

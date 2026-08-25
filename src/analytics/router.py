@@ -14,8 +14,8 @@ router = APIRouter(prefix="/api/v1/analytics", tags=["analytics"])
 @router.get("/dashboard", response_model=AnalyticsDashboardResponse)
 def get_analytics_dashboard(
     period: str = Query(
-        default="30d",
-        description="Período de análise: 'today', '7d', '30d', 'month', 'all'",
+        default="3d",
+        description="Período de análise: 'today', '3d', '7d', '30d', 'month', 'all'",
     ),
     group_by: str = Query(
         default="day",

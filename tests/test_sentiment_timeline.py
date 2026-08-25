@@ -105,3 +105,40 @@ def test_sentiment_endpoints():
     tl_data = res_tl.json()
     assert tl_data["speaker"] == "Debora Patel"
     assert "timeline" in tl_data
+
+
+def test_daily_snapshots_3d_and_automated_message_neutralization():
+    """Valida o filtro de 3 dias como padrão e a neutralização de mensagens automáticas."""
+    db = SessionLocal()
+    try:
+        from datetime import timedelta
+        now = datetime.now(timezone.utc)
+        today_str = now.strftime("%Y-%m-%d")
+
+        # Mensagem de robô de atendimento com termos de fila/SAC
+        m_bot = MessageRecord(
+            id=str(uuid4()),
+            created_at=now,
+            speaker="Bot Atendimento SAC",
+            revised_text="Olá! Você é o número 200 na fila de espera. O agente transferiu o atendimento.",
+            sentiment="NEGATIVE",
+            sentiment_score=-0.8,
+        )
+        db.add(m_bot)
+        db.commit()
+
+        # Coleta do dia
+        sentiment_timeline_service.collect_daily_sentiments(target_date=today_str, db=db)
+
+        # Snapshots agregados padrão (3 dias)
+        snaps = sentiment_timeline_service.get_daily_snapshots(target_date="3d", days=3, db=db)
+        assert isinstance(snaps, list)
+
+        # O robô deve ter sido neutralizado para NEUTRAL
+        bot_snap = next((s for s in snaps if "Bot Atendimento" in s.speaker), None)
+        if bot_snap:
+            assert bot_snap.dominant_sentiment == "NEUTRAL"
+            assert bot_snap.avg_sentiment_score == 0.0
+    finally:
+        db.close()
+

@@ -197,6 +197,41 @@ def is_emoji_only_or_symbols(text: str) -> bool:
     return False
 
 
+AUTOMATED_SERVICE_PATTERNS = [
+    r"fila\s+de\s+espera",
+    r"n[uú]mero\s+\d+\s+na\s+fila",
+    r"posi[cç][aã]o\s+na\s+fila",
+    r"transferi[uo]\s+o\s+atendimento",
+    r"transferindo\s+para\s+a\s+equipe",
+    r"canal\s+de\s+atendimento\s+.*via\s+whatsapp",
+    r"assistente\s+de\s+ia\s+d[aoe]",
+    r"como\s+posso\s+te\s+ajudar\s+hoje\?",
+    r"digite\s+\d+\s+para",
+    r"escolha\s+(uma\s+das\s+)?op[cç][oõ]es",
+    r"qual\s+[eé]\s+a\s+sua\s+modalidade",
+    r"protocolo\s+de\s+atendimento",
+    r"c[oó]digo\s+de\s+verifica[cç][aã]o",
+    r"c[oó]digo\s+de\s+seguran[cç]a",
+    r"token\s+de\s+acesso",
+    r"segunda\s+via\s*[/e]?\s*boletos?",
+    r"renegocia[cç][aã]o\s+de\s+d[eé]bitos",
+]
+
+
+def is_automated_service_message(text: str) -> bool:
+    """Detecta de forma universal se uma mensagem é originada por robô de atendimento, SAC ou notificação transacional."""
+    if not text or not text.strip():
+        return False
+
+    clean = text.lower().strip()
+    for pattern in AUTOMATED_SERVICE_PATTERNS:
+        if re.search(pattern, clean, re.IGNORECASE):
+            return True
+
+    return False
+
+
+
 def is_registered_contact(speaker: Optional[str] = None, meta_info: Optional[Dict[str, Any]] = None, db: Optional[Any] = None) -> bool:
     """Verifica se o remetente é o Dono do Sistema ou um Contato previamente cadastrado com cartão válido."""
     # Se não há identificação explícita de speaker nem remetente externo em meta_info, assume a interface do Dono

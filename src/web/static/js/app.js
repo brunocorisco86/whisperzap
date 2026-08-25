@@ -484,19 +484,32 @@ document.addEventListener('DOMContentLoaded', async () => {
   formContact.addEventListener('submit', handleSaveContact);
   formTerm.addEventListener('submit', handleSaveTerm);
 
-  // Sentiment Tab Listeners
+  // Sentiment Tab Listeners (Érato)
   const sentimentDatePicker = document.getElementById('sentiment-date-picker');
+  const btnEratoView3d = document.getElementById('btn-erato-view-3d');
   const btnEratoViewAll = document.getElementById('btn-erato-view-all');
+
+  if (btnEratoView3d) {
+    btnEratoView3d.addEventListener('click', () => {
+      if (sentimentDatePicker) sentimentDatePicker.value = '';
+      btnEratoView3d.className = 'btn btn-primary btn-sm';
+      if (btnEratoViewAll) btnEratoViewAll.className = 'btn btn-secondary btn-sm';
+      loadDailySentiments('3d');
+    });
+  }
+
   if (btnEratoViewAll) {
     btnEratoViewAll.addEventListener('click', () => {
       if (sentimentDatePicker) sentimentDatePicker.value = '';
       btnEratoViewAll.className = 'btn btn-primary btn-sm';
-      loadDailySentiments('all');
+      if (btnEratoView3d) btnEratoView3d.className = 'btn btn-secondary btn-sm';
+      loadDailySentiments('30d');
     });
   }
 
   if (sentimentDatePicker) {
     sentimentDatePicker.addEventListener('change', (e) => {
+      if (btnEratoView3d) btnEratoView3d.className = 'btn btn-secondary btn-sm';
       if (btnEratoViewAll) btnEratoViewAll.className = 'btn btn-secondary btn-sm';
       loadDailySentiments(e.target.value);
     });
@@ -2823,19 +2836,26 @@ window.runHermesQuery = runHermesQuery;
 // --- Subsistema de Sentimentos & Série Temporal (Erato) ---
 
 let cachedDailySnapshots = [];
-let currentEratoTargetDate = 'all';
+let currentEratoTargetDate = '3d';
 
-async function loadDailySentiments(targetDate = 'all') {
+async function loadDailySentiments(targetDate = '3d') {
   const container = document.getElementById('sentiment-daily-container');
   const badge = document.getElementById('sentiment-day-badge');
   if (!container) return;
 
   currentEratoTargetDate = targetDate;
-  const isAll = !targetDate || targetDate === 'all' || targetDate === 'todos';
-  const url = isAll ? '/api/v1/memory/sentiment/daily?date=all&days=30' : `/api/v1/memory/sentiment/daily?date=${targetDate}`;
+  const is3d = !targetDate || targetDate === '3d' || targetDate === '3days';
+  const is30d = targetDate === '30d' || targetDate === 'all' || targetDate === 'todos';
   
-  if (badge) {
-    badge.textContent = isAll ? 'Últimos 30 Dias' : targetDate;
+  let url = `/api/v1/memory/sentiment/daily?date=${targetDate}`;
+  if (is3d) {
+    url = '/api/v1/memory/sentiment/daily?date=3d&days=3';
+    if (badge) badge.textContent = 'Últimos 3 Dias';
+  } else if (is30d) {
+    url = '/api/v1/memory/sentiment/daily?date=all&days=30';
+    if (badge) badge.textContent = 'Últimos 30 Dias';
+  } else {
+    if (badge) badge.textContent = targetDate;
   }
 
   container.innerHTML = `
@@ -3088,7 +3108,7 @@ async function loadAnalyticsDashboard() {
   const periodSelect = document.getElementById('analytics-period');
   const groupSelect = document.getElementById('analytics-groupby');
 
-  const period = periodSelect ? periodSelect.value : '30d';
+  const period = periodSelect ? periodSelect.value : '3d';
   const groupBy = groupSelect ? groupSelect.value : 'day';
 
   try {

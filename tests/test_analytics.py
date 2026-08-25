@@ -290,3 +290,65 @@ def test_analytics_actionability_rate_never_exceeds_100_percent():
         db.close()
 
 
+def test_analytics_period_3d_and_human_engagement_ranking():
+    """Testa o período 3d e garante que conversas humanas com áudio e tarefas superam bots de SAC com rajadas de texto."""
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+
+        # 1. Contato Humano com 1 áudio e 1 tarefa
+        m_human = MessageRecord(
+            id="msg-human-voice",
+            created_at=now - timedelta(days=1),
+            speaker="Larissa Cooperada",
+            revised_text="Preciso alinhar a rota dos caminhões de ração para amanhã cedo.",
+            audio_duration_s=65.0,
+            sentiment="POSITIVE",
+            sentiment_score=0.7,
+        )
+        t_human = TaskRecord(
+            id="task-human-1",
+            message_id="msg-human-voice",
+            created_at=now - timedelta(days=1),
+            title="Alinhar rota de caminhões",
+            status="PENDING",
+        )
+        db.add_all([m_human, t_human])
+
+        # 2. Bot de Autoatendimento com 20 mensagens mecânicas de texto sem áudio e sem tarefa
+        for i in range(20):
+            m_bot = MessageRecord(
+                id=f"msg-bot-sac-{i}",
+                created_at=now - timedelta(days=1),
+                speaker="5511999990000",
+                meta_info={"phone": "5511999990000", "pushName": "Central SAC Automático"},
+                revised_text=f"Olá! Você é o número {200 + i} na fila de espera do atendimento. Digite 1 para aguardar.",
+                audio_duration_s=None,
+                sentiment="NEUTRAL",
+                sentiment_score=0.0,
+            )
+            db.add(m_bot)
+
+        db.commit()
+
+        # Consulta com período padrão 3d
+        metrics_3d = analytics_service.get_dashboard_metrics(period="3d", group_by="day", db=db)
+        assert metrics_3d.period == "3d"
+        assert len(metrics_3d.timeseries) == 3
+
+        # O interlocutor humano (Larissa) deve estar à frente do bot de SAC no ranking mesmo com menos mensagens brutas
+        speakers = [s.speaker for s in metrics_3d.top_senders]
+        assert "Larissa Cooperada" in speakers
+        larissa_idx = next(i for i, s in enumerate(metrics_3d.top_senders) if s.speaker == "Larissa Cooperada")
+        assert metrics_3d.top_senders[larissa_idx].audio_count == 1
+        assert metrics_3d.top_senders[larissa_idx].tasks_count == 1
+
+        bot_indices = [i for i, s in enumerate(metrics_3d.top_senders) if "SAC" in s.speaker or "5511999990000" in s.speaker]
+        if bot_indices:
+            # Se o bot estiver no ranking, deve estar atrás de Larissa
+            assert bot_indices[0] > larissa_idx
+    finally:
+        db.close()
+
+
+

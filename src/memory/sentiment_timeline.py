@@ -80,7 +80,7 @@ class SentimentTimelineService:
             snapshots_responses: list[DailySentimentSnapshotResponse] = []
             total_interactions = len(messages)
 
-            from src.ai_gateway.bypass import is_owner_interaction
+            from src.ai_gateway.bypass import is_owner_interaction, is_automated_service_message
 
             # Carrega catálogo de contatos para resolução flexível
             all_contacts = db.query(ContactRecord).all()
@@ -95,9 +95,17 @@ class SentimentTimelineService:
                 neu = 0
                 neg = 0
                 highlights = []
+                automated_msgs_count = 0
 
                 for msg in msgs:
-                    sent = (msg.sentiment or "NEUTRAL").upper()
+                    msg_txt = (msg.raw_text or msg.revised_text or "").strip()
+                    is_auto = is_automated_service_message(msg_txt)
+                    if is_auto:
+                        automated_msgs_count += 1
+                        sent = "NEUTRAL"
+                    else:
+                        sent = (msg.sentiment or "NEUTRAL").upper()
+
                     if sent in ["POSITIVE", "POSITIVO", "CONFIDENT", "CONFIANTE"]:
                         pos += 1
                     elif sent in ["NEGATIVE", "NEGATIVO", "URGENT", "URGENTE", "ANXIOUS", "ANSIOSO", "FRUSTRATED", "FRUSTRADO"]:
@@ -110,6 +118,11 @@ class SentimentTimelineService:
                         highlights.append(f"[{sent}] {summary_or_text}")
 
                 dominant_sent, avg_score = compute_dominant_sentiment(pos, neu, neg)
+
+                # Se for 100% de mensagens de sistema/autoatendimento, neutraliza o tom
+                if automated_msgs_count == len(msgs) and len(msgs) > 0:
+                    dominant_sent = "NEUTRAL"
+                    avg_score = 0.0
 
                 # Resolução estrita do contato cadastrado (evita colisões de substring)
                 speaker_clean = speaker.strip().lower()
@@ -239,17 +252,27 @@ class SentimentTimelineService:
     def get_daily_snapshots(
         self,
         target_date: Optional[str] = None,
-        days: int = 30,
+        days: int = 3,
         db: Session | None = None,
     ) -> list[DailySentimentSnapshotResponse]:
-        """Retorna os snapshots gravados para uma data específica ou agregados dos últimos N dias."""
+        """Retorna os snapshots gravados para uma data específica ou agregados dos últimos N dias (padrão: 3 dias)."""
         should_close = False
         if db is None:
             db = SessionLocal()
             should_close = True
 
         try:
-            is_all = not target_date or target_date.lower() in ("all", "todos", "")
+            target_clean = (target_date or "3d").lower()
+            if target_clean in ("3d", "3days", "3_dias"):
+                days = 3
+                is_all = True
+            elif target_clean in ("7d", "7days"):
+                days = 7
+                is_all = True
+            elif target_clean in ("30d", "30days", "all", "todos", ""):
+                is_all = True
+            else:
+                is_all = False
 
             if is_all:
                 from datetime import timedelta
