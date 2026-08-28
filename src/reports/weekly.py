@@ -8,6 +8,7 @@ from src.ai_gateway.schemas import DailyActionItem, WeeklyReportResponse
 from src.memory.database import SessionLocal
 from src.memory.graph import knowledge_graph
 from src.memory.models import MessageRecord, TaskRecord
+from src.memory.timezone_utils import BRASILIA_TZ, get_now_brt, to_local_tz, format_brt
 
 
 def deduplicate_list(items: list[str]) -> list[str]:
@@ -104,7 +105,7 @@ class WeeklyReportService:
             db = SessionLocal()
             should_close = True
 
-        now = datetime.now(timezone.utc)
+        now = get_now_brt()
         if not end_date:
             end_date = now.strftime("%Y-%m-%d")
         if not start_date:
@@ -113,8 +114,8 @@ class WeeklyReportService:
         period_str = f"{start_date} a {end_date}"
 
         try:
-            start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-            end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=BRASILIA_TZ)
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59, tzinfo=BRASILIA_TZ)
 
             all_msgs = db.query(MessageRecord).all()
             weekly_msgs = [
@@ -124,10 +125,10 @@ class WeeklyReportService:
                     "intent": m.intent,
                     "summary": m.summary,
                     "revised_text": m.revised_text,
-                    "created_at": m.created_at.strftime("%Y-%m-%d") if m.created_at else "",
+                    "created_at": format_brt(m.created_at, "%Y-%m-%d") if m.created_at else "",
                 }
                 for m in all_msgs
-                if m.created_at and start_dt <= m.created_at.replace(tzinfo=timezone.utc) <= end_dt
+                if m.created_at and to_local_tz(m.created_at) and start_dt <= to_local_tz(m.created_at) <= end_dt
             ]
 
             all_tasks = db.query(TaskRecord).all()

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from src.contacts.models import ContactRecord
 from src.config import settings
 from src.memory.database import SessionLocal
+from src.memory.timezone_utils import get_now_brt, to_local_tz, format_brt
 from src.memory.models import (
     DailySentimentCollectionResponse,
     DailySentimentSnapshotRecord,
@@ -59,16 +60,18 @@ class SentimentTimelineService:
 
         try:
             if not target_date:
-                target_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                target_date = get_now_brt().strftime("%Y-%m-%d")
 
-            # Busca todas as mensagens da data de forma compatível com PostgreSQL e SQLite
-            from sqlalchemy import cast, String
-            messages = (
+            # Busca mensagens e filtra garantindo conversão para o fuso horário de Brasília
+            all_messages = (
                 db.query(MessageRecord)
-                .filter(cast(MessageRecord.created_at, String).like(f"{target_date}%"))
                 .order_by(MessageRecord.created_at.asc())
                 .all()
             )
+            messages = [
+                m for m in all_messages
+                if m.created_at and to_local_tz(m.created_at) and to_local_tz(m.created_at).strftime("%Y-%m-%d") == target_date
+            ]
 
             # Agrupa por speaker
             person_messages = defaultdict(list)

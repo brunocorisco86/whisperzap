@@ -8,6 +8,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 from src.dictionary.harvester import lexical_harvester
+from src.memory.timezone_utils import get_now_brt
 
 logger = logging.getLogger(__name__)
 
@@ -16,12 +17,12 @@ _last_executed_hour: dict[str, str] = {}
 
 
 async def _background_scheduler_loop():
-    """Loop assíncrono que verifica horários de agendamento (18:00 e 19:00)."""
-    logger.info("🕒 Hermes Background Scheduler iniciado com sucesso na VPS.")
+    """Loop assíncrono que verifica horários de agendamento (18:00 e 19:00 BRT)."""
+    logger.info("🕒 Hermes Background Scheduler iniciado com sucesso (Horário de Brasília / America/Sao_Paulo).")
 
     while True:
         try:
-            now = datetime.now()
+            now = get_now_brt()
             today_str = now.strftime("%Y-%m-%d")
             hour = now.hour
             minute = now.minute

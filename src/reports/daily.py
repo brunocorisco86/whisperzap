@@ -7,6 +7,7 @@ from src.ai_gateway.agent import hermes_agent_service
 from src.ai_gateway.schemas import DailyActionItem, DailySummaryResponse
 from src.memory.database import SessionLocal
 from src.memory.models import MessageRecord, TaskRecord
+from src.memory.timezone_utils import get_now_brt, to_local_tz, format_brt
 
 
 def deduplicate_list(items: list[str]) -> list[str]:
@@ -118,10 +119,10 @@ class DailyReportService:
             should_close = True
 
         if not target_date:
-            target_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            target_date = get_now_brt().strftime("%Y-%m-%d")
 
         try:
-            # Busca mensagens do dia
+            # Busca mensagens do dia considerando o fuso horário de Brasília
             msg_query = db.query(MessageRecord)
             if speaker_filter:
                 msg_query = msg_query.filter(MessageRecord.speaker == speaker_filter)
@@ -134,10 +135,10 @@ class DailyReportService:
                     "intent": m.intent,
                     "summary": m.summary,
                     "revised_text": m.revised_text,
-                    "created_at": m.created_at.strftime("%Y-%m-%d %H:%M"),
+                    "created_at": format_brt(m.created_at),
                 }
                 for m in all_msgs
-                if m.created_at and m.created_at.strftime("%Y-%m-%d") == target_date
+                if m.created_at and to_local_tz(m.created_at) and to_local_tz(m.created_at).strftime("%Y-%m-%d") == target_date
             ]
 
             # Busca tarefas do dia ou tarefas pendentes gerais
@@ -150,10 +151,10 @@ class DailyReportService:
                     "due_date": t.due_date,
                     "priority": t.priority,
                     "status": t.status,
-                    "created_at": t.created_at.strftime("%Y-%m-%d") if t.created_at else None,
+                    "created_at": format_brt(t.created_at, "%Y-%m-%d") if t.created_at else None,
                 }
                 for t in all_tasks
-                if (t.created_at and t.created_at.strftime("%Y-%m-%d") == target_date) or t.status == "PENDING"
+                if (t.created_at and to_local_tz(t.created_at) and to_local_tz(t.created_at).strftime("%Y-%m-%d") == target_date) or t.status == "PENDING"
             ]
 
             # Executa a coleta e consolidação dos sentimentos 'as is' para a série temporal
