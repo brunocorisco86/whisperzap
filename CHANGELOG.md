@@ -4,6 +4,26 @@ Todas as mudanças notáveis, refatorações arquiteturais, motores de IA e otim
 
 ---
 
+## [v2.7.0] — 2026-08-27 — Release: Timezone Alignment & Background Scheduler Accuracy
+
+### 🕒 1. Alinhamento de Fuso Horário (Horário Oficial de Brasília — BRT / UTC-3)
+- **Correção no Background Cron (`src/scheduler/cron_service.py`)**: Substituição do uso de relógio ingênuo do sistema (`datetime.now()`), que operava no fuso UTC na VPS Hostinger, pelo helper `get_now_brt()`, eliminando o disparo antecipado das 15:00 e fixando os disparos nos horários exatos do horário comercial brasileiro:
+  - **18:00 BRT**: Resumo Diário & Plano para Amanhã via WhatsApp.
+  - **19:00 BRT**: Execução do Agente Pescador Léxico (Harvester).
+  - **Domingo 20:00 BRT**: Relatório Semanal & Plano de Domingo.
+  - **Domingo 02:00 BRT**: Descoberta semanal de novos modelos de IA custo-eficientes.
+  - **Domingo 23:00 BRT**: Faxina semanal do Grafo de Conhecimento pela Zeladora.
+
+### 📊 2. Filtragem de Mensagens e Tarefas por Fuso Horário
+- **Resumo Diário (`src/reports/daily.py`) & Relatório Semanal (`src/reports/weekly.py`)**: Filtragem e agrupamento de mensagens e tarefas ajustados para converter os timestamps gravados em UTC para o Horário de Brasília via `to_local_tz()` e `format_brt()`, evitando que mensagens do fim do dia sejam alocadas incorretamente no dia seguinte.
+- **Série Temporal de Sentimentos (`src/memory/sentiment_timeline.py`)**: Consolidação diária de humor ajustada para o dia civil no fuso de Brasília.
+
+### 🧪 3. Cobertura de Testes Automatizados
+- **Nova Suite `tests/test_scheduler_timezone.py`**: Testes unitários para validar que o agendador reage estritamente no fuso BRT e rejeita disparos em horários incorretos de UTC.
+- Cobertura validada e aprovada com 100% de sucesso.
+
+---
+
 ## [v2.6.0] — 2026-08-20 — Release: Long Audio Resilience & Executive Post-Processing
 
 ### 🎙️ 1. Resiliência de Áudios Longos & Fallback Gracioso (Zero 502)
