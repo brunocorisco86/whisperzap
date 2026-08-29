@@ -79,6 +79,17 @@ def init_db() -> None:
             ("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS can_generate_tasks BOOLEAN DEFAULT FALSE" if not is_sqlite else "ALTER TABLE contacts ADD COLUMN can_generate_tasks BOOLEAN DEFAULT 0"),
             ("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS last_interaction_at TIMESTAMP WITH TIME ZONE" if not is_sqlite else "ALTER TABLE contacts ADD COLUMN last_interaction_at TIMESTAMP"),
             ("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS notes TEXT" if not is_sqlite else "ALTER TABLE tasks ADD COLUMN notes TEXT"),
+            ("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_idea BOOLEAN DEFAULT FALSE" if not is_sqlite else "ALTER TABLE tasks ADD COLUMN is_idea BOOLEAN DEFAULT 0"),
+            ("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_epic BOOLEAN DEFAULT FALSE" if not is_sqlite else "ALTER TABLE tasks ADD COLUMN is_epic BOOLEAN DEFAULT 0"),
+            ("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN DEFAULT FALSE" if not is_sqlite else "ALTER TABLE tasks ADD COLUMN is_favorite BOOLEAN DEFAULT 0"),
+            ("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS in_vault BOOLEAN DEFAULT FALSE" if not is_sqlite else "ALTER TABLE tasks ADD COLUMN in_vault BOOLEAN DEFAULT 0"),
+            ("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS postponed_until TIMESTAMP WITH TIME ZONE" if not is_sqlite else "ALTER TABLE tasks ADD COLUMN postponed_until TIMESTAMP"),
+            ("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS reminder_scheduled_at TIMESTAMP WITH TIME ZONE" if not is_sqlite else "ALTER TABLE tasks ADD COLUMN reminder_scheduled_at TIMESTAMP"),
+            ("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS vault_reason VARCHAR(255)" if not is_sqlite else "ALTER TABLE tasks ADD COLUMN vault_reason VARCHAR(255)"),
+            ("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS procrastination_factor VARCHAR(50)" if not is_sqlite else "ALTER TABLE tasks ADD COLUMN procrastination_factor VARCHAR(50)"),
+            ("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS stakeholder_link VARCHAR(150)" if not is_sqlite else "ALTER TABLE tasks ADD COLUMN stakeholder_link VARCHAR(150)"),
+            ("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS project_link VARCHAR(150)" if not is_sqlite else "ALTER TABLE tasks ADD COLUMN project_link VARCHAR(150)"),
+            ("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS reassessment_notes TEXT" if not is_sqlite else "ALTER TABLE tasks ADD COLUMN reassessment_notes TEXT"),
         ]
 
         for stmt in migrations:

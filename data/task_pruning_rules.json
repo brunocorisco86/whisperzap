@@ -1,20 +1,20 @@
 {
   "version": "1.1",
-  "last_optimized_at": "2026-08-25T00:39:28.549435+00:00",
+  "last_optimized_at": "2026-08-29T02:36:34.977430+00:00",
   "total_cancelled_analyzed": 2,
   "negative_guidelines": [
     "NUNCA crie tarefas baseadas em mensagens que contenham apenas intenção de comunicação futura (ex: 'preciso falar com', 'vou ligar para') sem uma ação concreta de execução.",
-    "NUNCA gere tarefas a partir de campos de texto vazios, nulos ou que contenham apenas metadados de sistema sem conteúdo semântico relevante.",
+    "NUNCA gere tarefas se o texto de origem estiver vazio, nulo ou contiver apenas metadados irrelevantes.",
     "NUNCA interprete observações descritivas ou relatos de estado atual (ex: 'aves sentadas') como tarefas, a menos que haja um verbo de ação explícito solicitando intervenção ou correção.",
-    "NUNCA crie tarefas para menções de urgência que não especifiquem o 'o quê' deve ser feito, tratando-as apenas como contexto de conversação.",
-    "NUNCA deduza tarefas baseadas em suposições ou inferências sobre o estado operacional; a tarefa deve ser extraída estritamente de uma solicitação direta ou comando de ação."
+    "NUNCA crie tarefas para menções de urgência que não descrevam um procedimento técnico ou operacional específico a ser realizado.",
+    "NUNCA deduza tarefas de contextos ambíguos onde a intenção do usuário é apenas informar um fato ou registrar uma observação passiva."
   ],
   "noise_taxonomies": {
     "FIELD_OBSERVATION": "Frases nominais curtas descrevendo sintomas ou estados sem comando imperativo.",
     "STATUS_UPDATE": "Mensagens relatando progresso, espera ou remarcação passiva de prazos.",
     "ROADMAP_CHAT": "Discussões de ideias futuras ou brainstormings não atribuídos.",
     "HYPOTHETICAL_ADVICE": "Sugestões que dependem de condições incertas não acionáveis no momento.",
-    "LLM_SUMMARY": "O sistema está falhando ao confundir intenções de comunicação (agendamentos de conversa) e descrições de estado (observações passivas) com tarefas executáveis, além de processar inputs vazios como dados válidos."
+    "LLM_SUMMARY": "O sistema está confundindo intenções de comunicação (agendamento de conversas) e relatos descritivos de rotina com tarefas operacionais, além de falhar ao processar entradas vazias."
   },
   "metrics": {
     "cancelled_count": 2,

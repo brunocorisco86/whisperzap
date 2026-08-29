@@ -13,6 +13,10 @@ let graphRawData = null;
 // Performance & Pagination State
 let contactsLimit = 20;
 let tasksLimit = 10;
+let tasksCurrentPage = 1;
+let tasksPageSize = 10;
+let tasksViewMode = 'active'; // 'active', 'vault', 'garden', 'radar'
+let procrastinationRadarChart = null;
 let messagesCurrentPage = 1;
 const messagesPageSize = 10;
 let dictCurrentPage = 1;
@@ -32,6 +36,7 @@ const messagesContainer = document.getElementById('messages-container');
 const countContactsEl = document.getElementById('count-contacts');
 const countDictEl = document.getElementById('count-dict');
 const countTasksEl = document.getElementById('count-tasks');
+const countVaultTasksEl = document.getElementById('count-vault-tasks');
 const statGraphNodesEl = document.getElementById('stat-graph-nodes');
 
 const contactSearchInput = document.getElementById('contact-search');
@@ -41,6 +46,7 @@ const dictSearchInput = document.getElementById('dict-search');
 const dictFilterCategory = document.getElementById('dict-filter-category');
 const tasksSearchInput = document.getElementById('tasks-search');
 const tasksFilterSpeaker = document.getElementById('tasks-filter-speaker');
+const tasksFilterNature = document.getElementById('tasks-filter-nature');
 const tasksFilterStatus = document.getElementById('tasks-filter-status');
 const tasksFilterPriority = document.getElementById('tasks-filter-priority');
 const msgSearchInput = document.getElementById('msg-search');
@@ -282,15 +288,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  if (tasksSearchInput) tasksSearchInput.addEventListener('input', renderTasks);
-  if (tasksFilterSpeaker) tasksFilterSpeaker.addEventListener('change', renderTasks);
-  if (tasksFilterStatus) tasksFilterStatus.addEventListener('change', renderTasks);
-  if (tasksFilterPriority) tasksFilterPriority.addEventListener('change', renderTasks);
+  if (tasksSearchInput) tasksSearchInput.addEventListener('input', () => { tasksCurrentPage = 1; renderTasks(); });
+  if (tasksFilterSpeaker) tasksFilterSpeaker.addEventListener('change', () => { tasksCurrentPage = 1; renderTasks(); });
+  if (tasksFilterNature) tasksFilterNature.addEventListener('change', () => { tasksCurrentPage = 1; renderTasks(); });
+  if (tasksFilterStatus) tasksFilterStatus.addEventListener('change', () => { tasksCurrentPage = 1; renderTasks(); });
+  if (tasksFilterPriority) tasksFilterPriority.addEventListener('change', () => { tasksCurrentPage = 1; renderTasks(); });
 
   const tasksLimitSelect = document.getElementById('tasks-limit-select');
   if (tasksLimitSelect) {
     tasksLimitSelect.addEventListener('change', (e) => {
-      tasksLimit = e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10);
+      tasksPageSize = e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10);
+      tasksLimit = tasksPageSize;
+      tasksCurrentPage = 1;
       renderTasks();
     });
   }
@@ -755,13 +764,26 @@ function updateTasksSpeakerOptions() {
 
 async function loadTasks() {
   try {
-    const res = await fetch('/api/v1/memory/tasks');
+    const res = await fetch(`/api/v1/memory/tasks?view_mode=${tasksViewMode}`);
     if (res.ok) {
       allTasks = await res.json();
-      if (countTasksEl) countTasksEl.textContent = allTasks.filter(t => t.status === 'PENDING').length;
+      if (countTasksEl && tasksViewMode === 'active') {
+        countTasksEl.textContent = allTasks.filter(t => t.status === 'PENDING').length;
+      }
       updateTasksSpeakerOptions();
       renderTasks();
     }
+
+    // Atualiza contador de itens ativos no Baú
+    try {
+      const vaultRes = await fetch('/api/v1/memory/tasks?view_mode=vault');
+      if (vaultRes.ok) {
+        const vaultTasks = await vaultRes.json();
+        const vCount = vaultTasks.filter(t => t.status !== 'DONE').length;
+        const countVaultEl = document.getElementById('count-vault-tasks');
+        if (countVaultEl) countVaultEl.textContent = vCount;
+      }
+    } catch (_) {}
   } catch (err) {
     console.error('Erro ao carregar tarefas:', err);
   }
@@ -1269,6 +1291,7 @@ function renderTasks() {
 
   const searchTerm = (tasksSearchInput ? tasksSearchInput.value : '').toLowerCase().trim();
   const filterSpeaker = tasksFilterSpeaker ? tasksFilterSpeaker.value.toLowerCase().trim() : '';
+  const filterNature = tasksFilterNature ? tasksFilterNature.value : '';
   const filterStatus = tasksFilterStatus ? tasksFilterStatus.value.toUpperCase() : '';
   const filterPriority = tasksFilterPriority ? tasksFilterPriority.value.toUpperCase() : '';
 
@@ -1280,35 +1303,61 @@ function renderTasks() {
       (t.assignee && t.assignee.toLowerCase().includes(searchTerm)) ||
       (t.speaker && t.speaker.toLowerCase().includes(searchTerm)) ||
       (t.message_summary && t.message_summary.toLowerCase().includes(searchTerm)) ||
+      (t.vault_reason && t.vault_reason.toLowerCase().includes(searchTerm)) ||
+      (t.stakeholder_link && t.stakeholder_link.toLowerCase().includes(searchTerm)) ||
+      (t.project_link && t.project_link.toLowerCase().includes(searchTerm)) ||
       matchTags
     );
     const matchSpeaker = !filterSpeaker || (t.speaker && t.speaker.toLowerCase().trim() === filterSpeaker);
     const matchStatus = !filterStatus || t.status === filterStatus;
     const matchPriority = !filterPriority || t.priority === filterPriority;
-    return matchSearch && matchSpeaker && matchStatus && matchPriority;
+
+    let matchNature = true;
+    if (filterNature === 'FAVORITE') matchNature = Boolean(t.is_favorite);
+    else if (filterNature === 'EPIC') matchNature = Boolean(t.is_epic);
+    else if (filterNature === 'IDEA') matchNature = Boolean(t.is_idea);
+
+    return matchSearch && matchSpeaker && matchStatus && matchPriority && matchNature;
   });
 
   const totalFiltered = filtered.length;
   const paginationBar = document.getElementById('tasks-pagination-bar');
   const paginationInfo = document.getElementById('tasks-pagination-info');
+  const btnPrev = document.getElementById('btn-tasks-prev');
+  const btnNext = document.getElementById('btn-tasks-next');
 
   if (totalFiltered === 0) {
     if (paginationBar) paginationBar.style.display = 'none';
+    const emptyMsg = tasksViewMode === 'vault'
+      ? 'Nenhuma tarefa no Baú de Espera (Vault)'
+      : 'Nenhuma tarefa encontrada no fluxo imediato';
+    const emptySub = tasksViewMode === 'vault'
+      ? 'Tarefas com prazos superiores a 7 dias ou adiadas para reavaliação aparecerão aqui.'
+      : 'Tarefas acionáveis de curto prazo extraídas de notas de voz aparecerão aqui com a ancoragem de quem solicitou.';
+
     tasksContainer.innerHTML = `
       <div class="empty-state" style="text-align: center; padding: 3rem; color: var(--text-muted);">
-        <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">Nenhuma tarefa encontrada</p>
-        <small>Tarefas acionáveis extraídas de notas de voz aparecerão aqui com a ancoragem de quem solicitou.</small>
+        <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">${emptyMsg}</p>
+        <small>${emptySub}</small>
       </div>
     `;
     return;
   }
 
-  const displayedList = tasksLimit === 'all' ? filtered : filtered.slice(0, tasksLimit);
+  const effectivePageSize = tasksPageSize === 'all' ? totalFiltered : (parseInt(tasksPageSize, 10) || 10);
+  const totalPages = Math.ceil(totalFiltered / effectivePageSize) || 1;
+  if (tasksCurrentPage > totalPages) tasksCurrentPage = totalPages;
+  if (tasksCurrentPage < 1) tasksCurrentPage = 1;
+
+  const startIndex = tasksPageSize === 'all' ? 0 : (tasksCurrentPage - 1) * effectivePageSize;
+  const displayedList = tasksPageSize === 'all' ? filtered : filtered.slice(startIndex, startIndex + effectivePageSize);
 
   if (paginationBar) paginationBar.style.display = 'flex';
   if (paginationInfo) {
-    paginationInfo.innerHTML = `Exibindo <strong>${displayedList.length}</strong> de <strong>${totalFiltered}</strong> tarefas`;
+    paginationInfo.innerHTML = `Página <strong>${tasksCurrentPage}</strong> de <strong>${totalPages}</strong> (Total: ${totalFiltered} tarefas)`;
   }
+  if (btnPrev) btnPrev.disabled = tasksCurrentPage <= 1;
+  if (btnNext) btnNext.disabled = tasksCurrentPage >= totalPages || tasksPageSize === 'all';
 
   tasksContainer.innerHTML = displayedList.map(t => {
     const isDone = t.status === 'DONE';
@@ -1337,20 +1386,66 @@ function renderTasks() {
     if (isDone) cardClass += ' task-done';
     if (isCancelled) cardClass += ' task-cancelled';
 
+    // Formatadores do Baú
+    let vaultBannerHtml = '';
+    if (t.in_vault) {
+      const delayStr = t.postponed_until ? `Adiada até ${typeof t.postponed_until === 'string' ? t.postponed_until.substring(0, 10) : ''}` : 'No Baú (Prazo estendido)';
+      const reminderStr = t.reminder_scheduled_at ? ` • 🔔 Lembrete agendado` : '';
+      const reasonStr = t.vault_reason ? ` • Motivo: ${t.vault_reason}` : '';
+      const factorMap = {
+        'LOW_URGENCY': '⏳ Baixa Urgência',
+        'DEPENDENCY': '🤝 Dependência de Terceiros',
+        'SCOPE_CLARITY': '🔍 Falta Clareza Escopo',
+        'OVERLOAD_ANXIETY': '🧘 Sobrecarga Mental',
+        'PERFECTIONISM': '✨ Perfeccionismo/Complexidade',
+        'LACK_OF_RESOURCES': '📦 Recursos/Alinhamento',
+      };
+      const factorLabel = t.procrastination_factor ? (factorMap[t.procrastination_factor] || t.procrastination_factor) : null;
+
+      vaultBannerHtml = `
+        <div class="task-vault-highlight">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span>🗝️ <b>${delayStr}</b>${reminderStr}</span>
+            ${factorLabel ? `<span class="badge" style="background: rgba(254, 240, 138, 0.2); color: #fef08a;">${factorLabel}</span>` : ''}
+          </div>
+          ${t.stakeholder_link ? `<div>👥 <b>Stakeholder:</b> ${t.stakeholder_link}</div>` : ''}
+          ${t.project_link ? `<div>🏢 <b>Projeto:</b> ${t.project_link}</div>` : ''}
+          ${t.reassessment_notes ? `<div style="font-style: italic; opacity: 0.9;">📝 Propósito: "${t.reassessment_notes}"</div>` : ''}
+        </div>
+      `;
+    }
+
     return `
       <div class="${cardClass}" id="task-card-${t.id}">
-        <!-- Topo: Título da Tarefa e Solicitante (Gatilho) -->
+        <!-- Topo: Título da Tarefa, Ações Estratégicas e Solicitante (Gatilho) -->
         <div class="task-top-row">
           <div style="flex: 1;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.25rem;">
+              <div class="task-quick-actions">
+                <button type="button" class="btn-pill-action ${t.is_favorite ? 'active-fav' : ''}" onclick="window.toggleTaskFavorite('${t.id}')" title="Fixar como Favorito">
+                  ${t.is_favorite ? '⭐ Favorito' : '☆ Favoritar'}
+                </button>
+                <button type="button" class="btn-pill-action ${t.is_epic ? 'active-epic' : ''}" onclick="window.toggleTaskEpic('${t.id}')" title="Marcar como Objetivo Épico">
+                  ${t.is_epic ? '🏛️ Épico' : '🏛️ Épico'}
+                </button>
+                <button type="button" class="btn-pill-action ${t.is_idea ? 'active-idea' : ''}" onclick="window.toggleTaskIdea('${t.id}')" title="Marcar como Ideia / Semente">
+                  ${t.is_idea ? '💡 Ideia' : '💡 Ideia'}
+                </button>
+              </div>
+            </div>
+
             <div class="task-title">
               ${isCancelled ? '<span style="color: #ef4444; font-size: 0.85rem; margin-right: 0.4rem;">[IGNORADA]</span>' : ''}
               ${t.title}
             </div>
+
             ${(t.tags && t.tags.length > 0) ? `
               <div class="task-tags-container">
                 ${t.tags.map(tag => `<span class="task-tag" onclick="filterTasksByTag('${tag.replace(/'/g, "\\'")}')" title="Filtrar tarefas por #${tag}">#${tag}</span>`).join('')}
               </div>
             ` : ''}
+
+            ${vaultBannerHtml}
           </div>
 
           <!-- Box de Ancoragem do Solicitante (Gatilho) -->
@@ -1456,6 +1551,16 @@ function renderTasks() {
           </div>
 
           <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            ${t.in_vault ? `
+              <button class="btn btn-primary btn-sm" onclick="window.restoreTaskFromVault('${t.id}')" title="Resgatar do Baú de volta ao fluxo imediato">
+                ⚡ Resgatar do Baú
+              </button>
+            ` : `
+              <button class="btn btn-secondary btn-sm" onclick="window.openVaultModal('${t.id}')" title="Adiar ou guardar no Baú para reavaliação de propósito">
+                🗝️ Guardar no Baú
+              </button>
+            `}
+
             <button class="btn btn-secondary btn-sm" onclick="generateTaskPDF('${t.id}')" title="Gerar visualização e PDF formatado desta tarefa para compartilhamento">
               📄 Gerar PDF
             </button>
@@ -1770,6 +1875,394 @@ async function mergeSimilarTasks() {
   }
 }
 window.mergeSimilarTasks = mergeSimilarTasks;
+
+// --- Terpsícore: Sub-visões, Paginação, Vault, Jardim & Radar ---
+
+function goToTasksPage(page) {
+  tasksCurrentPage = page;
+  renderTasks();
+  if (tasksContainer) tasksContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+window.goToTasksPage = goToTasksPage;
+
+function handleTasksLimitChange(val) {
+  tasksPageSize = val === 'all' ? 'all' : parseInt(val, 10);
+  tasksLimit = tasksPageSize;
+  tasksCurrentPage = 1;
+  renderTasks();
+}
+window.handleTasksLimitChange = handleTasksLimitChange;
+
+function switchTerpsicoreView(view) {
+  tasksViewMode = view;
+  tasksCurrentPage = 1;
+
+  // Atualiza botões da sub-barra de navegação
+  ['active', 'vault', 'garden', 'radar'].forEach(v => {
+    const btn = document.getElementById(`btn-tasks-subview-${v}`);
+    if (btn) {
+      if (v === view) {
+        btn.classList.remove('btn-secondary');
+        btn.classList.add('btn-primary', 'active');
+      } else {
+        btn.classList.remove('btn-primary', 'active');
+        btn.classList.add('btn-secondary');
+      }
+    }
+  });
+
+  const toolbar = document.getElementById('tasks-toolbar');
+  const listSection = document.getElementById('tasks-list-section');
+  const gardenSection = document.getElementById('garden-section');
+  const radarSection = document.getElementById('radar-section');
+  const btnMergeActive = document.getElementById('btn-merge-tasks');
+  const btnMergeVault = document.getElementById('btn-merge-vault-embeddings');
+
+  if (view === 'active' || view === 'vault') {
+    if (toolbar) toolbar.style.display = 'flex';
+    if (listSection) listSection.style.display = 'block';
+    if (gardenSection) gardenSection.style.display = 'none';
+    if (radarSection) radarSection.style.display = 'none';
+
+    if (btnMergeActive) btnMergeActive.style.display = view === 'active' ? 'inline-flex' : 'none';
+    if (btnMergeVault) btnMergeVault.style.display = view === 'vault' ? 'inline-flex' : 'none';
+
+    loadTasks();
+  } else if (view === 'garden') {
+    if (toolbar) toolbar.style.display = 'none';
+    if (listSection) listSection.style.display = 'none';
+    if (gardenSection) gardenSection.style.display = 'block';
+    if (radarSection) radarSection.style.display = 'none';
+    loadGardenMetrics();
+  } else if (view === 'radar') {
+    if (toolbar) toolbar.style.display = 'none';
+    if (listSection) listSection.style.display = 'none';
+    if (gardenSection) gardenSection.style.display = 'none';
+    if (radarSection) radarSection.style.display = 'block';
+    loadProcrastinationRadar();
+  }
+}
+window.switchTerpsicoreView = switchTerpsicoreView;
+
+async function toggleTaskFavorite(taskId) {
+  try {
+    const res = await fetch(`/api/v1/memory/tasks/${taskId}/toggle-favorite`, { method: 'POST' });
+    if (res.ok) {
+      const updated = await res.json();
+      showToast(updated.is_favorite ? '⭐ Tarefa fixada como Favorita!' : 'Tarefa removida dos favoritos.');
+      await loadTasks();
+    }
+  } catch (err) {
+    showToast('Erro ao favoritar tarefa: ' + err.message, 'error');
+  }
+}
+window.toggleTaskFavorite = toggleTaskFavorite;
+
+async function toggleTaskEpic(taskId) {
+  try {
+    const res = await fetch(`/api/v1/memory/tasks/${taskId}/toggle-epic`, { method: 'POST' });
+    if (res.ok) {
+      const updated = await res.json();
+      showToast(updated.is_epic ? '🏛️ Marcado como Objetivo Épico!' : 'Objetivo Épico desmarcado.');
+      await loadTasks();
+    }
+  } catch (err) {
+    showToast('Erro ao atualizar Objetivo Épico: ' + err.message, 'error');
+  }
+}
+window.toggleTaskEpic = toggleTaskEpic;
+
+async function toggleTaskIdea(taskId) {
+  try {
+    const res = await fetch(`/api/v1/memory/tasks/${taskId}/toggle-idea`, { method: 'POST' });
+    if (res.ok) {
+      const updated = await res.json();
+      showToast(updated.is_idea ? '💡 Registrado no Jardim de Ideias / Sementes!' : 'Removido das ideias.');
+      await loadTasks();
+    }
+  } catch (err) {
+    showToast('Erro ao atualizar Ideia: ' + err.message, 'error');
+  }
+}
+window.toggleTaskIdea = toggleTaskIdea;
+
+function openVaultModal(taskId) {
+  const t = allTasks.find(item => item.id === taskId);
+  if (!t) return;
+
+  const modal = document.getElementById('modal-vault-action');
+  const taskIdInput = document.getElementById('vault-task-id');
+  const modalTitle = document.getElementById('vault-modal-title');
+  const postponeDaysInput = document.getElementById('vault-postpone-days');
+  const reminderInput = document.getElementById('vault-reminder-datetime');
+  const factorSelect = document.getElementById('vault-procrastination-factor');
+  const stakeholderInput = document.getElementById('vault-stakeholder-link');
+  const projectInput = document.getElementById('vault-project-link');
+  const notesTextarea = document.getElementById('vault-reassessment-notes');
+
+  if (taskIdInput) taskIdInput.value = taskId;
+  if (modalTitle) modalTitle.textContent = `🗝️ Guardar no Baú: "${t.title.substring(0, 35)}..."`;
+  if (postponeDaysInput) postponeDaysInput.value = 7;
+  if (reminderInput) reminderInput.value = '';
+  if (factorSelect) factorSelect.value = t.procrastination_factor || 'LOW_URGENCY';
+  if (stakeholderInput) stakeholderInput.value = t.speaker || '';
+  if (projectInput) projectInput.value = '';
+  if (notesTextarea) notesTextarea.value = '';
+
+  if (modal) modal.style.display = 'flex';
+}
+window.openVaultModal = openVaultModal;
+
+function closeVaultModal() {
+  const modal = document.getElementById('modal-vault-action');
+  if (modal) modal.style.display = 'none';
+}
+window.closeVaultModal = closeVaultModal;
+
+function setVaultDelayPreset(days) {
+  const postponeDaysInput = document.getElementById('vault-postpone-days');
+  if (postponeDaysInput) postponeDaysInput.value = days;
+}
+window.setVaultDelayPreset = setVaultDelayPreset;
+
+async function saveVaultAction(event) {
+  if (event) event.preventDefault();
+  const taskId = document.getElementById('vault-task-id').value;
+  const postponeDays = parseInt(document.getElementById('vault-postpone-days').value, 10) || null;
+  const reminderDateTime = document.getElementById('vault-reminder-datetime').value || null;
+  const factor = document.getElementById('vault-procrastination-factor').value;
+  const stakeholder = document.getElementById('vault-stakeholder-link').value.trim() || null;
+  const project = document.getElementById('vault-project-link').value.trim() || null;
+  const reassessment = document.getElementById('vault-reassessment-notes').value.trim() || null;
+
+  try {
+    const res = await fetch(`/api/v1/memory/tasks/${taskId}/vault`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        postpone_days: postponeDays,
+        reminder_datetime: reminderDateTime ? reminderDateTime.replace('T', ' ') : null,
+        procrastination_factor: factor,
+        stakeholder_link: stakeholder,
+        project_link: project,
+        reassessment_notes: reassessment,
+      }),
+    });
+
+    if (res.ok) {
+      closeVaultModal();
+      showToast('🗝️ Tarefa guardada com sucesso no Baú de Espera (Vault)!');
+      await loadTasks();
+    } else {
+      showToast('Erro ao mover tarefa para o Baú', true);
+    }
+  } catch (err) {
+    showToast('Falha na comunicação: ' + err.message, 'error');
+  }
+}
+window.saveVaultAction = saveVaultAction;
+
+async function restoreTaskFromVault(taskId) {
+  try {
+    const res = await fetch(`/api/v1/memory/tasks/${taskId}/unvault`, { method: 'POST' });
+    if (res.ok) {
+      showToast('⚡ Tarefa resgatada com sucesso do Baú para o fluxo ativo!');
+      await loadTasks();
+    }
+  } catch (err) {
+    showToast('Erro ao resgatar tarefa: ' + err.message, 'error');
+  }
+}
+window.restoreTaskFromVault = restoreTaskFromVault;
+
+async function mergeVaultTasksEmbeddings() {
+  const confirmMsg = "Deseja agrupar e fundir tarefas no Baú utilizando cálculo vetorial de embeddings?\n\nPendências de longo prazo semelhantes serão unificadas para reduzir o ruído cognitivo.";
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    showToast('🧬 Executando fusão semântica por embeddings vetoriais...', false);
+    const res = await fetch('/api/v1/memory/tasks/vault/merge-embeddings', { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      showToast(`🧬 ${data.message}`);
+      await loadTasks();
+    }
+  } catch (err) {
+    showToast('Erro na fusão por embeddings: ' + err.message, 'error');
+  }
+}
+window.mergeVaultTasksEmbeddings = mergeVaultTasksEmbeddings;
+
+async function loadGardenMetrics() {
+  try {
+    const res = await fetch('/api/v1/memory/tasks/garden/metrics');
+    if (res.ok) {
+      const data = await res.json();
+      renderGarden(data);
+    }
+  } catch (err) {
+    console.error('Erro ao carregar Jardim de Realizações:', err);
+  }
+}
+window.loadGardenMetrics = loadGardenMetrics;
+
+function renderGarden(data) {
+  const seedsEl = document.getElementById('garden-kpi-seeds');
+  const activeEl = document.getElementById('garden-kpi-active');
+  const vaultEl = document.getElementById('garden-kpi-vault');
+  const harvestedEl = document.getElementById('garden-kpi-harvested');
+  const rateEl = document.getElementById('garden-kpi-rate');
+  const matEl = document.getElementById('garden-avg-maturation');
+
+  if (seedsEl) seedsEl.textContent = data.total_seeds || 0;
+  if (activeEl) activeEl.textContent = data.in_germination_active || 0;
+  if (vaultEl) vaultEl.textContent = data.in_germination_vault || 0;
+  if (harvestedEl) harvestedEl.textContent = data.total_harvested || 0;
+  if (rateEl) rateEl.textContent = `Taxa de Concretização: ${data.conversion_rate_pct || 0}%`;
+  if (matEl) matEl.textContent = `${data.avg_maturation_days || 0} dias`;
+
+  // Colheitas Recentes
+  const harvestContainer = document.getElementById('garden-harvest-list');
+  if (harvestContainer) {
+    if (!data.recent_harvests || data.recent_harvests.length === 0) {
+      harvestContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; padding: 1rem; text-align: center;">Nenhuma realização concluída recentemente no Jardim.</div>';
+    } else {
+      harvestContainer.innerHTML = data.recent_harvests.map(h => `
+        <div class="garden-harvest-item-card">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.35rem;">
+            <strong style="color: #6ee7b7; font-size: 0.9rem;">✅ ${h.title}</strong>
+            <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #6ee7b7; font-size: 0.72rem;">${h.maturation_days}d maturação</span>
+          </div>
+          <div style="font-size: 0.78rem; color: var(--text-muted); display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            <span>🌱 Concepção: ${h.conceived_at}</span>
+            <span>🌸 Realizado: ${h.realized_at}</span>
+            <span>👤 ${h.speaker}</span>
+            ${h.project ? `<span>🏢 ${h.project}</span>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+  }
+
+  // Constelações
+  const constContainer = document.getElementById('garden-constellations-list');
+  if (constContainer) {
+    if (!data.active_constellations || data.active_constellations.length === 0) {
+      constContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; padding: 1rem; text-align: center;">Nenhuma constelação de ideias em incubação no momento.</div>';
+    } else {
+      constContainer.innerHTML = data.active_constellations.map(c => `
+        <div class="garden-constellation-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+            <strong style="color: #93c5fd; font-size: 0.9rem;">✨ ${c.theme}</strong>
+            <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #bfdbfe; font-size: 0.72rem;">${c.ideas_count} ideias</span>
+          </div>
+          <ul style="padding-left: 1.2rem; margin: 0; font-size: 0.8rem; color: var(--text-secondary);">
+            ${c.sample_ideas.map(i => `<li>${i}</li>`).join('')}
+          </ul>
+        </div>
+      `).join('');
+    }
+  }
+}
+
+async function loadProcrastinationRadar() {
+  try {
+    const res = await fetch('/api/v1/memory/tasks/vault/radar');
+    if (res.ok) {
+      const data = await res.json();
+      renderProcrastinationRadar(data);
+    }
+  } catch (err) {
+    console.error('Erro ao carregar Radar de Procrastinação:', err);
+  }
+}
+window.loadProcrastinationRadar = loadProcrastinationRadar;
+
+function renderProcrastinationRadar(data) {
+  const canvas = document.getElementById('chart-procrastination-radar');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  const dims = data.dimensions || {};
+  const labels = [
+    'Clareza Escopo',
+    'Dependência',
+    'Ansiedade/Sobrecarga',
+    'Perfeccionismo',
+    'Baixa Urgência',
+    'Recursos/Alinhamento'
+  ];
+  const values = [
+    dims.SCOPE_CLARITY || 25,
+    dims.DEPENDENCY || 25,
+    dims.OVERLOAD_ANXIETY || 25,
+    dims.PERFECTIONISM || 25,
+    dims.LOW_URGENCY || 25,
+    dims.LACK_OF_RESOURCES || 25
+  ];
+
+  if (procrastinationRadarChart) {
+    procrastinationRadarChart.destroy();
+  }
+
+  const ctx = canvas.getContext('2d');
+  procrastinationRadarChart = new Chart(ctx, {
+    type: 'radar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Vetor de Estagnação (%)',
+        data: values,
+        backgroundColor: 'rgba(234, 179, 8, 0.25)',
+        borderColor: '#eab308',
+        pointBackgroundColor: '#fef08a',
+        pointBorderColor: '#090d16',
+        pointHoverBackgroundColor: '#fff',
+        pointHoverBorderColor: '#eab308',
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        r: {
+          angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+          grid: { color: 'rgba(255, 255, 255, 0.08)' },
+          pointLabels: {
+            color: '#f8fafc',
+            font: { size: 11, weight: '600' }
+          },
+          ticks: {
+            backdropColor: 'transparent',
+            color: '#64748b',
+            stepSize: 20,
+            max: 100,
+            min: 0,
+          }
+        }
+      },
+      plugins: {
+        legend: { display: false }
+      }
+    }
+  });
+
+  // Renderiza insights e top factors
+  const insightsContainer = document.getElementById('radar-insights-container');
+  if (insightsContainer) {
+    const topFactorsHtml = (data.top_factors && data.top_factors.length > 0)
+      ? `<div style="display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+          ${data.top_factors.slice(0, 3).map(tf => `<span class="badge" style="background: rgba(234, 179, 8, 0.15); color: #fef08a; font-size: 0.75rem;">${tf.factor}: ${tf.pct}%</span>`).join('')}
+         </div>`
+      : '';
+
+    const insightsHtml = (data.insights && data.insights.length > 0)
+      ? data.insights.map(ins => `<div class="radar-insight-pill">${ins}</div>`).join('')
+      : '<div class="radar-insight-pill">🌿 Suas tarefas estão distribuídas de forma equilibrada no Baú.</div>';
+
+    insightsContainer.innerHTML = topFactorsHtml + insightsHtml;
+  }
+}
 
 function toggleTaskAccordion(taskId) {
   const body = document.getElementById(`task-accordion-body-${taskId}`);

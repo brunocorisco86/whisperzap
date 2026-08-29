@@ -174,5 +174,83 @@ class DailyReportService:
             if should_close:
                 db.close()
 
+    async def generate_serenity_closing(
+        self,
+        target_date: Optional[str] = None,
+        db: Optional[Session] = None,
+    ) -> str:
+        """Gera a mensagem de Fechamento Sereno das 21:00 BRT com foco em descompressão e calma."""
+        should_close = False
+        if db is None:
+            db = SessionLocal()
+            should_close = True
+
+        if not target_date:
+            target_date = get_now_brt().strftime("%Y-%m-%d")
+
+        try:
+            from src.memory.repository import memory_repository
+            try:
+                dt = datetime.strptime(target_date, "%Y-%m-%d")
+                friendly_date = dt.strftime("%d/%m/%Y")
+            except Exception:
+                friendly_date = target_date
+
+            all_tasks = db.query(TaskRecord).all()
+            today_completed = [
+                t for t in all_tasks
+                if t.status == "DONE" and t.completed_at and to_local_tz(t.completed_at) and to_local_tz(t.completed_at).strftime("%Y-%m-%d") == target_date
+            ]
+
+            active_tasks = memory_repository.list_tasks(view_mode="active", status="PENDING", db=db)
+            vault_tasks = memory_repository.list_tasks(view_mode="vault", status="PENDING", db=db)
+
+            # Seleciona no máximo 3 prioridades para amanhã
+            top_tomorrow = active_tasks[:3]
+
+            lines = [
+                f"🌙 *FECHAMENTO SERENO — {friendly_date} (21:00)*",
+                f"_Descanse com a certeza de que seu dia foi produtivo e sua mente está livre de pendências soltas._\n",
+            ]
+
+            if today_completed:
+                lines.append(f"✨ *Conquistas de Hoje ({len(today_completed)}):*")
+                for t in today_completed[:4]:
+                    is_idea_badge = " 💡" if t.is_idea else ""
+                    lines.append(f"• ✅ {t.title}{is_idea_badge}")
+                lines.append("")
+            else:
+                lines.append("✨ *O dia de hoje foi de reflexão, alinhamentos e planejamento.*\n")
+
+            lines.append("🎯 *FOCO ESSENCIAL PARA AMANHÃ (Apenas o Vital):*")
+            if top_tomorrow:
+                for idx, t in enumerate(top_tomorrow, start=1):
+                    p_icon = "🔴" if t.priority in ["HIGH", "URGENT"] else "🔵"
+                    assignee_str = f" ({t.assignee})" if t.assignee else ""
+                    fav_icon = " ⭐" if t.is_favorite else ""
+                    epic_icon = " 🏛️" if t.is_epic else ""
+                    lines.append(f"{idx}. {p_icon} *{t.title}*{fav_icon}{epic_icon}{assignee_str}")
+            else:
+                lines.append("• Nenhuma tarefa urgente. O fluxo está calmo e livre para novos projetos.")
+
+            lines.append("")
+            vault_count = len(vault_tasks)
+            if vault_count > 0:
+                lines.append(
+                    f"🗝️ *No Baú de Espera (Vault):*\n"
+                    f"_{vault_count} tarefas de prazo estendido estão guardadas com segurança no seu Baú. "
+                    f"Você não precisa se preocupar com elas esta noite._"
+                )
+            else:
+                lines.append("🗝️ *Baú de Espera (Vault):* Todas as suas ideias e tarefas estão sincronizadas.")
+
+            lines.append("\n🌿 _\"A serenidade vem de saber que o essencial está organizado e o restante seguro no Baú.\"_")
+            lines.append("_Tenha uma ótima noite de descanso e serenidade!_ 😴✨")
+
+            return "\n".join(lines)
+        finally:
+            if should_close:
+                db.close()
+
 
 daily_report_service = DailyReportService()

@@ -187,8 +187,9 @@ def test_analytics_utc3_heatmap_and_timeseries_continuity():
 
     db = SessionLocal()
     try:
-        # Mensagem às 15:00 UTC (que equivale a 12:00 UTC-3 em Brasília)
-        dt_utc = datetime(2026, 8, 20, 15, 0, 0, tzinfo=timezone.utc)
+        # Mensagem às 15:00 UTC de ontem (que equivale a 12:00 UTC-3 em Brasília)
+        now_utc = datetime.now(timezone.utc)
+        dt_utc = (now_utc - timedelta(days=1)).replace(hour=15, minute=0, second=0, microsecond=0)
         m = MessageRecord(
             id="test-msg-utc3",
             created_at=dt_utc,

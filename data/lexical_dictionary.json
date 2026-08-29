@@ -40,14 +40,14 @@
     "term": "eProdutor",
     "phonetic_variations": [
       "ep",
-      "e produtor",
-      "aplicativo do produtor",
       "e-produtor",
       "EP",
+      "e produtor",
+      "aplicativo do produtor",
       "eprodutor"
     ],
     "expansion": "Aplicativo eProdutor C.Vale",
-    "category": "AGRONEGOCIO_COOP",
+    "category": "SISTEMAS_ERP",
     "description": "Plataforma digital de relacionamento e gestão para produtores integrados da C.Vale.",
     "id": "3dd119a9",
     "created_at": "2026-08-14T22:47:18.174150"
@@ -117,20 +117,20 @@
   {
     "term": "TMS",
     "phonetic_variations": [
-      "t em esse",
-      "t.m.s.",
-      "tem esse",
-      "t m s",
-      "tms",
-      "roteirizador",
       "t em s",
-      "têemeésse",
+      "temesse",
+      "tem esse",
+      "tms",
+      "t.m.s.",
+      "t em esse",
       "têmessi",
+      "roteirizador",
+      "t m s",
       "sistema tms",
-      "temesse"
+      "têemeésse"
     ],
     "expansion": "Transportation Management System",
-    "category": "LOGISTICA_SILOS",
+    "category": "LOGISTICA",
     "description": "Sistema de gestão de transporte utilizado para alocação de cargas e logística de ração.",
     "id": "2f3a4b56",
     "created_at": "2026-08-15T01:06:00.000000"
@@ -281,7 +281,7 @@
       "sensores de silo io te"
     ],
     "expansion": null,
-    "category": "LOGISTICA_SILOS",
+    "category": "LOGISTICA",
     "description": "Promovido manualmente a partir de: 'sensores de silo io te' (Estamos instalando sensores de silo io te na granja 04)",
     "id": "969e7342",
     "created_at": "2026-08-15T16:50:44.245649+00:00"

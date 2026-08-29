@@ -70,6 +70,29 @@ async def _background_scheduler_loop():
                     except Exception as e:
                         logger.error(f"❌ [Cron 18:00] Erro ao consolidar/enviar Resumo Diário: {e}")
 
+            # 3. Rotina das 21:00 -> Fechamento Sereno do Dia & Lembretes Ativos via WhatsApp
+            if hour == 21 and minute < 5:
+                key = f"serenity_closing_{today_str}"
+                if _last_executed_hour.get("serenity_closing") != key:
+                    logger.info("🌙 [Cron 21:00] Iniciando consolidação e disparo do Fechamento Sereno do Dia...")
+                    _last_executed_hour["serenity_closing"] = key
+                    try:
+                        from src.reports.daily import daily_report_service
+                        from src.whatsapp.service import whatsapp_service
+                        from src.config import settings
+                        from src.memory.database import SessionLocal
+
+                        with SessionLocal() as db:
+                            serenity_text = await daily_report_service.generate_serenity_closing(target_date=today_str, db=db)
+                            if serenity_text and settings.USER_PHONE_NUMBER:
+                                await whatsapp_service.send_text_message(
+                                    number=settings.USER_PHONE_NUMBER,
+                                    text=serenity_text,
+                                )
+                                logger.info(f"✅ [Cron 21:00] Fechamento Sereno enviado para {settings.USER_PHONE_NUMBER}.")
+                    except Exception as e:
+                        logger.error(f"❌ [Cron 21:00] Erro ao enviar Fechamento Sereno: {e}")
+
             # 3. Rotina Semanal de Domingo às 20:00 -> Disparo do Relatório Semanal via WhatsApp
             if now.weekday() == 6 and hour == 20 and minute < 5:
                 key = f"weekly_report_{today_str}"

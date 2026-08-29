@@ -2671,6 +2671,118 @@ select:focus {
   .hide-mobile {
     display: none !important;
   }
+  .garden-grid-responsive,
+  .radar-grid-responsive {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ==========================================================================
+   TERPSÍCORE: SUBNAV, VAULT, JARDIM DE REALIZAÇÕES & RADAR
+   ========================================================================== */
+.subnav-btn {
+  border-radius: var(--radius-full);
+  padding: 0.4rem 1rem;
+  font-size: 0.82rem;
+  transition: all 0.2s ease;
+}
+
+.subnav-btn.active {
+  background: var(--color-primary);
+  color: #090d16;
+  font-weight: 700;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+}
+
+.task-quick-actions {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.btn-pill-action {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  border-radius: var(--radius-full);
+  padding: 0.2rem 0.6rem;
+  font-size: 0.72rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.15s ease;
+}
+
+.btn-pill-action:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+}
+
+.btn-pill-action.active-fav {
+  background: rgba(234, 179, 8, 0.2);
+  border-color: #eab308;
+  color: #fef08a;
+  font-weight: 600;
+}
+
+.btn-pill-action.active-epic {
+  background: rgba(168, 85, 247, 0.2);
+  border-color: #a855f7;
+  color: #e9d5ff;
+  font-weight: 600;
+}
+
+.btn-pill-action.active-idea {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+  color: #bfdbfe;
+  font-weight: 600;
+}
+
+.task-vault-highlight {
+  background: rgba(234, 179, 8, 0.08);
+  border: 1px solid rgba(234, 179, 8, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  color: #fef08a;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.garden-harvest-item-card {
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  transition: transform 0.15s ease;
+}
+
+.garden-harvest-item-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.garden-constellation-card {
+  background: rgba(59, 130, 246, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.radar-insight-pill {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.85rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
 }
 
 

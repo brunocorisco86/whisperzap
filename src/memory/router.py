@@ -11,13 +11,16 @@ from src.ai_gateway.schemas import (
 from src.memory.database import get_db
 from src.memory.graph import knowledge_graph
 from src.memory.models import (
+    GardenMetamorphosisMetrics,
     MemoryStats,
     MessageCreate,
     MergeTasksResponse,
+    ProcrastinationRadarMetrics,
     SearchQuery,
     SearchResult,
     TaskResponse,
     TaskUpdate,
+    TaskVaultAction,
 )
 from src.memory.repository import memory_repository
 from src.reports.daily import daily_report_service
@@ -127,10 +130,90 @@ async def list_tasks(
     priority: str | None = Query(default=None, description="Filtrar por prioridade: LOW, MEDIUM, HIGH, URGENT"),
     assignee: str | None = Query(default=None, description="Filtrar por responsável"),
     speaker: str | None = Query(default=None, description="Filtrar por pessoa de origem / remetente"),
+    view_mode: str = Query(default="active", description="Modo de visualização: active (fluxo normal), vault (baú), garden (jardim), all (todas)"),
+    is_idea: bool | None = Query(default=None, description="Filtrar por ideia/sonho"),
+    is_epic: bool | None = Query(default=None, description="Filtrar por objetivo épico"),
+    is_favorite: bool | None = Query(default=None, description="Filtrar por favorito / pin"),
     db: Session = Depends(get_db),
 ):
-    """Lista tarefas extraídas com filtros."""
-    return memory_repository.list_tasks(status=status, priority=priority, assignee=assignee, speaker=speaker, db=db)
+    """Lista tarefas extraídas com segregação estrita sem duplicidade entre Fluxo Normal e Vault."""
+    return memory_repository.list_tasks(
+        status=status,
+        priority=priority,
+        assignee=assignee,
+        speaker=speaker,
+        view_mode=view_mode,
+        is_idea=is_idea,
+        is_epic=is_epic,
+        is_favorite=is_favorite,
+        db=db,
+    )
+
+
+@router.post("/tasks/{task_id}/toggle-favorite", response_model=TaskResponse)
+async def toggle_task_favorite(task_id: str, db: Session = Depends(get_db)):
+    """Alterna o status de favorito/pin da tarefa."""
+    task = memory_repository.toggle_task_favorite(task_id, db=db)
+    if not task:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+    return task
+
+
+@router.post("/tasks/{task_id}/toggle-epic", response_model=TaskResponse)
+async def toggle_task_epic(task_id: str, db: Session = Depends(get_db)):
+    """Alterna o status de Objetivo Épico da tarefa."""
+    task = memory_repository.toggle_task_epic(task_id, db=db)
+    if not task:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+    return task
+
+
+@router.post("/tasks/{task_id}/toggle-idea", response_model=TaskResponse)
+async def toggle_task_idea(task_id: str, db: Session = Depends(get_db)):
+    """Alterna o status de Ideia / Semente da tarefa."""
+    task = memory_repository.toggle_task_idea(task_id, db=db)
+    if not task:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+    return task
+
+
+@router.post("/tasks/{task_id}/vault", response_model=TaskResponse)
+async def move_task_to_vault(task_id: str, payload: TaskVaultAction, db: Session = Depends(get_db)):
+    """Envia tarefa para o Baú aplicando delay, agendamento de lembrete e reavaliação de propósito."""
+    task = memory_repository.move_task_to_vault(task_id, payload, db=db)
+    if not task:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+    return task
+
+
+@router.post("/tasks/{task_id}/unvault", response_model=TaskResponse)
+async def restore_task_from_vault(task_id: str, db: Session = Depends(get_db)):
+    """Resgata uma tarefa do Baú de volta ao fluxo de execução normal."""
+    task = memory_repository.restore_task_from_vault(task_id, db=db)
+    if not task:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+    return task
+
+
+@router.post("/tasks/vault/merge-embeddings", response_model=MergeTasksResponse)
+async def merge_vault_tasks_embeddings(
+    similarity_threshold: float = Query(default=0.55, ge=0.1, le=1.0, description="Limiar de similaridade vetorial de embeddings"),
+    db: Session = Depends(get_db),
+):
+    """Mescla tarefas do Baú agrupando por similaridade de embeddings vetoriais."""
+    return memory_repository.merge_vault_tasks_by_embeddings(similarity_threshold=similarity_threshold, db=db)
+
+
+@router.get("/tasks/vault/radar", response_model=ProcrastinationRadarMetrics)
+async def get_procrastination_radar(db: Session = Depends(get_db)):
+    """Retorna métricas consolidadas dos 6 vetores de procrastinação para o Radar Chart."""
+    return memory_repository.get_procrastination_radar_metrics(db=db)
+
+
+@router.get("/tasks/garden/metrics", response_model=GardenMetamorphosisMetrics)
+async def get_garden_metamorphosis_metrics(db: Session = Depends(get_db)):
+    """Retorna métricas do Jardim de Realizações: Metamorfose Sonho ➔ Ação ➔ Resultado."""
+    return memory_repository.get_garden_metamorphosis_metrics(db=db)
 
 
 @router.post("/tasks/merge-similar", response_model=MergeTasksResponse)
@@ -144,7 +227,7 @@ async def merge_similar_tasks(
 
 @router.patch("/tasks/{task_id}", response_model=TaskResponse)
 async def update_task(task_id: str, payload: TaskUpdate, db: Session = Depends(get_db)):
-    """Atualiza status ou dados de uma tarefa."""
+    """Atualiza status, dimensões ou dados de uma tarefa."""
     task = memory_repository.update_task(task_id, payload, db=db)
     if not task:
         raise HTTPException(status_code=404, detail="Tarefa não encontrada")

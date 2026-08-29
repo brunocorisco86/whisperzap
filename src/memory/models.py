@@ -1,7 +1,7 @@
 """Modelos de Banco de Dados e Schemas para a Memória Hermes."""
 
 from datetime import datetime, timezone
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from sqlalchemy import (
@@ -64,6 +64,19 @@ class TaskRecord(Base):
     status = Column(String(20), default="PENDING", index=True)  # PENDING, IN_PROGRESS, DONE, CANCELLED
     notes = Column(Text, nullable=True)
     completed_at = Column(DateTime, nullable=True)
+
+    # 🏛️ Novas dimensões estratégicas e de foco mental
+    is_idea = Column(Boolean, default=False, index=True)           # 💡 Ideia / Semente de Sonho
+    is_epic = Column(Boolean, default=False, index=True)           # 🏛️ Objetivo Épico
+    is_favorite = Column(Boolean, default=False, index=True)       # ⭐ Favorito / Destaque
+    in_vault = Column(Boolean, default=False, index=True)          # 🗝️ Está no Baú/Stage (> 1 semana / Arquivada)
+    postponed_until = Column(DateTime, nullable=True)              # ⏱️ Data limite do adiamento (delay)
+    reminder_scheduled_at = Column(DateTime, nullable=True)        # 🔔 Agendamento de notificação/lembrete
+    vault_reason = Column(String(255), nullable=True)              # Motivo do adiamento / ida ao baú
+    procrastination_factor = Column(String(50), nullable=True)     # Fator de bloqueio cognitivo (SCOPE, DEPENDENCY, etc.)
+    stakeholder_link = Column(String(150), nullable=True)          # Stakeholder vinculado
+    project_link = Column(String(150), nullable=True)              # Projeto / Empresa vinculada
+    reassessment_notes = Column(Text, nullable=True)               # Anotações da reavaliação de propósito
 
     message = relationship("MessageRecord", back_populates="tasks")
 
@@ -213,6 +226,19 @@ class TaskResponse(BaseModel):
     created_at: datetime
     completed_at: Optional[datetime] = None
 
+    # Dimensões Estratégicas & Vault
+    is_idea: bool = False
+    is_epic: bool = False
+    is_favorite: bool = False
+    in_vault: bool = False
+    postponed_until: Optional[datetime] = None
+    reminder_scheduled_at: Optional[datetime] = None
+    vault_reason: Optional[str] = None
+    procrastination_factor: Optional[str] = None
+    stakeholder_link: Optional[str] = None
+    project_link: Optional[str] = None
+    reassessment_notes: Optional[str] = None
+
     # Ancoragem de Origem / Rastreamento Bidirecional (De quem foi ➔ Pra quem foi)
     speaker: Optional[str] = None
     sender_phone: Optional[str] = None
@@ -250,6 +276,65 @@ class TaskUpdate(BaseModel):
     priority: Optional[Literal["LOW", "MEDIUM", "HIGH", "URGENT"]] = None
     status: Optional[Literal["PENDING", "IN_PROGRESS", "DONE", "CANCELLED"]] = None
     notes: Optional[str] = None
+    is_idea: Optional[bool] = None
+    is_epic: Optional[bool] = None
+    is_favorite: Optional[bool] = None
+    in_vault: Optional[bool] = None
+    postponed_until: Optional[datetime] = None
+    reminder_scheduled_at: Optional[datetime] = None
+    vault_reason: Optional[str] = None
+    procrastination_factor: Optional[str] = None
+    stakeholder_link: Optional[str] = None
+    project_link: Optional[str] = None
+    reassessment_notes: Optional[str] = None
+
+
+class TaskVaultAction(BaseModel):
+    """Payload para enviar ao Baú ou adiar tarefa com reavaliação de propósito."""
+    postpone_days: Optional[int] = Field(default=None, ge=1, le=365, description="Dias para adiamento")
+    custom_postpone_date: Optional[str] = Field(default=None, description="Data limite YYYY-MM-DD")
+    reminder_datetime: Optional[str] = Field(default=None, description="Data/Hora do lembrete YYYY-MM-DD HH:MM")
+    vault_reason: Optional[str] = Field(default=None, description="Motivo do adiamento / ida ao baú")
+    procrastination_factor: Optional[str] = Field(default="LOW_URGENCY", description="Fator de bloqueio cognitivo")
+    stakeholder_link: Optional[str] = Field(default=None, description="Stakeholder vinculado")
+    project_link: Optional[str] = Field(default=None, description="Projeto / Cooperativa vinculada")
+    reassessment_notes: Optional[str] = Field(default=None, description="Anotações da reavaliação")
+    priority: Optional[Literal["LOW", "MEDIUM", "HIGH", "URGENT"]] = None
+
+
+class ProcrastinationRadarMetrics(BaseModel):
+    """Dados consolidados para o Gráfico de Radar de Procrastinação."""
+    total_vault_tasks: int
+    avg_delay_days: float
+    dimensions: dict[str, float]  # Score de 0 a 100 para cada um dos 6 vetores
+    top_factors: list[dict[str, Any]] = []
+    insights: list[str] = []
+
+
+class GardenHarvestItem(BaseModel):
+    """Item realizado na colheita do Jardim."""
+    task_id: str
+    title: str
+    speaker: str
+    conceived_at: str
+    realized_at: str
+    maturation_days: int
+    is_idea: bool
+    is_epic: bool
+    stakeholder: Optional[str] = None
+    project: Optional[str] = None
+
+
+class GardenMetamorphosisMetrics(BaseModel):
+    """Métricas de Metamorfose: Sonho ➔ Ação ➔ Resultado."""
+    total_seeds: int              # Total de ideias/sonhos identificados
+    in_germination_active: int    # Tarefas ativas no fluxo imediato
+    in_germination_vault: int     # Ideias em maturação no Baú
+    total_harvested: int          # Ideias e tarefas concretizadas com sucesso
+    conversion_rate_pct: float    # Taxa de realização (% sementes que viraram realidade)
+    avg_maturation_days: float    # Tempo médio desde a concepção até a conclusão
+    recent_harvests: list[GardenHarvestItem] = []
+    active_constellations: list[dict[str, Any]] = []
 
 
 class MessageCreate(BaseModel):

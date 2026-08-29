@@ -3,11 +3,12 @@
 import json
 import logging
 import math
+from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any, Optional, List
 from uuid import uuid4
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from src.ai_gateway.providers import get_ai_provider
 from src.ai_gateway.schemas import SemanticExtractionRequest
 from src.config import settings
@@ -731,15 +732,56 @@ class MemoryRepository:
             if should_close:
                 db.close()
 
+    def is_task_in_vault(self, task: TaskRecord, now_dt: datetime | None = None) -> bool:
+        """Determina com precisão se uma tarefa pertence ao Vault (Baú / Stage) sem duplicidade."""
+        if task.in_vault:
+            return True
+        if now_dt is None:
+            now_dt = datetime.now(timezone.utc)
+        
+        # 1. Adiamento explícito ativo
+        if task.postponed_until:
+            post_dt = task.postponed_until
+            if post_dt.tzinfo is None:
+                post_dt = post_dt.replace(tzinfo=timezone.utc)
+            if post_dt > now_dt:
+                return True
+
+        # 2. Prazo superior a 7 dias (due_date > 7d)
+        if task.due_date:
+            due_str = str(task.due_date).strip().lower()
+            if any(term in due_str for term in ["mês", "mes", "ano", "30 dias", "15 dias", "2 semanas", "3 semanas", "sem prazo"]):
+                return True
+            try:
+                import re
+                date_match = re.search(r"(\d{4}-\d{2}-\d{2})|(\d{2}/\d{2}/\d{4})", due_str)
+                if date_match:
+                    d_raw = date_match.group(0)
+                    if "-" in d_raw:
+                        d_dt = datetime.strptime(d_raw, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                    else:
+                        d_dt = datetime.strptime(d_raw, "%d/%m/%Y").replace(tzinfo=timezone.utc)
+                    from datetime import timedelta
+                    if d_dt > (now_dt + timedelta(days=7)):
+                        return True
+            except Exception:
+                pass
+
+        return False
+
     def list_tasks(
         self,
         status: str | None = None,
         priority: str | None = None,
         assignee: str | None = None,
         speaker: str | None = None,
+        view_mode: str = "active",  # active, vault, garden, all
+        is_idea: bool | None = None,
+        is_epic: bool | None = None,
+        is_favorite: bool | None = None,
         db: Session | None = None,
     ) -> list[Any]:
-        """Lista tarefas filtradas por status, prioridade, responsável ou remetente com tags e ancoragem."""
+        """Lista tarefas filtradas com segregação estrita entre Fluxo Normal, Vault e Jardim."""
         should_close = False
         if db is None:
             db = SessionLocal()
@@ -750,6 +792,7 @@ class MemoryRepository:
             from src.memory.models import TaskResponse
             from src.memory.task_sentiment_analyzer import task_sentiment_analyzer
 
+            now_dt = datetime.now(timezone.utc)
             contacts_map = {c.name.lower(): c for c in db.query(ContactRecord).all()}
 
             query = db.query(TaskRecord)
@@ -759,19 +802,58 @@ class MemoryRepository:
                 query = query.filter(TaskRecord.priority == priority.upper())
             if assignee:
                 query = query.filter(TaskRecord.assignee.ilike(f"%{assignee}%"))
+            if is_idea is not None:
+                query = query.filter(TaskRecord.is_idea == is_idea)
+            if is_epic is not None:
+                query = query.filter(TaskRecord.is_epic == is_epic)
+            if is_favorite is not None:
+                query = query.filter(TaskRecord.is_favorite == is_favorite)
 
-            records = query.order_by(TaskRecord.created_at.desc()).all()
-            responses = []
+            records = query.all()
+            filtered_records = []
+            
             for r in records:
+                in_v = self.is_task_in_vault(r, now_dt)
+                if view_mode == "active":
+                    # Apenas tarefas que NÃO estão no Vault
+                    if in_v:
+                        continue
+                elif view_mode == "vault":
+                    # Apenas tarefas do Vault (> 1 semana / arquivadas)
+                    if not in_v:
+                        continue
+                elif view_mode == "garden":
+                    # Apenas ideias ou conquistas realizadas
+                    if not (r.is_idea or r.status == "DONE"):
+                        continue
+                # Se view_mode == "all", inclui tudo
+
+                # Filtro por remetente/origem se especificado
                 msg = r.message
                 speaker_name = msg.speaker if msg else "user"
-                
-                # Filtro por remetente/origem se especificado
                 if speaker:
                     spk_clean = speaker.strip().lower()
                     if spk_clean and spk_clean != "all" and spk_clean not in speaker_name.lower():
                         continue
 
+                filtered_records.append((r, in_v))
+
+            # Ordenação com prioridade: Favoritos > Épicos > Urgência > Data
+            priority_weight = {"URGENT": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
+            filtered_records.sort(
+                key=lambda item: (
+                    1 if item[0].is_favorite else 0,
+                    1 if item[0].is_epic else 0,
+                    priority_weight.get(item[0].priority, 1),
+                    item[0].created_at or now_dt,
+                ),
+                reverse=True,
+            )
+
+            responses = []
+            for r, in_v in filtered_records:
+                msg = r.message
+                speaker_name = msg.speaker if msg else "user"
                 contact_match = contacts_map.get(speaker_name.lower()) if speaker_name else None
 
                 sender_phone = ""
@@ -808,6 +890,17 @@ class MemoryRepository:
                         notes=r.notes,
                         created_at=r.created_at,
                         completed_at=r.completed_at,
+                        is_idea=bool(r.is_idea),
+                        is_epic=bool(r.is_epic),
+                        is_favorite=bool(r.is_favorite),
+                        in_vault=in_v,
+                        postponed_until=r.postponed_until,
+                        reminder_scheduled_at=r.reminder_scheduled_at,
+                        vault_reason=r.vault_reason,
+                        procrastination_factor=r.procrastination_factor,
+                        stakeholder_link=r.stakeholder_link,
+                        project_link=r.project_link,
+                        reassessment_notes=r.reassessment_notes,
                         speaker=speaker_name,
                         sender_phone=sender_phone,
                         sender_role=sender_role,
@@ -825,154 +918,558 @@ class MemoryRepository:
             if should_close:
                 db.close()
 
-    def merge_similar_pending_tasks(
-        self,
-        similarity_threshold: float = 0.55,
-        db: Session | None = None,
-    ) -> dict:
-        """Mescla tarefas semelhantes com status PENDING agrupando por pessoa de origem e unificando comentários."""
+    def toggle_task_favorite(self, task_id: str, db: Session | None = None) -> Any | None:
+        """Alterna status de favorito / pin de uma tarefa."""
+        return self._toggle_task_field(task_id, "is_favorite", db)
+
+    def toggle_task_epic(self, task_id: str, db: Session | None = None) -> Any | None:
+        """Alterna status de Objetivo Épico de uma tarefa."""
+        return self._toggle_task_field(task_id, "is_epic", db)
+
+    def toggle_task_idea(self, task_id: str, db: Session | None = None) -> Any | None:
+        """Alterna status de Ideia / Semente de uma tarefa."""
+        return self._toggle_task_field(task_id, "is_idea", db)
+
+    def _toggle_task_field(self, task_id: str, field_name: str, db: Session | None = None) -> Any | None:
         should_close = False
         if db is None:
             db = SessionLocal()
             should_close = True
-
         try:
-            from src.memory.models import TaskRecord, TaskMergeCluster, MergeTasksResponse
+            from src.memory.models import TaskResponse
+            task = db.query(TaskRecord).filter(TaskRecord.id == task_id).first()
+            if not task:
+                return None
+            current_val = getattr(task, field_name, False)
+            setattr(task, field_name, not current_val)
+            db.commit()
+            db.refresh(task)
+            return self.get_task_response(task, db)
+        finally:
+            if should_close:
+                db.close()
+
+    def move_task_to_vault(self, task_id: str, payload: Any, db: Session | None = None) -> Any | None:
+        """Envia tarefa para o Baú aplicando delay, agendamento de lembrete e reavaliação."""
+        should_close = False
+        if db is None:
+            db = SessionLocal()
+            should_close = True
+        try:
+            from datetime import timedelta
+            task = db.query(TaskRecord).filter(TaskRecord.id == task_id).first()
+            if not task:
+                return None
+
+            task.in_vault = True
+            now_dt = datetime.now(timezone.utc)
+
+            # Cálculo de delay
+            if hasattr(payload, "postpone_days") and payload.postpone_days:
+                task.postponed_until = now_dt + timedelta(days=int(payload.postpone_days))
+            elif hasattr(payload, "custom_postpone_date") and payload.custom_postpone_date:
+                try:
+                    task.postponed_until = datetime.strptime(payload.custom_postpone_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                except Exception:
+                    pass
+
+            # Agendamento de lembrete
+            if hasattr(payload, "reminder_datetime") and payload.reminder_datetime:
+                try:
+                    fmt = "%Y-%m-%d %H:%M" if len(payload.reminder_datetime) > 10 else "%Y-%m-%d"
+                    task.reminder_scheduled_at = datetime.strptime(payload.reminder_datetime, fmt).replace(tzinfo=timezone.utc)
+                except Exception:
+                    pass
+
+            if hasattr(payload, "vault_reason") and payload.vault_reason:
+                task.vault_reason = payload.vault_reason
+            if hasattr(payload, "procrastination_factor") and payload.procrastination_factor:
+                task.procrastination_factor = payload.procrastination_factor
+            if hasattr(payload, "stakeholder_link") and payload.stakeholder_link:
+                task.stakeholder_link = payload.stakeholder_link
+            if hasattr(payload, "project_link") and payload.project_link:
+                task.project_link = payload.project_link
+            if hasattr(payload, "reassessment_notes") and payload.reassessment_notes:
+                task.reassessment_notes = payload.reassessment_notes
+            if hasattr(payload, "priority") and payload.priority:
+                task.priority = payload.priority
+
+            db.commit()
+            db.refresh(task)
+            return self.get_task_response(task, db)
+        finally:
+            if should_close:
+                db.close()
+
+    def restore_task_from_vault(self, task_id: str, db: Session | None = None) -> Any | None:
+        """Resgata uma tarefa do Baú de volta ao fluxo de execução normal."""
+        should_close = False
+        if db is None:
+            db = SessionLocal()
+            should_close = True
+        try:
+            task = db.query(TaskRecord).filter(TaskRecord.id == task_id).first()
+            if not task:
+                return None
+            task.in_vault = False
+            task.postponed_until = None
+            task.vault_reason = None
+            db.commit()
+            db.refresh(task)
+            return self.get_task_response(task, db)
+        finally:
+            if should_close:
+                db.close()
+
+    def get_task_response(self, task: TaskRecord, db: Session) -> Any:
+        """Converte TaskRecord em TaskResponse estruturado."""
+        from src.contacts.models import ContactRecord
+        from src.memory.models import TaskResponse
+        from src.memory.task_sentiment_analyzer import task_sentiment_analyzer
+
+        msg = task.message
+        speaker_name = msg.speaker if msg else "user"
+        contact_match = db.query(ContactRecord).filter(ContactRecord.name.ilike(speaker_name)).first() if speaker_name else None
+
+        sender_phone = ""
+        if contact_match and contact_match.phone_number:
+            sender_phone = contact_match.phone_number
+        elif msg and isinstance(msg.meta_info, dict) and msg.meta_info.get("remoteJid"):
+            sender_phone = msg.meta_info.get("remoteJid", "").split("@")[0]
+
+        msg_entities = [e.name for e in msg.entities] if (msg and msg.entities) else []
+        source_full = (msg.revised_text or msg.raw_text or "") if msg else ""
+        tags = task_sentiment_analyzer.extract_task_tags(
+            title=task.title,
+            source_text=source_full,
+            existing_entities=msg_entities,
+            priority=task.priority,
+        )
+
+        return TaskResponse(
+            id=task.id,
+            message_id=task.message_id,
+            title=task.title,
+            assignee=task.assignee,
+            due_date=task.due_date,
+            priority=task.priority,
+            status=task.status,
+            notes=task.notes,
+            created_at=task.created_at,
+            completed_at=task.completed_at,
+            is_idea=bool(task.is_idea),
+            is_epic=bool(task.is_epic),
+            is_favorite=bool(task.is_favorite),
+            in_vault=self.is_task_in_vault(task),
+            postponed_until=task.postponed_until,
+            reminder_scheduled_at=task.reminder_scheduled_at,
+            vault_reason=task.vault_reason,
+            procrastination_factor=task.procrastination_factor,
+            stakeholder_link=task.stakeholder_link,
+            project_link=task.project_link,
+            reassessment_notes=task.reassessment_notes,
+            speaker=speaker_name,
+            sender_phone=sender_phone,
+            sender_role=contact_match.role if contact_match else None,
+            message_time=msg.created_at.strftime("%d/%m/%Y %H:%M") if msg and msg.created_at else None,
+            audio_duration_s=msg.audio_duration_s if msg else None,
+            revised_text=msg.revised_text if msg else None,
+            raw_text=msg.raw_text if msg else None,
+            message_summary=msg.summary if msg else None,
+            source_text_snippet=msg.revised_text[:140] if msg and msg.revised_text else None,
+            tags=tags,
+        )
+
+    def merge_vault_tasks_by_embeddings(
+        self,
+        similarity_threshold: float = 0.55,
+        db: Session | None = None,
+    ) -> dict:
+        """Mescla tarefas do Baú por similaridade semântica vetorial (embeddings) e lemas."""
+        should_close = False
+        if db is None:
+            db = SessionLocal()
+            should_close = True
+        try:
+            from src.memory.models import TaskMergeCluster, MergeTasksResponse
             from src.memory.task_sentiment_analyzer import task_sentiment_analyzer
             from collections import defaultdict
 
-            pending_tasks = db.query(TaskRecord).filter(TaskRecord.status == "PENDING").all()
-            if not pending_tasks:
+            all_tasks = db.query(TaskRecord).filter(TaskRecord.status != "DONE").all()
+            vault_tasks = [t for t in all_tasks if self.is_task_in_vault(t)]
+
+            if len(vault_tasks) < 2:
                 return MergeTasksResponse(
                     status="success",
                     merged_groups_count=0,
                     tasks_merged_count=0,
                     clusters=[],
-                    message="Nenhuma tarefa pendente encontrada para mesclagem.",
+                    message="Menos de 2 tarefas no Baú para mesclagem semântica.",
                 ).model_dump()
 
-            # 1. Agrupa por pessoa de origem (speaker)
-            tasks_by_speaker = defaultdict(list)
-            for t in pending_tasks:
-                spk = t.message.speaker if t.message and t.message.speaker else "user"
-                tasks_by_speaker[spk].append(t)
+            # Mapeamento de embeddings salvos
+            emb_map = {}
+            for t in vault_tasks:
+                if t.message and t.message.embeddings:
+                    emb_map[t.id] = t.message.embeddings[0].embedding_json
 
-            merged_clusters: list[TaskMergeCluster] = []
-            total_tasks_merged = 0
+            visited = set()
+            merged_clusters = []
+            total_merged = 0
 
-            priority_order = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "URGENT": 4}
-
-            for speaker, tasks in tasks_by_speaker.items():
-                if len(tasks) < 2:
+            for i, t1 in enumerate(vault_tasks):
+                if t1.id in visited:
                     continue
+                cluster = [t1]
+                vec1 = emb_map.get(t1.id)
 
-                # Encontra grupos de similaridade dentro do mesmo remetente
-                visited_ids = set()
-                for i, t1 in enumerate(tasks):
-                    if t1.id in visited_ids:
+                for j, t2 in enumerate(vault_tasks):
+                    if i == j or t2.id in visited:
                         continue
+                    vec2 = emb_map.get(t2.id)
 
-                    cluster = [t1]
-                    for j, t2 in enumerate(tasks):
-                        if i == j or t2.id in visited_ids:
-                            continue
-
+                    sim = 0.0
+                    if vec1 and vec2:
+                        # Similaridade de cosseno vetorial
+                        sim = self._cosine_similarity(vec1, vec2)
+                    else:
+                        # Fallback léxico
                         sim = task_sentiment_analyzer.compute_task_similarity(
-                            title_a=t1.title,
-                            notes_a=t1.notes or "",
-                            title_b=t2.title,
-                            notes_b=t2.notes or "",
+                            t1.title, t1.notes or "", t2.title, t2.notes or ""
                         )
 
-                        # Similaridade acima do threshold ou títulos quase idênticos
-                        if sim >= similarity_threshold:
-                            cluster.append(t2)
-                            visited_ids.add(t2.id)
+                    if sim >= similarity_threshold:
+                        cluster.append(t2)
+                        visited.add(t2.id)
 
-                    if len(cluster) > 1:
-                        visited_ids.add(t1.id)
-                        # Ordena o cluster para determinar a tarefa primária (mais antiga ou mais detalhada)
-                        cluster.sort(key=lambda x: x.created_at or datetime.now(timezone.utc))
-                        primary = cluster[0]
+                if len(cluster) > 1:
+                    visited.add(t1.id)
+                    primary = cluster[0]
+                    merged_ids = []
+                    merged_titles = []
+                    additional_notes = []
 
-                        # Consolida prioridade máxima do cluster
-                        max_prio = primary.priority or "MEDIUM"
-                        for c_item in cluster:
-                            if priority_order.get(c_item.priority, 1) > priority_order.get(max_prio, 1):
-                                max_prio = c_item.priority
-                        primary.priority = max_prio
+                    for other in cluster[1:]:
+                        merged_ids.append(other.id)
+                        merged_titles.append(other.title)
+                        note_text = (other.notes or other.vault_reason or "").strip()
+                        additional_notes.append(f"📌 [Mesclado do Baú: \"{other.title}\"]:\n{note_text}")
+                        other.status = "CANCELLED"
+                        other.notes = f"[Mesclada no Baú na tarefa {primary.id}]\n{other.notes or ''}"
 
-                        merged_ids = []
-                        merged_titles = []
-                        additional_notes = []
+                    orig = (primary.notes or "").strip()
+                    primary.notes = (orig + "\n\n" + "\n\n".join(additional_notes)).strip()
+                    total_merged += len(merged_ids)
 
-                        for other in cluster[1:]:
-                            merged_ids.append(other.id)
-                            merged_titles.append(other.title)
-                            created_str = other.created_at.strftime("%d/%m/%Y %H:%M") if other.created_at else ""
-                            note_text = (other.notes or "").strip()
-                            if not note_text:
-                                note_text = f"Origem: Mensagem '{other.title}'"
-                            
-                            additional_notes.append(
-                                f"📌 [Mesclado de \"{other.title}\" em {created_str}]:\n{note_text}"
-                            )
-
-                            # Marca a tarefa secundária como CANCELLED / Mesclada
-                            other.status = "CANCELLED"
-                            other.notes = f"[Mesclada na tarefa principal ID: {primary.id}]\n{other.notes or ''}".strip()
-
-                        # Unifica os comentários na tarefa primária
-                        orig_notes = (primary.notes or "").strip()
-                        divider = "\n\n---\n" if orig_notes else ""
-                        primary.notes = (orig_notes + divider + "\n\n".join(additional_notes)).strip()
-
-                        total_tasks_merged += len(merged_ids)
-                        merged_clusters.append(
-                            TaskMergeCluster(
-                                speaker=speaker,
-                                primary_task_id=primary.id,
-                                primary_title=primary.title,
-                                merged_task_ids=merged_ids,
-                                merged_titles=merged_titles,
-                                notes_consolidated_preview=primary.notes[:200] if primary.notes else None,
-                            )
+                    spk = primary.message.speaker if primary.message and primary.message.speaker else "user"
+                    merged_clusters.append(
+                        TaskMergeCluster(
+                            speaker=spk,
+                            primary_task_id=primary.id,
+                            primary_title=primary.title,
+                            merged_task_ids=merged_ids,
+                            merged_titles=merged_titles,
+                            notes_consolidated_preview=primary.notes[:200] if primary.notes else None,
                         )
+                    )
 
             db.commit()
-
-            msg_feedback = (
-                f"{len(merged_clusters)} grupo(s) de tarefas semelhantes mesclados ({total_tasks_merged} tarefas consolidadas)."
-                if merged_clusters
-                else "Nenhuma tarefa duplicada/semelhante encontrada para mesclagem."
-            )
-
             return MergeTasksResponse(
                 status="success",
                 merged_groups_count=len(merged_clusters),
-                tasks_merged_count=total_tasks_merged,
+                tasks_merged_count=total_merged,
                 clusters=merged_clusters,
-                message=msg_feedback,
+                message=f"{len(merged_clusters)} grupo(s) mesclados por embeddings ({total_merged} tarefas unificadas no Baú).",
             ).model_dump()
-        except Exception as exc:
-            db.rollback()
-            logger.error(f"Erro ao mesclar tarefas semelhantes: {exc}", exc_info=True)
-            raise exc
         finally:
             if should_close:
                 db.close()
 
-    def update_task(self, task_id: str, updates: TaskUpdate, db: Session | None = None) -> Any | None:
-        """Atualiza dados, status e anotações de uma tarefa."""
+    def merge_similar_pending_tasks(self, similarity_threshold: float = 0.60, db: Session | None = None) -> dict:
+        """Analisa todas as tarefas PENDING agrupadas por pessoa de origem e mescla semelhantes."""
         should_close = False
         if db is None:
             db = SessionLocal()
             should_close = True
 
         try:
-            from src.contacts.models import ContactRecord
-            from src.memory.models import TaskResponse
+            from src.memory.task_sentiment_analyzer import task_sentiment_analyzer
+            from src.memory.models import MergeTasksResponse, TaskMergeCluster
 
+            # Busca todas as tarefas PENDENTES
+            pending_tasks = (
+                db.query(TaskRecord)
+                .options(joinedload(TaskRecord.message))
+                .filter(TaskRecord.status == "PENDING")
+                .all()
+            )
+
+            # Agrupa tarefas por interlocutor / solicitante de origem
+            grouped: dict[str, list[TaskRecord]] = {}
+            for t in pending_tasks:
+                speaker_key = (t.message.speaker if t.message and t.message.speaker else "user").strip().lower()
+                if speaker_key not in grouped:
+                    grouped[speaker_key] = []
+                grouped[speaker_key].append(t)
+
+            merged_clusters: list[TaskMergeCluster] = []
+            total_merged_tasks = 0
+
+            for speaker, tasks in grouped.items():
+                if len(tasks) < 2:
+                    continue
+
+                visited = set()
+                for i, t1 in enumerate(tasks):
+                    if t1.id in visited:
+                        continue
+
+                    cluster = [t1]
+                    for j, t2 in enumerate(tasks):
+                        if i == j or t2.id in visited:
+                            continue
+
+                        sim = task_sentiment_analyzer.compute_task_similarity(
+                            t1.title, t1.notes or "", t2.title, t2.notes or ""
+                        )
+                        if sim >= similarity_threshold:
+                            cluster.append(t2)
+                            visited.add(t2.id)
+
+                    if len(cluster) > 1:
+                        visited.add(t1.id)
+                        # A tarefa primária é a primeira (mais antiga ou principal)
+                        primary_task = cluster[0]
+                        merged_ids = []
+                        merged_titles = []
+                        additional_notes = []
+
+                        for other_task in cluster[1:]:
+                            merged_ids.append(other_task.id)
+                            merged_titles.append(other_task.title)
+                            note_text = (other_task.notes or "").strip()
+                            additional_notes.append(f"📌 [Mesclado da tarefa \"{other_task.title}\"]:\n{note_text}")
+                            # Marca como CANCELLED/IGNORADA e anota referência
+                            other_task.status = "CANCELLED"
+                            other_task.notes = f"[Mesclada na tarefa {primary_task.id}]\n{other_task.notes or ''}"
+
+                        # Consolida anotações na tarefa principal
+                        existing_notes = (primary_task.notes or "").strip()
+                        new_notes_section = "\n\n".join(additional_notes)
+                        if existing_notes:
+                            primary_task.notes = f"{existing_notes}\n\n{new_notes_section}"
+                        else:
+                            primary_task.notes = new_notes_section
+
+                        # Herda a prioridade mais alta do cluster
+                        p_weights = {"URGENT": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
+                        best_p = max(cluster, key=lambda x: p_weights.get(x.priority or "MEDIUM", 2)).priority
+                        if best_p:
+                            primary_task.priority = best_p
+
+                        total_merged_tasks += len(merged_ids)
+
+                        spk_display = primary_task.message.speaker if primary_task.message and primary_task.message.speaker else speaker
+                        merged_clusters.append(
+                            TaskMergeCluster(
+                                speaker=spk_display,
+                                primary_task_id=primary_task.id,
+                                primary_title=primary_task.title,
+                                merged_task_ids=merged_ids,
+                                merged_titles=merged_titles,
+                                notes_consolidated_preview=primary_task.notes[:200] if primary_task.notes else None,
+                            )
+                        )
+
+            db.commit()
+
+            msg = (
+                f"{len(merged_clusters)} grupo(s) de tarefas mesclados ({total_merged_tasks} tarefas unificadas com sucesso)."
+                if merged_clusters
+                else "Nenhuma tarefa semelhante encontrada para mesclagem."
+            )
+
+            resp = MergeTasksResponse(
+                status="success",
+                merged_groups_count=len(merged_clusters),
+                tasks_merged_count=total_merged_tasks,
+                clusters=merged_clusters,
+                message=msg,
+            )
+            return resp.model_dump()
+        finally:
+            if should_close:
+                db.close()
+
+    def get_procrastination_radar_metrics(self, db: Session | None = None) -> dict:
+        """Calcula métricas dos 6 vetores de procrastinação para o Radar Chart."""
+        should_close = False
+        if db is None:
+            db = SessionLocal()
+            should_close = True
+        try:
+            from src.memory.models import ProcrastinationRadarMetrics
+            all_tasks = db.query(TaskRecord).all()
+            vault_tasks = [t for t in all_tasks if self.is_task_in_vault(t) and t.status != "DONE"]
+
+            factors = {
+                "SCOPE_CLARITY": 0,       # Falta de clareza de escopo
+                "DEPENDENCY": 0,          # Dependência de terceiros / stakeholders
+                "OVERLOAD_ANXIETY": 0,    # Sobrecarga cognitiva / ansiedade
+                "PERFECTIONISM": 0,       # Perfeccionismo / complexidade
+                "LOW_URGENCY": 0,         # Baixo senso de urgência (> 1 semana)
+                "LACK_OF_RESOURCES": 0,   # Recursos insuficientes / alinhamento
+            }
+
+            now_dt = datetime.now(timezone.utc)
+            total_delay_days = 0
+
+            for t in vault_tasks:
+                factor = t.procrastination_factor or "LOW_URGENCY"
+                if factor not in factors:
+                    factor = "LOW_URGENCY"
+                factors[factor] += 1
+
+                if t.postponed_until:
+                    post_dt = t.postponed_until if t.postponed_until.tzinfo else t.postponed_until.replace(tzinfo=timezone.utc)
+                    days = max(1, (post_dt - now_dt).days)
+                    total_delay_days += days
+                else:
+                    total_delay_days += 7
+
+            total_v = len(vault_tasks)
+            avg_delay = round(total_delay_days / total_v, 1) if total_v > 0 else 0.0
+
+            # Normalização de 0 a 100 para o gráfico radar
+            dimensions = {}
+            for k, count in factors.items():
+                score = round((count / max(1, total_v)) * 100, 1) if total_v > 0 else 20.0
+                dimensions[k] = min(100.0, max(15.0, score if total_v > 0 else 25.0))
+
+            top_factors = sorted(
+                [{"factor": k, "count": v, "pct": round((v / max(1, total_v)) * 100, 1) if total_v > 0 else 0} for k, v in factors.items()],
+                key=lambda x: x["count"],
+                reverse=True,
+            )
+
+            insights = []
+            if top_factors and top_factors[0]["count"] > 0:
+                lead = top_factors[0]["factor"]
+                if lead == "DEPENDENCY":
+                    insights.append("🤝 A principal causa de espera é a dependência de stakeholders. Agende cobranças objetivas.")
+                elif lead == "SCOPE_CLARITY":
+                    insights.append("🔍 Muitas tarefas estão travadas por falta de clareza. Quebre em subtarefas menores de 15 minutos.")
+                elif lead == "OVERLOAD_ANXIETY":
+                    insights.append("🧘 Há sobrecarga perceptível. Mantenha o fluxo diário com no máximo 3 tarefas prioritárias.")
+                elif lead == "LOW_URGENCY":
+                    insights.append("⏳ Prazos longos estão acumulando. Use lembretes programados para não esquecer.")
+                elif lead == "PERFECTIONISM":
+                    insights.append("✨ Entregue uma versão simples primeiro (MVP) para destravar o progresso.")
+                elif lead == "LACK_OF_RESOURCES":
+                    insights.append("📦 Alinhe recursos e decisões com a diretoria para desbloquear o fluxo.")
+            else:
+                insights.append("🌟 Baú equilibrado! Suas pendências de longo prazo estão organizadas e sem sobrecarga.")
+
+            return ProcrastinationRadarMetrics(
+                total_vault_tasks=total_v,
+                avg_delay_days=avg_delay,
+                dimensions=dimensions,
+                top_factors=top_factors,
+                insights=insights,
+            ).model_dump()
+        finally:
+            if should_close:
+                db.close()
+
+    def get_garden_metamorphosis_metrics(self, db: Session | None = None) -> dict:
+        """Calcula a jornada e métricas do Jardim de Realizações (Sonho ➔ Ação ➔ Resultado)."""
+        should_close = False
+        if db is None:
+            db = SessionLocal()
+            should_close = True
+        try:
+            from src.memory.models import GardenMetamorphosisMetrics, GardenHarvestItem
+            now_dt = datetime.now(timezone.utc)
+
+            all_tasks = db.query(TaskRecord).all()
+            ideas = [t for t in all_tasks if t.is_idea]
+            total_seeds = len(ideas)
+
+            in_germ_active = len([t for t in all_tasks if t.status == "PENDING" and not self.is_task_in_vault(t, now_dt)])
+            in_germ_vault = len([t for t in all_tasks if self.is_task_in_vault(t, now_dt) and t.status != "DONE"])
+            harvested_tasks = [t for t in all_tasks if t.status == "DONE"]
+            total_harvested = len(harvested_tasks)
+
+            total_creations = max(1, total_seeds + len(all_tasks))
+            conversion_rate = round((total_harvested / total_creations) * 100, 1) if all_tasks else 0.0
+
+            # Maturação média das tarefas concluídas
+            maturation_days_list = []
+            recent_harvests = []
+
+            for t in sorted(harvested_tasks, key=lambda x: x.completed_at or x.created_at or now_dt, reverse=True)[:10]:
+                c_at = t.created_at or now_dt
+                d_at = t.completed_at or now_dt
+                if c_at.tzinfo is None:
+                    c_at = c_at.replace(tzinfo=timezone.utc)
+                if d_at.tzinfo is None:
+                    d_at = d_at.replace(tzinfo=timezone.utc)
+
+                diff_days = max(1, (d_at - c_at).days)
+                maturation_days_list.append(diff_days)
+
+                spk = t.message.speaker if t.message and t.message.speaker else "user"
+                recent_harvests.append(
+                    GardenHarvestItem(
+                        task_id=t.id,
+                        title=t.title,
+                        speaker=spk,
+                        conceived_at=c_at.strftime("%d/%m/%Y"),
+                        realized_at=d_at.strftime("%d/%m/%Y"),
+                        maturation_days=diff_days,
+                        is_idea=bool(t.is_idea),
+                        is_epic=bool(t.is_epic),
+                        stakeholder=t.stakeholder_link,
+                        project=t.project_link,
+                    )
+                )
+
+            avg_mat = round(sum(maturation_days_list) / len(maturation_days_list), 1) if maturation_days_list else 0.0
+
+            # Agrupamento em Constelações de Ideias ativas
+            constellations_map = defaultdict(list)
+            for t in all_tasks:
+                if t.is_idea and t.status != "DONE":
+                    proj = t.project_link or "Ideias & Inovações Gerais"
+                    constellations_map[proj].append(t.title)
+
+            constellations_list = [
+                {"theme": k, "ideas_count": len(v), "sample_ideas": v[:3]}
+                for k, v in constellations_map.items()
+            ]
+
+            return GardenMetamorphosisMetrics(
+                total_seeds=total_seeds,
+                in_germination_active=in_germ_active,
+                in_germination_vault=in_germ_vault,
+                total_harvested=total_harvested,
+                conversion_rate_pct=conversion_rate,
+                avg_maturation_days=avg_mat,
+                recent_harvests=recent_harvests,
+                active_constellations=constellations_list,
+            ).model_dump()
+        finally:
+            if should_close:
+                db.close()
+
+    def update_task(self, task_id: str, updates: TaskUpdate, db: Session | None = None) -> Any | None:
+        """Atualiza dados, status, dimensões e anotações de uma tarefa."""
+        should_close = False
+        if db is None:
+            db = SessionLocal()
+            should_close = True
+
+        try:
             task = db.query(TaskRecord).filter(TaskRecord.id == task_id).first()
             if not task:
                 return None
@@ -987,6 +1484,28 @@ class MemoryRepository:
                 task.priority = updates.priority
             if updates.notes is not None:
                 task.notes = updates.notes
+            if updates.is_idea is not None:
+                task.is_idea = updates.is_idea
+            if updates.is_epic is not None:
+                task.is_epic = updates.is_epic
+            if updates.is_favorite is not None:
+                task.is_favorite = updates.is_favorite
+            if updates.in_vault is not None:
+                task.in_vault = updates.in_vault
+            if updates.postponed_until is not None:
+                task.postponed_until = updates.postponed_until
+            if updates.reminder_scheduled_at is not None:
+                task.reminder_scheduled_at = updates.reminder_scheduled_at
+            if updates.vault_reason is not None:
+                task.vault_reason = updates.vault_reason
+            if updates.procrastination_factor is not None:
+                task.procrastination_factor = updates.procrastination_factor
+            if updates.stakeholder_link is not None:
+                task.stakeholder_link = updates.stakeholder_link
+            if updates.project_link is not None:
+                task.project_link = updates.project_link
+            if updates.reassessment_notes is not None:
+                task.reassessment_notes = updates.reassessment_notes
             if updates.status is not None:
                 task.status = updates.status
                 if updates.status == "DONE":
@@ -994,37 +1513,20 @@ class MemoryRepository:
 
             db.commit()
             db.refresh(task)
-
-            msg = task.message
-            speaker_name = msg.speaker if msg else "user"
-            contact_match = db.query(ContactRecord).filter(ContactRecord.name.ilike(speaker_name)).first() if speaker_name else None
-
-            sender_phone = ""
-            if contact_match and contact_match.phone_number:
-                sender_phone = contact_match.phone_number
-            elif msg and isinstance(msg.meta_info, dict) and msg.meta_info.get("remoteJid"):
-                sender_phone = msg.meta_info.get("remoteJid", "").split("@")[0]
-
-            return TaskResponse(
-                id=task.id,
-                message_id=task.message_id,
-                title=task.title,
-                assignee=task.assignee,
-                due_date=task.due_date,
-                priority=task.priority,
-                status=task.status,
-                notes=task.notes,
-                created_at=task.created_at,
-                completed_at=task.completed_at,
-                speaker=speaker_name,
-                sender_phone=sender_phone,
-                sender_role=contact_match.role if contact_match else None,
-                message_summary=msg.summary if msg else None,
-                source_text_snippet=msg.revised_text[:140] if msg else None,
-            )
+            return self.get_task_response(task, db)
         finally:
             if should_close:
                 db.close()
+
+    def _cosine_similarity(self, vec_a: list[float], vec_b: list[float]) -> float:
+        """Calcula similaridade de cosseno entre dois vetores."""
+        import math
+        dot = sum(a * b for a, b in zip(vec_a, vec_b))
+        norm_a = math.sqrt(sum(a * a for a in vec_a))
+        norm_b = math.sqrt(sum(b * b for b in vec_b))
+        if norm_a == 0.0 or norm_b == 0.0:
+            return 0.0
+        return max(0.0, min(1.0, dot / (norm_a * norm_b)))
 
     def get_stats(self, db: Session | None = None) -> MemoryStats:
         """Coleta métricas globais de uso da memória."""

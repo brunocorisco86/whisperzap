@@ -272,7 +272,8 @@ def test_sentiment_timeline_excludes_owner_and_unregistered_contacts():
         db.merge(c_lucas)
         db.commit()
 
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        from src.memory.timezone_utils import get_now_brt
+        today_str = get_now_brt().strftime("%Y-%m-%d")
 
         msg_owner = MessageRecord(
             id=str(uuid4()),
