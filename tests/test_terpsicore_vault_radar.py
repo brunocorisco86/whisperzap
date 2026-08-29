@@ -293,3 +293,53 @@ async def test_serenity_closing_report_generation():
         assert "Baú de Espera (Vault)" in msg_text
     finally:
         db.close()
+
+
+def test_vault_strict_one_week_rule_and_auto_return():
+    """Testa a regra de que o Baú só pode ter tarefas > 1 semana e retorno automático quando faltam <= 7 dias."""
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+
+        # 1. Tarefa com delay curto (ex: 3 dias) NÃO pode pertencer ao Baú (pertence ao fluxo normal)
+        t_short_delay = TaskRecord(
+            id=str(uuid.uuid4()),
+            title="Ligar para o produtor e alinhar visita",
+            status="PENDING",
+            postponed_until=now + timedelta(days=3),
+        )
+
+        # 2. Tarefa com delay longo (> 7 dias: 14 dias) pertence ao Baú
+        t_long_delay = TaskRecord(
+            id=str(uuid.uuid4()),
+            title="Revisar contrato da cooperativa com o fornecedor",
+            status="PENDING",
+            postponed_until=now + timedelta(days=14),
+        )
+
+        db.add_all([t_short_delay, t_long_delay])
+        db.commit()
+
+        # Validação direta da função de classificação
+        assert memory_repository.is_task_in_vault(t_short_delay, now) is False, "Delay <= 7 dias NÃO pertence ao Baú"
+        assert memory_repository.is_task_in_vault(t_long_delay, now) is True, "Delay > 7 dias pertence ao Baú"
+
+        # Consulta com view_mode="active"
+        active_list = memory_repository.list_tasks(view_mode="active", db=db)
+        active_ids = [t.id for t in active_list]
+        assert t_short_delay.id in active_ids, "Tarefa de 3 dias deve estar no fluxo normal"
+        assert t_long_delay.id not in active_ids, "Tarefa de 14 dias NÃO pode estar no fluxo normal"
+
+        # Consulta com view_mode="vault"
+        vault_list = memory_repository.list_tasks(view_mode="vault", db=db)
+        vault_ids = [t.id for t in vault_list]
+        assert t_short_delay.id not in vault_ids, "Tarefa de 3 dias NÃO pode estar no Baú"
+        assert t_long_delay.id in vault_ids, "Tarefa de 14 dias deve estar no Baú"
+
+        # 3. Transição Temporal: Simula que passaram 10 dias (faltam apenas 4 dias para o prazo de 14 dias)
+        simulated_future_now = now + timedelta(days=10)
+        assert memory_repository.is_task_in_vault(t_long_delay, simulated_future_now) is False, \
+            "Quando faltam <= 7 dias, a tarefa deve sair do Baú e retornar automaticamente ao fluxo ativo"
+
+    finally:
+        db.close()

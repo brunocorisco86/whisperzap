@@ -733,21 +733,31 @@ class MemoryRepository:
                 db.close()
 
     def is_task_in_vault(self, task: TaskRecord, now_dt: datetime | None = None) -> bool:
-        """Determina com precisão se uma tarefa pertence ao Vault (Baú / Stage) sem duplicidade."""
-        if task.in_vault:
-            return True
+        """Determina com precisão se uma tarefa pertence ao Baú (Vault / Stage).
+        
+        REGRA ESTRITA: O Baú só pode conter tarefas com horizonte temporal superior a 1 semana (> 7 dias).
+        Qualquer tarefa com prazo ou adiamento <= 7 dias pertence estritamente ao Fluxo Normal (Imediato).
+        Quando o tempo passa e faltam 7 dias ou menos para o prazo, ela retorna automaticamente ao Fluxo Normal.
+        """
+        from datetime import timedelta
+
         if now_dt is None:
             now_dt = datetime.now(timezone.utc)
-        
-        # 1. Adiamento explícito ativo
+
+        one_week_ahead = now_dt + timedelta(days=7)
+
+        # 1. Adiamento explícito ativo (postponed_until)
         if task.postponed_until:
             post_dt = task.postponed_until
             if post_dt.tzinfo is None:
                 post_dt = post_dt.replace(tzinfo=timezone.utc)
-            if post_dt > now_dt:
+            # Se adiada para mais de 1 semana à frente, permanece no Baú
+            if post_dt > one_week_ahead:
                 return True
+            # Se faltam 7 dias ou menos (ou já expirou), RETORNA ao fluxo normal
+            return False
 
-        # 2. Prazo superior a 7 dias (due_date > 7d)
+        # 2. Análise do prazo informado (due_date)
         if task.due_date:
             due_str = str(task.due_date).strip().lower()
             if any(term in due_str for term in ["mês", "mes", "ano", "30 dias", "15 dias", "2 semanas", "3 semanas", "sem prazo"]):
@@ -761,11 +771,17 @@ class MemoryRepository:
                         d_dt = datetime.strptime(d_raw, "%Y-%m-%d").replace(tzinfo=timezone.utc)
                     else:
                         d_dt = datetime.strptime(d_raw, "%d/%m/%Y").replace(tzinfo=timezone.utc)
-                    from datetime import timedelta
-                    if d_dt > (now_dt + timedelta(days=7)):
+                    
+                    if d_dt > one_week_ahead:
                         return True
+                    # Se o prazo for de até 7 dias, pertence ao Fluxo Normal
+                    return False
             except Exception:
                 pass
+
+        # 3. Marcada manualmente como in_vault sem data específica (considera pendência de longo prazo)
+        if task.in_vault:
+            return True
 
         return False
 
@@ -964,14 +980,19 @@ class MemoryRepository:
             task.in_vault = True
             now_dt = datetime.now(timezone.utc)
 
-            # Cálculo de delay
+            # Cálculo de delay (mínimo de 8 dias para pertencer ao Baú)
             if hasattr(payload, "postpone_days") and payload.postpone_days:
-                task.postponed_until = now_dt + timedelta(days=int(payload.postpone_days))
+                days = max(int(payload.postpone_days), 8)
+                task.postponed_until = now_dt + timedelta(days=days)
             elif hasattr(payload, "custom_postpone_date") and payload.custom_postpone_date:
                 try:
-                    task.postponed_until = datetime.strptime(payload.custom_postpone_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                    custom_dt = datetime.strptime(payload.custom_postpone_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                    task.postponed_until = custom_dt
                 except Exception:
-                    pass
+                    task.postponed_until = now_dt + timedelta(days=8)
+            else:
+                # Default de 8 dias para horizonte > 1 semana
+                task.postponed_until = now_dt + timedelta(days=8)
 
             # Agendamento de lembrete
             if hasattr(payload, "reminder_datetime") and payload.reminder_datetime:

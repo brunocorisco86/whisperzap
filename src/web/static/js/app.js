@@ -2002,7 +2002,7 @@ function openVaultModal(taskId) {
 
   if (taskIdInput) taskIdInput.value = taskId;
   if (modalTitle) modalTitle.textContent = `🗝️ Guardar no Baú: "${t.title.substring(0, 35)}..."`;
-  if (postponeDaysInput) postponeDaysInput.value = 7;
+  if (postponeDaysInput) postponeDaysInput.value = 8;
   if (reminderInput) reminderInput.value = '';
   if (factorSelect) factorSelect.value = t.procrastination_factor || 'LOW_URGENCY';
   if (stakeholderInput) stakeholderInput.value = t.speaker || '';
@@ -2021,14 +2021,18 @@ window.closeVaultModal = closeVaultModal;
 
 function setVaultDelayPreset(days) {
   const postponeDaysInput = document.getElementById('vault-postpone-days');
-  if (postponeDaysInput) postponeDaysInput.value = days;
+  if (postponeDaysInput) postponeDaysInput.value = Math.max(days, 8);
 }
 window.setVaultDelayPreset = setVaultDelayPreset;
 
 async function saveVaultAction(event) {
   if (event) event.preventDefault();
   const taskId = document.getElementById('vault-task-id').value;
-  const postponeDays = parseInt(document.getElementById('vault-postpone-days').value, 10) || null;
+  let postponeDays = parseInt(document.getElementById('vault-postpone-days').value, 10) || 8;
+  if (postponeDays < 8) {
+    postponeDays = 8;
+    showToast('ℹ️ O prazo para o Baú deve ser de no mínimo 8 dias (> 1 semana). Ajustado para 8 dias.');
+  }
   const reminderDateTime = document.getElementById('vault-reminder-datetime').value || null;
   const factor = document.getElementById('vault-procrastination-factor').value;
   const stakeholder = document.getElementById('vault-stakeholder-link').value.trim() || null;
