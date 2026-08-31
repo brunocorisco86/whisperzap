@@ -433,13 +433,20 @@ class WhatsAppService:
                 )
                 saved_msg = await memory_repository.save_message(data=msg_in, db=db)
 
-                # 4. Envia resposta no WhatsApp EXCLUSIVAMENTE para o proprietário se for Self-Memo recente
-                if is_self_memo and not is_historic:
+                # 4. Envia transcrição no WhatsApp EXCLUSIVAMENTE para o proprietário se for áudio recente
+                if not is_historic:
                     created_tasks = []
                     if saved_msg:
                         created_tasks = db.query(TaskRecord).filter(TaskRecord.message_id == saved_msg.id).all()
 
-                    reply_lines = [f"🎙️ *Nota Pessoal Gravada:*", f'"{revised_text.strip()}"']
+                    if is_self_memo:
+                        reply_lines = [f"🎙️ *Nota Pessoal Gravada:*", f'"{revised_text.strip()}"']
+                    else:
+                        contact_name = info.get("push_name") or "Contato"
+                        contact_phone = sanitize_phone_number(info.get("remote_jid", ""))
+                        phone_badge = f" ({contact_phone})" if contact_phone and contact_phone != contact_name else ""
+                        reply_lines = [f"🎙️ *Áudio Recebido de:* {contact_name}{phone_badge}", f'"{revised_text.strip()}"']
+
                     if created_tasks:
                         reply_lines.append("")
                         reply_lines.append("📋 *Tarefas Capturadas:*")
@@ -453,13 +460,14 @@ class WhatsAppService:
                     elif getattr(saved_msg, "intent", None) == "DECISION":
                         reply_lines.append("")
                         reply_lines.append("⚖️ *Classificação:* Decisão Registrada (salvo no Grafo)")
-                    else:
+                    elif is_self_memo:
                         reply_lines.append("")
                         reply_lines.append("📝 *Classificação:* Nota Pessoal (Memória & Grafo)")
+
                     reply_text = "\n".join(reply_lines)
                     await self.send_text_message(number=settings.USER_PHONE_NUMBER, text=reply_text)
                 else:
-                    logger.info(f"🎧 Áudio arquivado silenciosamente na memória passiva (sem envio de mensagem).")
+                    logger.info(f"🎧 Áudio histórico arquivado silenciosamente na memória passiva (sem envio de mensagem).")
 
                 return {
                     "status": "success",

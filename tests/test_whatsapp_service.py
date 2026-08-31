@@ -4,7 +4,9 @@ import uuid
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
+
 from src.main import app
+from src.config import settings
 from src.whatsapp.service import (
     whatsapp_service,
     sanitize_phone_number,
@@ -212,8 +214,12 @@ async def test_process_webhook_audio_flow_mocked():
         assert res["type"] == "audio"
         assert res["speaker"] == "Debora Patel"
         assert "ração" in res["text"].lower()
-        # Garante que NENHUMA mensagem foi enviada para o terceiro (proteção de privacidade e anti-looping)
-        mock_send.assert_not_called()
+        # Garante que a transcrição foi enviada para o proprietário com o cabeçalho do remetente
+        mock_send.assert_called_once()
+        sent_number = mock_send.call_args[1]["number"]
+        sent_text = mock_send.call_args[1]["text"]
+        assert sent_number == settings.USER_PHONE_NUMBER
+        assert "*Áudio Recebido de:* Debora Patel" in sent_text
 
 
 @pytest.mark.asyncio
