@@ -212,7 +212,8 @@ async def test_process_webhook_audio_flow_mocked():
         assert res["type"] == "audio"
         assert res["speaker"] == "Debora Patel"
         assert "ração" in res["text"].lower()
-        mock_send.assert_called_once()
+        # Garante que NENHUMA mensagem foi enviada para o terceiro (proteção de privacidade e anti-looping)
+        mock_send.assert_not_called()
 
 
 @pytest.mark.asyncio

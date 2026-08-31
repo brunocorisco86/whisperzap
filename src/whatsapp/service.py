@@ -106,15 +106,35 @@ class WhatsAppService:
             self._processed_keys[key_id] = time.time()
         return False
 
+    def _is_owner_number(self, phone: str) -> bool:
+        """Verifica se o número de telefone pertence ao proprietário do sistema."""
+        owner = sanitize_phone_number(settings.USER_PHONE_NUMBER)
+        clean = sanitize_phone_number(phone)
+        if not clean or not owner:
+            return False
+        return clean == owner or clean.endswith(owner[-8:]) or owner.endswith(clean[-8:])
+
     async def send_text_message(self, number: str, text: str) -> bool:
-        """Envia mensagem de texto para um número no WhatsApp via Evolution API."""
-        if not number or not text:
-            logger.warning("Tentativa de envio de mensagem vazia ou sem número.")
+        """Envia mensagem de texto para o WhatsApp, com trava mandatória garantindo envio EXCLUSIVO ao proprietário."""
+        if not text:
+            logger.warning("Tentativa de envio de mensagem vazia.")
             return False
 
-        clean_number = sanitize_phone_number(number)
+        owner_number = sanitize_phone_number(settings.USER_PHONE_NUMBER)
+        target_number = sanitize_phone_number(number)
+
+        # 🛡️ TRAVA MANDATÓRIA DE PRIVACIDADE: Nunca enviar para contatos de terceiros
+        if not self._is_owner_number(target_number):
+            logger.warning(
+                f"🛡️ [TRAVA DE SEGURANÇA] Tentativa de envio para terceiro ({target_number}) bloqueada. "
+                f"Redirecionando exclusivamente para o proprietário ({owner_number})."
+            )
+            clean_number = owner_number
+        else:
+            clean_number = target_number or owner_number
+
         if not clean_number:
-            logger.warning(f"Número inválido para envio: {number}")
+            logger.error("Número do proprietário não configurado para envio de WhatsApp.")
             return False
 
         headers = {
@@ -132,7 +152,7 @@ class WhatsAppService:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 resp = await client.post(target_url, json=payload, headers=headers)
                 if resp.status_code in (200, 201):
-                    logger.info(f"✅ Mensagem enviada com sucesso para {clean_number}.")
+                    logger.info(f"✅ Mensagem enviada com sucesso para o proprietário ({clean_number}).")
                     return True
                 logger.error(f"Erro ao enviar mensagem WhatsApp ({resp.status_code}): {resp.text}")
         except Exception as exc:
@@ -305,9 +325,10 @@ class WhatsAppService:
             logger.debug(f"Mídia ignorada ({info['key_id']}).")
             return {"status": "ignored", "reason": "ignorable_media_type"}
 
-        # 3. Prevenção de loop de eco de respostas geradas pelo próprio bot
+        # 3. Prevenção estrita de loop de eco de respostas geradas pelo próprio bot
         raw_text = info["text"]
-        if raw_text.startswith("🎙️ *Transcrição:*") or raw_text.startswith("🎙️ *Nota Pessoal") or raw_text.startswith("Salve,") or raw_text.startswith("📋 *Tarefas Capturadas:*"):
+        BOT_PREFIXES = ("🎙️", "📋", "🤖", "💡", "⚖️", "📝", "🌙", "📊", "✅", "Salve,")
+        if any(raw_text.startswith(p) for p in BOT_PREFIXES):
             logger.debug("Mensagem do bot descartada para evitar eco.")
             return {"status": "ignored", "reason": "bot_echo_response"}
 
@@ -404,7 +425,7 @@ class WhatsAppService:
                 )
                 saved_msg = await memory_repository.save_message(data=msg_in, db=db)
 
-                # 4. Formata e Envia Feedback no WhatsApp
+                # 4. Formata e Envia Feedback no WhatsApp EXCLUSIVAMENTE para o proprietário se for Self-Memo
                 if is_self_memo:
                     created_tasks = []
                     if saved_msg:
@@ -428,10 +449,9 @@ class WhatsAppService:
                         reply_lines.append("")
                         reply_lines.append("📝 *Classificação:* Nota Pessoal (Memória & Grafo)")
                     reply_text = "\n".join(reply_lines)
+                    await self.send_text_message(number=settings.USER_PHONE_NUMBER, text=reply_text)
                 else:
-                    reply_text = f"🎙️ *Transcrição:* {revised_text.strip()}"
-
-                await self.send_text_message(number=info["phone_number"], text=reply_text)
+                    logger.info(f"🎧 Áudio de terceiro ({info['push_name']}) arquivado na memória passiva. Nenhuma mensagem externa enviada.")
 
                 return {
                     "status": "success",
@@ -446,14 +466,14 @@ class WhatsAppService:
             if not raw_text:
                 return {"status": "ignored", "reason": "empty_text"}
 
-            # 1. Detecção de Pergunta para o Hermes Agent ('?', '/hermes', 'hermes,')
+            # 1. Detecção de Pergunta para o Hermes Agent ('?', '/hermes', 'hermes,') - Apenas para o proprietário
             hermes_match = re.match(r"^(\?|/hermes|hermes,)\s*(.*)", raw_text, flags=re.IGNORECASE)
-            if hermes_match:
+            if hermes_match and is_self_memo:
                 query_str = hermes_match.group(2).strip()
                 if not query_str:
                     query_str = "Quais são as tarefas pendentes mais recentes?"
 
-                logger.info(f"🧠 Consulta interativa ao Hermes Agent recebida: '{query_str}'")
+                logger.info(f"🧠 Consulta interativa ao Hermes Agent recebida do proprietário: '{query_str}'")
 
                 answer_resp = await memory_repository.query_hermes_rag(
                     query=query_str,
@@ -463,8 +483,8 @@ class WhatsAppService:
                 )
                 answer_text = answer_resp.answer
 
-                # Envia resposta interativa de volta no WhatsApp
-                await self.send_text_message(number=info["phone_number"], text=answer_text)
+                # Envia resposta interativa EXCLUSIVAMENTE para o proprietário
+                await self.send_text_message(number=settings.USER_PHONE_NUMBER, text=answer_text)
 
                 return {
                     "status": "success",
@@ -498,7 +518,7 @@ class WhatsAppService:
             )
             saved_msg = await memory_repository.save_message(data=msg_in, db=db)
 
-            # 4. Se for nota de texto pessoal (não trivial) e gerou tarefas, confirma por WhatsApp
+            # 4. Se for nota de texto pessoal (não trivial) e gerou tarefas, confirma EXCLUSIVAMENTE para o proprietário
             if is_self_memo and not bypass_ai and saved_msg:
                 created_tasks = db.query(TaskRecord).filter(TaskRecord.message_id == saved_msg.id).all()
                 if created_tasks:
@@ -507,7 +527,7 @@ class WhatsAppService:
                         due_str = f" (📅 {t.due_date})" if t.due_date else ""
                         prio_badge = f"[{t.priority}]" if t.priority else ""
                         reply_lines.append(f"• 📌 *{prio_badge}* {t.title}{due_str}")
-                    await self.send_text_message(number=info["phone_number"], text="\n".join(reply_lines))
+                    await self.send_text_message(number=settings.USER_PHONE_NUMBER, text="\n".join(reply_lines))
 
             return {
                 "status": "success",
