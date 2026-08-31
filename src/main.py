@@ -101,6 +101,7 @@ app.include_router(memory_router)
 app.include_router(contacts_router)
 app.include_router(analytics_router)
 app.include_router(audit_router)
+app.include_router(audit_router, prefix="/api/audit", include_in_schema=False)
 app.include_router(whatsapp_router)
 
 
