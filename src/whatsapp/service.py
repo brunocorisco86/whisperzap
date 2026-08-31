@@ -107,7 +107,7 @@ class WhatsAppService:
         return False
 
     def _is_owner_number(self, phone: str) -> bool:
-        """Verifica se o número de telefone pertence ao proprietário do sistema."""
+        """Verifica se o número de telefone pertence estritamente ao proprietário do sistema."""
         owner = sanitize_phone_number(settings.USER_PHONE_NUMBER)
         clean = sanitize_phone_number(phone)
         if not clean or not owner:
@@ -115,24 +115,22 @@ class WhatsAppService:
         return clean == owner or clean.endswith(owner[-8:]) or owner.endswith(clean[-8:])
 
     async def send_text_message(self, number: str, text: str) -> bool:
-        """Envia mensagem de texto para o WhatsApp, com trava mandatória garantindo envio EXCLUSIVO ao proprietário."""
-        if not text:
-            logger.warning("Tentativa de envio de mensagem vazia.")
+        """Envia mensagem de texto para o WhatsApp, com trava MANDATÓRIA E INEGOCIÁVEL de envio EXCLUSIVO ao proprietário."""
+        if not text or not text.strip():
             return False
 
         owner_number = sanitize_phone_number(settings.USER_PHONE_NUMBER)
         target_number = sanitize_phone_number(number)
 
-        # 🛡️ TRAVA MANDATÓRIA DE PRIVACIDADE: Nunca enviar para contatos de terceiros
+        # 🛡️ TRAVA ABSOLUTA DE PRIVACIDADE: Nunca enviar para contatos de terceiros
         if not self._is_owner_number(target_number):
-            logger.warning(
-                f"🛡️ [TRAVA DE SEGURANÇA] Tentativa de envio para terceiro ({target_number}) bloqueada. "
-                f"Redirecionando exclusivamente para o proprietário ({owner_number})."
+            logger.error(
+                f"🚨 [BLOQUEIO TOTAL DE SEGURANÇA] Tentativa de envio para terceiro ({target_number}) CANCELADA IMEDIATAMENTE. "
+                f"Nenhuma mensagem foi disparada."
             )
-            clean_number = owner_number
-        else:
-            clean_number = target_number or owner_number
+            return False
 
+        clean_number = owner_number
         if not clean_number:
             logger.error("Número do proprietário não configurado para envio de WhatsApp.")
             return False
@@ -258,28 +256,38 @@ class WhatsAppService:
         # Detecta se é mídia ignorável (sticker, reação, localização)
         is_ignorable = any(ign in msg_type for ign in ["sticker", "reaction", "location", "contact"])
 
-        # Resolução do número de telefone com suporte a LID e Self-Memos
+        # Detecta se é mensagem histórica de sincronização (idade > 60s)
+        raw_ts = data.get("messageTimestamp") or payload.get("messageTimestamp") or 0
+        try:
+            msg_ts = float(raw_ts)
+            # Se vier em milissegundos
+            if msg_ts > 1000000000000:
+                msg_ts = msg_ts / 1000.0
+            is_historic = bool(msg_ts > 0 and (time.time() - msg_ts > 60.0))
+        except Exception:
+            is_historic = False
+
+        # Resolução estrita de Self-Memo (conversa consigo mesmo)
         raw_number = sanitize_phone_number(remote_jid)
-        remote_jid_alt = key.get("remoteJidAlt") or data.get("remoteJidAlt") or ""
-        owner_jid = data.get("ownerJid") or payload.get("ownerJid") or ""
-        
-        target_phone = sanitize_phone_number(remote_jid_alt) if "@s.whatsapp.net" in remote_jid_alt else ""
-        if not target_phone and "@s.whatsapp.net" in remote_jid:
-            target_phone = raw_number
-        if not target_phone and from_me:
-            target_phone = sanitize_phone_number(owner_jid) or settings.USER_PHONE_NUMBER
-        if not target_phone or len(target_phone) < 10:
-            target_phone = settings.USER_PHONE_NUMBER
+        owner_clean = sanitize_phone_number(settings.USER_PHONE_NUMBER)
+        is_chat_with_self = bool(
+            raw_number and owner_clean and (
+                raw_number == owner_clean or raw_number.endswith(owner_clean[-8:]) or owner_clean.endswith(raw_number[-8:])
+            )
+        )
+        is_self_memo = bool(from_me and is_chat_with_self)
 
         return {
             "key_id": key_id,
             "remote_jid": remote_jid,
-            "phone_number": target_phone or raw_number,
+            "phone_number": owner_clean if is_self_memo else raw_number,
             "from_me": from_me,
             "push_name": push_name,
             "is_group": is_group,
             "has_audio": has_audio,
             "is_ignorable": is_ignorable,
+            "is_historic": is_historic,
+            "is_self_memo": is_self_memo,
             "text": str(text_content).strip(),
             "direct_base64": direct_base64.strip() if direct_base64 else "",
             "raw_data": data,
@@ -307,9 +315,9 @@ class WhatsAppService:
     ) -> Dict[str, Any]:
         """Orquestra o fluxo de ponta a ponta nativamente em Python:
         1. Filtra grupos e mídias vazias;
-        2. Detecta se é captura pessoal do proprietário (Self-Memo) para tarefas/notas;
-        3. Se áudio: Baixa Base64 -> Whisper -> AI Revise -> Salva Memória/Tarefas -> Responde WhatsApp;
-        4. Se texto: Trata perguntas '?' do Hermes Agent ou salva memória/tarefas com bypass.
+        2. Bloqueia mensagens históricas de disparar automações de saída;
+        3. Se áudio de nota pessoal consigo mesmo: Transcreve -> Revisa -> Salva -> Responde no chat pessoal;
+        4. Mensagens de terceiros ou chats normais: Apenas arquiva silenciosamente no Grafo sem NENHUM envio.
         """
         info = pre_extracted_info or self.extract_message_info(payload)
         if not info:
@@ -332,9 +340,9 @@ class WhatsAppService:
             logger.debug("Mensagem do bot descartada para evitar eco.")
             return {"status": "ignored", "reason": "bot_echo_response"}
 
-        # 4. Detecção de Self-Memo (Áudios ou Notas para si mesmo / Proprietário)
-        is_self_memo = info["from_me"] or is_owner_interaction(info["push_name"], info["raw_data"])
-        speaker_label = f"{info['push_name']} (Nota Pessoal)" if (is_self_memo and info["from_me"]) else info["push_name"]
+        is_self_memo = info.get("is_self_memo", False)
+        is_historic = info.get("is_historic", False)
+        speaker_label = f"{info['push_name']} (Nota Pessoal)" if is_self_memo else info["push_name"]
 
         should_close = False
         if db is None:
@@ -344,7 +352,7 @@ class WhatsAppService:
         try:
             # ===================== FLUXO DE ÁUDIO =====================
             if info["has_audio"]:
-                logger.info(f"🎙️ Processando áudio WhatsApp de {info['push_name']} ({info['phone_number']}) [Self-Memo: {is_self_memo}]...")
+                logger.info(f"🎙️ Processando áudio WhatsApp de {info['push_name']} [Self-Memo: {is_self_memo}, Histórico: {is_historic}]...")
 
                 base64_str = info.get("direct_base64") or await self.get_media_base64(
                     message_id=info["key_id"],
@@ -425,8 +433,8 @@ class WhatsAppService:
                 )
                 saved_msg = await memory_repository.save_message(data=msg_in, db=db)
 
-                # 4. Formata e Envia Feedback no WhatsApp EXCLUSIVAMENTE para o proprietário se for Self-Memo
-                if is_self_memo:
+                # 4. Envia resposta no WhatsApp EXCLUSIVAMENTE para o proprietário se for Self-Memo recente
+                if is_self_memo and not is_historic:
                     created_tasks = []
                     if saved_msg:
                         created_tasks = db.query(TaskRecord).filter(TaskRecord.message_id == saved_msg.id).all()
@@ -451,7 +459,7 @@ class WhatsAppService:
                     reply_text = "\n".join(reply_lines)
                     await self.send_text_message(number=settings.USER_PHONE_NUMBER, text=reply_text)
                 else:
-                    logger.info(f"🎧 Áudio de terceiro ({info['push_name']}) arquivado na memória passiva. Nenhuma mensagem externa enviada.")
+                    logger.info(f"🎧 Áudio arquivado silenciosamente na memória passiva (sem envio de mensagem).")
 
                 return {
                     "status": "success",
@@ -466,9 +474,9 @@ class WhatsAppService:
             if not raw_text:
                 return {"status": "ignored", "reason": "empty_text"}
 
-            # 1. Detecção de Pergunta para o Hermes Agent ('?', '/hermes', 'hermes,') - Apenas para o proprietário
+            # 1. Detecção de Pergunta para o Hermes Agent ('?', '/hermes', 'hermes,') - Apenas em Self-Memo recente
             hermes_match = re.match(r"^(\?|/hermes|hermes,)\s*(.*)", raw_text, flags=re.IGNORECASE)
-            if hermes_match and is_self_memo:
+            if hermes_match and is_self_memo and not is_historic:
                 query_str = hermes_match.group(2).strip()
                 if not query_str:
                     query_str = "Quais são as tarefas pendentes mais recentes?"
@@ -501,7 +509,7 @@ class WhatsAppService:
                 or len(clean_t.split()) <= 2
             )
 
-            # 3. Salva Mensagem de Texto na Memória e Grafo
+            # 3. Salva Mensagem de Texto na Memória e Grafo (SILENCIOSO: NUNCA envia mensagens de WhatsApp para texto comum)
             msg_in = MessageCreate(
                 speaker=speaker_label,
                 raw_text=raw_text,
@@ -517,17 +525,6 @@ class WhatsAppService:
                 },
             )
             saved_msg = await memory_repository.save_message(data=msg_in, db=db)
-
-            # 4. Se for nota de texto pessoal (não trivial) e gerou tarefas, confirma EXCLUSIVAMENTE para o proprietário
-            if is_self_memo and not bypass_ai and saved_msg:
-                created_tasks = db.query(TaskRecord).filter(TaskRecord.message_id == saved_msg.id).all()
-                if created_tasks:
-                    reply_lines = ["📋 *Tarefas Capturadas a partir do Texto:*"]
-                    for t in created_tasks:
-                        due_str = f" (📅 {t.due_date})" if t.due_date else ""
-                        prio_badge = f"[{t.priority}]" if t.priority else ""
-                        reply_lines.append(f"• 📌 *{prio_badge}* {t.title}{due_str}")
-                    await self.send_text_message(number=settings.USER_PHONE_NUMBER, text="\n".join(reply_lines))
 
             return {
                 "status": "success",

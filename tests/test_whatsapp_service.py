@@ -144,8 +144,8 @@ async def test_process_webhook_hermes_query():
     """Testa comando '?' direcionado ao Hermes Agent com resposta automática."""
     query_payload = {
         "data": {
-            "key": {"id": "m_query_1", "remoteJid": "554499998877@s.whatsapp.net", "fromMe": False},
-            "pushName": "Bruno",
+            "key": {"id": "m_query_1", "remoteJid": "554497604925@s.whatsapp.net", "fromMe": True},
+            "pushName": "Bruno Conter",
             "message": {"conversation": "? Qual o status do silo de ração da C.Vale?"},
         }
     }
