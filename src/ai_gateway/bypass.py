@@ -276,15 +276,33 @@ def is_registered_contact(speaker: Optional[str] = None, meta_info: Optional[Dic
             c_name_norm = normalize_text(c.name)
             c_nick_norm = normalize_text(c.nickname or "")
             c_digits = re.sub(r"\D", "", c.phone_number or "")
+            c_id_digits = re.sub(r"\D", "", c.id or "")
 
-            # Match por dígitos de telefone (exato ou últimos 8 dígitos)
-            if speaker_digits and c_digits:
-                if speaker_digits == c_digits or (len(speaker_digits) >= 8 and len(c_digits) >= 8 and speaker_digits[-8:] == c_digits[-8:]):
+            # 1. Match por dígitos de telefone ou ID (exato ou últimos 8 dígitos)
+            if speaker_digits and len(speaker_digits) >= 8:
+                if c_digits and (speaker_digits == c_digits or (len(c_digits) >= 8 and speaker_digits[-8:] == c_digits[-8:])):
+                    return True
+                if c_id_digits and (speaker_digits == c_id_digits or (len(c_id_digits) >= 8 and speaker_digits[-8:] == c_id_digits[-8:])):
                     return True
 
-            # Match por nome / apelido
-            if speaker_norm and (speaker_norm == c_name_norm or (c_nick_norm and speaker_norm == c_nick_norm)):
-                return True
+            # 2. Match por nome completo, primeiro nome ou apelido
+            if speaker_norm and len(speaker_norm) >= 3:
+                # Match exato de nome ou apelido
+                if speaker_norm == c_name_norm or (c_nick_norm and speaker_norm == c_nick_norm):
+                    return True
+
+                # Match se speaker for o primeiro nome do contato (ex: "Joceli" em "Joceli Patel")
+                c_first_name = c_name_norm.split()[0] if c_name_norm else ""
+                if c_first_name and speaker_norm == c_first_name:
+                    return True
+
+                # Match se speaker estiver contido no nome completo ou vice-versa
+                if speaker_norm in c_name_norm or (c_name_norm and c_name_norm in speaker_norm):
+                    return True
+
+                # Match com apelido
+                if c_nick_norm and (speaker_norm in c_nick_norm or c_nick_norm in speaker_norm):
+                    return True
 
         return False
     except Exception as e:

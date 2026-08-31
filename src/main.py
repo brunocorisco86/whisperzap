@@ -112,12 +112,12 @@ async def legacy_ai_models():
     return {
         "status": "success",
         "active_models": {
-            "default": settings.GEMINI_MODEL,
-            "revise": settings.GEMINI_MODEL,
-            "extract": settings.GEMINI_MODEL,
-            "summarize": getattr(settings, "GEMINI_REPORTS_MODEL", "gemini-3.7-flash"),
-            "weekly": getattr(settings, "GEMINI_REPORTS_MODEL", "gemini-3.7-flash"),
-            "hermes": settings.GEMINI_MODEL,
+            "default": getattr(settings, "MODEL_REVISE", "gemini-3.5-flash-lite"),
+            "revise": getattr(settings, "MODEL_REVISE", "gemini-3.5-flash-lite"),
+            "extract": getattr(settings, "MODEL_EXTRACT", "gemini-3.5-flash-lite"),
+            "summarize": getattr(settings, "MODEL_SUMMARIZE", "gemini-3.7-flash"),
+            "weekly": getattr(settings, "MODEL_WEEKLY", "gemini-3.7-flash"),
+            "hermes": getattr(settings, "MODEL_REVISE", "gemini-3.5-flash-lite"),
             "embedding": settings.EMBEDDING_MODEL,
         },
         "registered_models": model_registry.list_models(),
