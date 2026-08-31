@@ -17,7 +17,7 @@ from src.ai_gateway.providers import get_ai_provider
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/ai", tags=["AI Gateway"])
+router = APIRouter(prefix="/api/v1/ai", tags=["AI Gateway"])
 
 
 @router.post(

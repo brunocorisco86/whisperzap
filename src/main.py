@@ -96,6 +96,7 @@ if os.path.exists(STATIC_DIR):
 app.include_router(web_router)
 app.include_router(transcriber_router)
 app.include_router(ai_router)
+app.include_router(ai_router, prefix="/ai", include_in_schema=False)
 app.include_router(dictionary_router)
 app.include_router(memory_router)
 app.include_router(contacts_router)
