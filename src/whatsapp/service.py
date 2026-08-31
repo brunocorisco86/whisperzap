@@ -205,6 +205,16 @@ class WhatsAppService:
         msg_obj = data.get("message") or {}
         msg_type = str(data.get("messageType") or payload.get("messageType") or "").lower()
 
+        # Extrai áudio em base64 direto se fornecido pelo webhook da Evolution API
+        direct_base64 = (
+            msg_obj.get("base64")
+            or (msg_obj.get("audioMessage") or {}).get("base64")
+            or (msg_obj.get("documentMessage") or {}).get("base64")
+            or data.get("base64")
+            or (payload.get("base64") if isinstance(payload, dict) else None)
+            or ""
+        )
+
         # Extrai texto direto se houver
         text_content = (
             msg_obj.get("conversation")
@@ -218,6 +228,7 @@ class WhatsAppService:
         has_audio = (
             "audio" in msg_type
             or bool(msg_obj.get("audioMessage"))
+            or bool(direct_base64 and "audio" in str(msg_obj))
             or (
                 "document" in msg_type
                 and str((msg_obj.get("documentMessage") or {}).get("mimetype") or "").startswith("audio/")
@@ -227,16 +238,30 @@ class WhatsAppService:
         # Detecta se é mídia ignorável (sticker, reação, localização)
         is_ignorable = any(ign in msg_type for ign in ["sticker", "reaction", "location", "contact"])
 
+        # Resolução do número de telefone com suporte a LID e Self-Memos
+        raw_number = sanitize_phone_number(remote_jid)
+        remote_jid_alt = key.get("remoteJidAlt") or data.get("remoteJidAlt") or ""
+        owner_jid = data.get("ownerJid") or payload.get("ownerJid") or ""
+        
+        target_phone = sanitize_phone_number(remote_jid_alt) if "@s.whatsapp.net" in remote_jid_alt else ""
+        if not target_phone and "@s.whatsapp.net" in remote_jid:
+            target_phone = raw_number
+        if not target_phone and from_me:
+            target_phone = sanitize_phone_number(owner_jid) or settings.USER_PHONE_NUMBER
+        if not target_phone or len(target_phone) < 10:
+            target_phone = settings.USER_PHONE_NUMBER
+
         return {
             "key_id": key_id,
             "remote_jid": remote_jid,
-            "phone_number": sanitize_phone_number(remote_jid),
+            "phone_number": target_phone or raw_number,
             "from_me": from_me,
             "push_name": push_name,
             "is_group": is_group,
             "has_audio": has_audio,
             "is_ignorable": is_ignorable,
             "text": str(text_content).strip(),
+            "direct_base64": direct_base64.strip() if direct_base64 else "",
             "raw_data": data,
         }
 
@@ -300,7 +325,7 @@ class WhatsAppService:
             if info["has_audio"]:
                 logger.info(f"🎙️ Processando áudio WhatsApp de {info['push_name']} ({info['phone_number']}) [Self-Memo: {is_self_memo}]...")
 
-                base64_str = await self.get_media_base64(
+                base64_str = info.get("direct_base64") or await self.get_media_base64(
                     message_id=info["key_id"],
                     remote_jid=info["remote_jid"],
                     from_me=info["from_me"],
