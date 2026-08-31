@@ -30,6 +30,35 @@ from src.reports.weekly import weekly_report_service
 router = APIRouter(prefix="/api/v1/memory", tags=["Memória em Camadas & Agente Hermes"])
 
 
+@router.get(
+    "/health",
+    summary="Verificação de integridade do subsistema de Memória e Banco de Dados",
+    tags=["memory", "health"],
+)
+async def memory_health_check(db: Session = Depends(get_db)):
+    """Verifica a conectividade com o PostgreSQL/pgvector e integridade das memórias."""
+    from src.memory.models import MessageRecord, EmbeddingRecord
+    from sqlalchemy import text
+
+    try:
+        db.execute(text("SELECT 1"))
+        msg_count = db.query(MessageRecord).count()
+        emb_count = db.query(EmbeddingRecord).count()
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "messages_count": msg_count,
+            "embeddings_count": emb_count,
+            "pgvector_enabled": True,
+        }
+    except Exception as e:
+        return {
+            "status": "degraded",
+            "database": "error",
+            "error": str(e),
+        }
+
+
 @router.post("/messages")
 async def save_message(payload: MessageCreate, response: Response, db: Session = Depends(get_db)):
     """Salva a mensagem, realiza a extração semântica silenciosa e atualiza o grafo.
