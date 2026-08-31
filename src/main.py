@@ -96,7 +96,6 @@ if os.path.exists(STATIC_DIR):
 app.include_router(web_router)
 app.include_router(transcriber_router)
 app.include_router(ai_router)
-app.include_router(ai_router, prefix="/ai", include_in_schema=False)
 app.include_router(dictionary_router)
 app.include_router(memory_router)
 app.include_router(contacts_router)
@@ -104,6 +103,26 @@ app.include_router(analytics_router)
 app.include_router(audit_router)
 app.include_router(audit_router, prefix="/api/audit", include_in_schema=False)
 app.include_router(whatsapp_router)
+
+
+@app.get("/ai/models", include_in_schema=False)
+async def legacy_ai_models():
+    from src.ai_gateway.model_registry import model_registry
+    from src.config import settings
+    return {
+        "status": "success",
+        "active_models": {
+            "default": settings.GEMINI_MODEL,
+            "revise": settings.GEMINI_MODEL,
+            "extract": settings.GEMINI_MODEL,
+            "summarize": getattr(settings, "GEMINI_REPORTS_MODEL", "gemini-3.7-flash"),
+            "weekly": getattr(settings, "GEMINI_REPORTS_MODEL", "gemini-3.7-flash"),
+            "hermes": settings.GEMINI_MODEL,
+            "embedding": settings.EMBEDDING_MODEL,
+        },
+        "registered_models": model_registry.list_models(),
+        "total_registered": len(model_registry.list_models()),
+    }
 
 
 
