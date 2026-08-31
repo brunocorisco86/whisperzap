@@ -729,10 +729,16 @@ async def export_vector_space_3d(
             return PlainTextResponse(content="# Wavefront OBJ - Hermes Vector Space (0 vertices)\n", media_type="text/plain", headers={"Content-Disposition": "attachment; filename=vector_space.obj"})
 
     raw_vectors = []
+    target_dim = 768
     for rec in embeddings_records:
         vec = rec.embedding_json
-        if isinstance(vec, list) and len(vec) > 0:
-            raw_vectors.append(vec)
+        if isinstance(vec, list) and len(vec) >= 3:
+            if len(vec) == target_dim:
+                raw_vectors.append(vec)
+            elif len(vec) > target_dim:
+                raw_vectors.append(vec[:target_dim])
+            else:
+                raw_vectors.append(vec + [0.0] * (target_dim - len(vec)))
 
     if len(raw_vectors) < 3:
         points_3d = []
