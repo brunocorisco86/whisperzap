@@ -466,22 +466,36 @@ class ContactService:
             if not name_clean:
                 return None
 
-            # 1. Correspondência exata case-insensitive
+            # 1. Limpa títulos honoríficos e saudações comuns (Dona, Seu, etc.)
+            clean_search = re.sub(r"^(dona|seu|sr\.?|sra\.?|dr\.?|dra\.?|eng\.?|prof\.?)\s+", "", name_clean, flags=re.IGNORECASE).strip()
+            if not clean_search:
+                clean_search = name_clean
+
+            # 2. Correspondência exata case-insensitive
             match = db.query(ContactRecord).filter(
-                (ContactRecord.name.ilike(name_clean)) | (ContactRecord.nickname.ilike(name_clean))
+                (ContactRecord.name.ilike(clean_search)) | (ContactRecord.nickname.ilike(clean_search))
             ).first()
             if match:
                 return match
 
-            # 2. Substring direta (ex: "Larissa Batista" contido em "Larissa Ajala Batista" ou vice-versa)
+            # 3. Substring direta (ex: "Larissa Batista" contido em "Larissa Ajala Batista" ou vice-versa)
             match = db.query(ContactRecord).filter(
-                (ContactRecord.name.ilike(f"%{name_clean}%")) | (ContactRecord.nickname.ilike(f"%{name_clean}%"))
+                (ContactRecord.name.ilike(f"%{clean_search}%")) | (ContactRecord.nickname.ilike(f"%{clean_search}%"))
             ).first()
             if match:
                 return match
 
-            # 3. Correspondência por tokens de nome (ex: primeiro + último nome)
-            tokens = [t for t in re.findall(r"\w+", name_clean.lower()) if len(t) >= 3]
+            # 4. Correspondência por primeiro nome (ex: "Joceli" -> "Joceli Patel")
+            first_token = clean_search.split()[0] if clean_search else ""
+            if len(first_token) >= 3:
+                match = db.query(ContactRecord).filter(
+                    ContactRecord.name.ilike(f"{first_token}%")
+                ).first()
+                if match:
+                    return match
+
+            # 5. Correspondência por tokens de nome (ex: primeiro + último nome)
+            tokens = [t for t in re.findall(r"\w+", clean_search.lower()) if len(t) >= 3]
             if len(tokens) >= 2:
                 all_contacts = db.query(ContactRecord).all()
                 for c in all_contacts:

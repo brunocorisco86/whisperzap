@@ -331,9 +331,12 @@ def should_drop_message(
         return True, "group_message"
 
     # 2. Exigência de Identidade Prévia (Dono ou Contato com Cartão)
+    # Áudios e notas de voz recebidos NUNCA são descartados por falta de cartão prévio!
     if require_registered_card:
-        if not is_registered_contact(speaker=speaker, meta_info=meta_info, db=db):
-            return True, "unregistered_contact_no_card"
+        is_audio = (message_type == "audio") or (isinstance(meta_info, dict) and meta_info.get("message_type") == "audio")
+        if not is_audio and not is_registered_contact(speaker=speaker, meta_info=meta_info, db=db):
+            if not has_business_or_action_intent(text or ""):
+                return True, "unregistered_contact_no_card"
 
     # 3. Tipos de mídia sem conteúdo textual ou sem suporte de fala
     non_text_types = {
