@@ -955,23 +955,71 @@
             </div>
           </div>
 
-          <!-- Card: n8n Workflow Automation -->
+          <!-- Card: NousResearch Hermes Autonomous Agent -->
           <div class="env-card">
             <div class="env-card-header">
-              <div class="env-icon" style="background: rgba(234, 88, 12, 0.15); color: #f97316; border: 1px solid rgba(234, 88, 12, 0.3);">🧩</div>
+              <div class="env-icon" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3);">🤖</div>
               <div class="env-header-text">
-                <h3 class="env-title">n8n Orchestrator</h3>
-                <span class="env-badge badge-active">Porta 5678 (Opcional)</span>
+                <h3 class="env-title">Hermes Agent (NousResearch)</h3>
+                <span class="env-badge badge-active">Raciocínio & RAG</span>
               </div>
             </div>
-            <p class="env-desc">Orquestrador visual para fluxos complexos, integrações externas customizadas e automações adicionais.</p>
+            <p class="env-desc">Agente autônomo com memória de longo prazo, raciocínio multietapas, busca GraphRAG vetorial e execução de ferramentas.</p>
             <div class="env-meta">
-              <span><strong>Status:</strong> Standalone / Opcional</span>
-              <span><strong>Console:</strong> Web UI :5678</span>
+              <span><strong>Engine:</strong> Nous Hermes / DeepSeek</span>
+              <span><strong>Status:</strong> Docker hermes_agent</span>
             </div>
             <div class="env-actions">
-              <a href="http://179.197.73.80:5678" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm env-btn" style="border-color: #f97316; color: #fdba74;" title="Acessar painel web do n8n">
-                🚀 Acessar Console n8n
+              <a href="/docs#/search/query_hermes_rag_api_v1_memory_query_hermes_post" target="_blank" class="btn btn-secondary btn-sm env-btn" style="border-color: #a855f7; color: #d8b4fe;" title="Testar RAG interativo do Hermes Agent">
+                🧠 Query Hermes RAG
+              </a>
+            </div>
+          </div>
+
+          <!-- Card: Faster-Whisper ASR & Acoustic Engine -->
+          <div class="env-card">
+            <div class="env-card-header">
+              <div class="env-icon" style="background: rgba(236, 72, 153, 0.15); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.3);">🎙️</div>
+              <div class="env-header-text">
+                <h3 class="env-title">Faster-Whisper ASR Engine</h3>
+                <span class="env-badge badge-active">CTranslate2 Local</span>
+              </div>
+            </div>
+            <p class="env-desc">Motor local de transcrição neural de alta precisão com priming dinâmico de termos avícolas C.Vale e análise de prosódia acústica.</p>
+            <div class="env-meta">
+              <span><strong>Latência:</strong> ~2.0s por áudio</span>
+              <span><strong>Idioma:</strong> Português (PT-BR)</span>
+            </div>
+            <div class="env-actions">
+              <a href="/docs#/transcription" target="_blank" class="btn btn-secondary btn-sm env-btn" style="border-color: #ec4899; color: #fbcfe8;" title="Ver endpoints do Whisper">
+                🎧 Pipeline ASR
+              </a>
+            </div>
+          </div>
+
+          <!-- Card: Urânia 3D Vector Space & Knowledge Graph -->
+          <div class="env-card">
+            <div class="env-card-header">
+              <div class="env-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">🌌</div>
+              <div class="env-header-text">
+                <h3 class="env-title">Urânia: Espaço Vetorial 3D</h3>
+                <span class="env-badge badge-active">Point Cloud Sem Rótulos</span>
+              </div>
+            </div>
+            <p class="env-desc">Projeção tridimensional (PCA/SVD) dos embeddings vetoriais (768D) em nuvem de pontos geométrica 3D pura, exportável para Blender e CAD.</p>
+            <div class="env-meta">
+              <span><strong>Formatos:</strong> .PLY / .OBJ / JSON 3D</span>
+              <span><strong>Modo:</strong> Unlabeled Pure Geometry</span>
+            </div>
+            <div class="env-actions">
+              <a href="/api/v1/memory/vector-space-3d?format=ply" download class="btn btn-secondary btn-sm env-btn" style="border-color: #38bdf8; color: #bae6fd;" title="Baixar Nuvem de Pontos 3D em formato .PLY (Blender / MeshLab)">
+                📐 Exportar .PLY 3D
+              </a>
+              <a href="/api/v1/memory/vector-space-3d?format=obj" download class="btn btn-secondary btn-sm env-btn" title="Baixar Modelo 3D em Wavefront .OBJ">
+                📦 .OBJ
+              </a>
+              <a href="/api/v1/memory/vector-space-3d?format=json" target="_blank" class="btn btn-secondary btn-sm env-btn" title="Ver Coordenadas XYZ em JSON">
+                📊 JSON
               </a>
             </div>
           </div>

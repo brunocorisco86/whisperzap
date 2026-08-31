@@ -11,6 +11,7 @@ from src.ai_gateway.schemas import (
 from src.memory.database import get_db
 from src.memory.graph import knowledge_graph
 from src.memory.models import (
+    EmbeddingRecord,
     GardenMetamorphosisMetrics,
     MemoryStats,
     MessageCreate,
@@ -695,6 +696,96 @@ async def get_token_savings_metrics():
         },
         "semantic_cache_stats": cache_metrics,
     }
+
+
+# ===================== Exportação 3D do Banco Vetorial =====================
+
+
+@router.get(
+    "/vector-space-3d",
+    summary="Exporta a projeção tridimensional (3D Point Cloud) dos embeddings do banco vetorial",
+    tags=["memory", "3d", "embeddings"],
+)
+async def export_vector_space_3d(
+    format: str = Query(default="json", enum=["json", "ply", "obj"], description="Formato de exportação 3D"),
+    scale: float = Query(default=100.0, ge=1.0, le=1000.0, description="Fator de escala espacial"),
+    db: Session = Depends(get_db),
+):
+    """Projeta os embeddings de alta dimensão (768D) em um espaço tridimensional (X, Y, Z) sem labels ou metadados de texto.
+
+    Ideal para renderização geométrica, impressão 3D, arte matemática ou visualizadores 3D (Blender, Three.js, MeshLab).
+    """
+    import numpy as np
+    from fastapi.responses import PlainTextResponse
+
+    embeddings_records = db.query(EmbeddingRecord).all()
+    if not embeddings_records:
+        if format == "json":
+            return {"points": [], "count": 0, "dimensions": 3}
+        elif format == "ply":
+            header = "ply\nformat ascii 1.0\nelement vertex 0\nproperty float x\nproperty float y\nproperty float z\nend_header\n"
+            return PlainTextResponse(content=header, media_type="application/octet-stream", headers={"Content-Disposition": "attachment; filename=vector_space.ply"})
+        else:
+            return PlainTextResponse(content="# Wavefront OBJ - Hermes Vector Space (0 vertices)\n", media_type="text/plain", headers={"Content-Disposition": "attachment; filename=vector_space.obj"})
+
+    raw_vectors = []
+    for rec in embeddings_records:
+        vec = rec.embedding_json
+        if isinstance(vec, list) and len(vec) > 0:
+            raw_vectors.append(vec)
+
+    if len(raw_vectors) < 3:
+        points_3d = []
+        for i, v in enumerate(raw_vectors):
+            points_3d.append([float(v[0] if len(v) > 0 else 0) * scale, float(v[1] if len(v) > 1 else 0) * scale, float(v[2] if len(v) > 2 else 0) * scale])
+    else:
+        # Aplica PCA via Singular Value Decomposition (SVD) de alta performance em NumPy
+        X = np.array(raw_vectors, dtype=np.float32)
+        X_centered = X - np.mean(X, axis=0)
+        U, S, Vt = np.linalg.svd(X_centered, full_matrices=False)
+        coords_3d = np.dot(X_centered, Vt[:3, :].T)
+
+        max_abs = np.max(np.abs(coords_3d)) or 1.0
+        normalized_coords = (coords_3d / max_abs) * scale
+        points_3d = normalized_coords.tolist()
+
+    if format == "json":
+        return {
+            "dimensions": 3,
+            "count": len(points_3d),
+            "scale": scale,
+            "points": [[round(p[0], 4), round(p[1], 4), round(p[2], 4)] for p in points_3d],
+        }
+    elif format == "ply":
+        lines = [
+            "ply",
+            "format ascii 1.0",
+            "comment Hermes Voice Memory - 3D Vector Space Point Cloud (Unlabeled)",
+            f"element vertex {len(points_3d)}",
+            "property float x",
+            "property float y",
+            "property float z",
+            "end_header",
+        ]
+        for p in points_3d:
+            lines.append(f"{p[0]:.4f} {p[1]:.4f} {p[2]:.4f}")
+        return PlainTextResponse(
+            content="\n".join(lines) + "\n",
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": "attachment; filename=vector_space_3d.ply"},
+        )
+    elif format == "obj":
+        lines = [
+            "# Wavefront OBJ - Hermes Voice Memory 3D Vector Cloud",
+            f"# Total vertices: {len(points_3d)}",
+        ]
+        for p in points_3d:
+            lines.append(f"v {p[0]:.4f} {p[1]:.4f} {p[2]:.4f}")
+        return PlainTextResponse(
+            content="\n".join(lines) + "\n",
+            media_type="text/plain",
+            headers={"Content-Disposition": "attachment; filename=vector_space_3d.obj"},
+        )
 
 
 
