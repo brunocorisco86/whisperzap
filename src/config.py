@@ -19,17 +19,17 @@ class Settings(BaseSettings):
     API_TITLE: str = "Hermes Voice Memory API"
     API_VERSION: str = "0.2.0"
 
-    # AI Gateway (Otimizado para Menor Pegada de Tokens com Gemini 3.1 Flash-Lite)
+    # AI Gateway (Otimizado para Menor Pegada de Tokens com Gemini 3.5 Flash-Lite)
     AI_PROVIDER: Literal["gemini", "openrouter", "mock"] = "gemini"
-    AI_DEFAULT_MODEL: str = "gemini-3.1-flash-lite"
+    AI_DEFAULT_MODEL: str = "gemini-3.5-flash-lite"
     GEMINI_API_KEY: str = ""
     OPENROUTER_API_KEY: str = ""
 
     # Model Router
-    MODEL_REVISE: str = "gemini-3.1-flash-lite"
-    MODEL_EXTRACT: str = "gemini-3.1-flash-lite"
-    MODEL_SUMMARIZE: str = "gemini-3.1-flash-lite"
-    MODEL_WEEKLY: str = "gemini-3.1-flash-lite"
+    MODEL_REVISE: str = "gemini-3.5-flash-lite"
+    MODEL_EXTRACT: str = "gemini-3.5-flash-lite"
+    MODEL_SUMMARIZE: str = "gemini-3.5-flash-lite"
+    MODEL_WEEKLY: str = "gemini-3.5-flash-lite"
 
     AI_LOG_PROMPTS: bool = False
     AI_LOG_RESPONSES: bool = False

@@ -121,3 +121,64 @@ def test_get_ai_provider_dynamic_resolution():
     model_registry.set_active_model("extract", "gemini-3.1-flash-lite")
     provider = get_ai_provider(task="extract")
     assert provider.model_name == "gemini-3.1-flash-lite"
+
+
+@pytest.mark.asyncio
+async def test_check_viable_models_mocked(temp_registry):
+    """Testa detecção de modelos viáveis, sobrecarga (503) e auto-remediação."""
+    # Configura modelo 'revise' como gemini-3.7-flash
+    temp_registry.set_active_model("revise", "gemini-3.7-flash")
+
+    def mock_post_side_effect(url, json=None, timeout=None):
+        mock_resp = AsyncMock()
+        # gemini-3.7-flash simula 503 (sobrecarga)
+        if "gemini-3.7-flash" in url:
+            mock_resp.status_code = 503
+            mock_resp.text = '{"error": "503 Service Unavailable"}'
+        elif "gemini-3.5-flash-lite" in url:
+            mock_resp.status_code = 200
+            mock_resp.json = lambda: {"candidates": [{"content": {"parts": [{"text": "pong"}]}}]}
+        elif "gemini-embedding-001" in url:
+            mock_resp.status_code = 200
+            mock_resp.json = lambda: {"embedding": {"values": [0.1] * 768}}
+        else:
+            mock_resp.status_code = 200
+            mock_resp.json = lambda: {"candidates": [{"content": {"parts": [{"text": "pong"}]}}]}
+        return mock_resp
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.side_effect = mock_post_side_effect
+        result = await temp_registry.check_viable_models(probe_each=True, api_key="fake-test-key")
+
+        assert result["status"] == "success"
+        checks = {c["model"]: c for c in result["model_checks"]}
+
+        # gemini-3.7-flash deve estar OVERLOADED
+        assert checks["gemini-3.7-flash"]["status"] == "OVERLOADED"
+        assert checks["gemini-3.7-flash"]["viable"] is False
+
+        # gemini-3.5-flash-lite deve estar HEALTHY
+        assert checks["gemini-3.5-flash-lite"]["status"] == "HEALTHY"
+        assert checks["gemini-3.5-flash-lite"]["viable"] is True
+
+        # Auto-remediação deve ter substituído o gemini-3.7-flash em 'revise' por gemini-3.5-flash-lite
+        assert result["auto_remediated"] is True
+        assert temp_registry.get_active_model("revise") == "gemini-3.5-flash-lite"
+
+
+def test_get_viable_models_endpoint():
+    """Testa a rota GET /ai/models/viable."""
+    with patch("src.ai_gateway.model_registry.model_registry.check_viable_models", new_callable=AsyncMock) as mock_check:
+        mock_check.return_value = {
+            "status": "success",
+            "summary": "4/5 modelos viáveis",
+            "active_models": {"revise": "gemini-3.5-flash-lite"},
+            "model_checks": [{"model": "gemini-3.5-flash-lite", "viable": True, "status": "HEALTHY", "latency_ms": 320}],
+            "auto_remediated": False,
+        }
+        resp = client.get("/ai/models/viable")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "success"
+        assert data["summary"] == "4/5 modelos viáveis"
+

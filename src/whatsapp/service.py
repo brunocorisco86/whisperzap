@@ -13,6 +13,7 @@ import time
 import base64
 import logging
 import tempfile
+from datetime import datetime, timezone, timedelta
 from threading import Lock
 from typing import Any, Dict, Optional, Tuple
 import httpx
@@ -89,6 +90,62 @@ def format_terpsicore_task_verbose(task: TaskRecord) -> str:
 
     if details:
         lines.append(f"  └ {' • '.join(details)}")
+
+    return "\n".join(lines)
+
+
+def format_viable_models_report(check_result: Dict[str, Any]) -> str:
+    """Formata relatório de viabilidade de modelos de IA com visual intuitivo para WhatsApp."""
+    brasilia_tz = timezone(timedelta(hours=-3))
+    now_str = datetime.now(brasilia_tz).strftime("%d/%m/%Y às %H:%M:%S")
+
+    lines = [
+        "🤖 *Diagnóstico de Modelos de IA (Hermes)*",
+        f"🕒 *Verificação:* {now_str} (Horário de Brasília)",
+        "",
+        "📊 *Status dos Modelos Verificados:*",
+    ]
+
+    checks = check_result.get("model_checks", [])
+    for c in checks:
+        m_name = c.get("model", "unknown")
+        is_viable = c.get("viable", False)
+        lat = c.get("latency_ms", 0)
+        status_tag = c.get("status", "UNKNOWN")
+        tier = c.get("tier", "")
+        tier_badge = f" [{tier}]" if tier else ""
+
+        if is_viable:
+            icon = "🟢"
+            desc = f"Viável ({lat}ms)"
+        elif status_tag == "OVERLOADED":
+            icon = "🟡"
+            desc = f"Sobrecarga / 503 ({lat}ms)"
+        elif status_tag == "TIMEOUT":
+            icon = "⏱️"
+            desc = "Timeout (>5s)"
+        else:
+            icon = "🔴"
+            desc = f"Indisponível ({c.get('error', status_tag)})"
+
+        lines.append(f"{icon} *{m_name}*{tier_badge}: {desc}")
+
+    lines.append("")
+    lines.append("⚙️ *Modelos Ativos no Sistema:*")
+    actives = check_result.get("active_models", {})
+    for task, mod in actives.items():
+        lines.append(f"• *{task}:* `{mod}`")
+
+    remediated = check_result.get("auto_remediated", False)
+    if remediated:
+        details = check_result.get("remediation_details", {})
+        lines.append("")
+        lines.append("⚡ *Auto-Recuperação Acionada:*")
+        for t, change in details.items():
+            lines.append(f"• {t}: {change}")
+    else:
+        lines.append("")
+        lines.append("🛡️ *Resiliência:* Cascata de Fallback Automático Ativa")
 
     return "\n".join(lines)
 
@@ -398,6 +455,22 @@ class WhatsAppService:
             should_close = True
 
         try:
+            # Garante idempotência no banco de dados para evitar reprocessamento concorrente entre workers
+            key_id = info.get("key_id")
+            if key_id and not key_id.startswith("msg_") and db is not None:
+                try:
+                    from src.memory.models import WebhookKeyRecord
+                    exists_key = db.query(WebhookKeyRecord.key_id).filter(WebhookKeyRecord.key_id == key_id).first()
+                    if exists_key:
+                        logger.info(f"Webhook key_id={key_id} já registrado no banco de dados. Descartando execução repetida.")
+                        return {"status": "ignored", "reason": "duplicate_key_id"}
+                    lock_rec = WebhookKeyRecord(key_id=key_id, status="PROCESSING")
+                    db.add(lock_rec)
+                    db.commit()
+                except Exception as e:
+                    db.rollback()
+                    logger.debug(f"Aviso de concorrência ao persistir WebhookKeyRecord ({key_id}): {e}")
+
             # ===================== FLUXO DE ÁUDIO =====================
             if info["has_audio"]:
                 logger.info(f"🎙️ Processando áudio WhatsApp de {info['push_name']} [Self-Memo: {is_self_memo}, Histórico: {is_historic}]...")
@@ -540,6 +613,29 @@ class WhatsAppService:
             # 1. Detecção de Pergunta para o Hermes Agent ('?', '/hermes', 'hermes,') - Apenas em Self-Memo ou mensagem do proprietário
             hermes_match = re.match(r"^(\?|/hermes|hermes,)\s*(.*)", raw_text, flags=re.IGNORECASE)
             is_owner = is_owner_interaction(speaker=speaker_label, meta_info=info.get("raw_data"))
+            stripped_text = raw_text.strip().lower()
+
+            # Atalhos diretos sem prefixo '?' para comando de status dos modelos
+            is_models_cmd = (
+                stripped_text in ["/modelos", "/status-ia", "/ia-status", "modelos", "modelos?"]
+                or (
+                    hermes_match is not None
+                    and any(w in hermes_match.group(2).strip().lower() for w in ["modelo", "modelos", "status ia", "ia status", "provedor", "diagnostico ia"])
+                )
+            )
+
+            if is_models_cmd and (is_self_memo or is_owner) and not is_historic:
+                logger.info(f"🤖 Comando de diagnóstico de modelos viáveis recebido do proprietário: '{raw_text}'")
+                from src.ai_gateway.model_registry import model_registry
+                check_result = await model_registry.check_viable_models(probe_each=True)
+                reply_text = format_viable_models_report(check_result)
+                await self.send_text_message(number=settings.USER_PHONE_NUMBER, text=reply_text)
+                return {
+                    "status": "success",
+                    "type": "hermes_models_check",
+                    "result": check_result,
+                }
+
             if hermes_match and (is_self_memo or is_owner) and not is_historic:
                 query_str = hermes_match.group(2).strip()
                 if not query_str:

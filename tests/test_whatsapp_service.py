@@ -404,3 +404,45 @@ async def test_process_webhook_self_memo_voice_with_verbose_signaled_tasks():
         assert "🏛️ *Objetivo Épico*" in sent_text or "💡 *Ideia/Semente*" in sent_text
 
 
+@pytest.mark.asyncio
+async def test_process_webhook_modelos_diagnostic_command():
+    """Testa que comando ? modelos dispara a conferência e responde com relatório visual."""
+    payload = {
+        "data": {
+            "key": {"id": "cmd_models_01", "remoteJid": "554497604925@s.whatsapp.net", "fromMe": True},
+            "pushName": "Bruno Conter",
+            "messageType": "conversation",
+            "message": {"conversation": "? modelos"},
+        }
+    }
+
+    mock_check_result = {
+        "status": "success",
+        "summary": "4/5 modelos viáveis",
+        "active_models": {"revise": "gemini-3.5-flash-lite", "hermes": "gemini-3.7-flash"},
+        "model_checks": [
+            {"model": "gemini-3.5-flash-lite", "tier": "LITE", "viable": True, "status": "HEALTHY", "latency_ms": 310},
+            {"model": "gemini-3.7-flash", "tier": "FLASH", "viable": False, "status": "OVERLOADED", "latency_ms": 820, "error": "HTTP 503"},
+        ],
+        "auto_remediated": True,
+        "remediation_details": {"hermes": "gemini-3.7-flash (OVERLOADED) ➔ gemini-3.5-flash-lite"},
+    }
+
+    with patch("src.ai_gateway.model_registry.model_registry.check_viable_models", new_callable=AsyncMock) as mock_check, \
+         patch.object(whatsapp_service, "send_text_message", new_callable=AsyncMock) as mock_send:
+
+        mock_check.return_value = mock_check_result
+        mock_send.return_value = True
+
+        res = await whatsapp_service.process_webhook_event(payload)
+
+        assert res["status"] == "success"
+        assert res["type"] == "hermes_models_check"
+        mock_send.assert_called_once()
+        sent_text = mock_send.call_args[1]["text"]
+        assert "Diagnóstico de Modelos de IA (Hermes)" in sent_text
+        assert "gemini-3.5-flash-lite" in sent_text
+        assert "Auto-Recuperação Acionada" in sent_text
+
+
+

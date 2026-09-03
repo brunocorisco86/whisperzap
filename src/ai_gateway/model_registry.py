@@ -35,12 +35,12 @@ class DiscoveredModel(BaseModel):
 
 class ModelRegistryData(BaseModel):
     active_models: Dict[str, str] = Field(default_factory=lambda: {
-        "default": "gemini-3.1-flash-lite",
-        "revise": "gemini-3.1-flash-lite",
-        "extract": "gemini-3.1-flash-lite",
-        "summarize": "gemini-3.1-flash-lite",
-        "weekly": "gemini-3.1-flash-lite",
-        "hermes": "gemini-3.1-flash-lite",
+        "default": "gemini-3.5-flash-lite",
+        "revise": "gemini-3.5-flash-lite",
+        "extract": "gemini-3.5-flash-lite",
+        "summarize": "gemini-3.5-flash-lite",
+        "weekly": "gemini-3.5-flash-lite",
+        "hermes": "gemini-3.5-flash-lite",
         "embedding": "gemini-embedding-001",
     })
     auto_adopt_best_lite: bool = True
@@ -333,6 +333,174 @@ class ModelRegistry:
             "adopted_changes": adopted_changes,
             "active_models": self.get_all_active_models(),
             "models": [m.model_dump() for m in discovered[:15]],
+        }
+
+    async def check_viable_models(
+        self,
+        probe_each: bool = True,
+        api_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Testa em tempo real a viabilidade, latência e status de sobrecarga (503/429) dos modelos.
+        Se o modelo ativo principal estiver indisponível ou sobrecarregado, substitui-o automaticamente
+        pelo modelo mais rápido e saudável disponível.
+        """
+        import asyncio
+        import time
+
+        key = api_key or settings.GEMINI_API_KEY
+        if not key or key.startswith("sua_chave"):
+            return {
+                "status": "error",
+                "message": "GEMINI_API_KEY não configurada.",
+                "active_models": self.get_all_active_models(),
+                "model_checks": [],
+                "auto_remediated": False,
+                "remediation_details": {},
+            }
+
+        candidates = [
+            {"name": "gemini-3.5-flash-lite", "type": "generate", "tier": "LITE"},
+            {"name": "gemini-3.7-flash", "type": "generate", "tier": "FLASH"},
+            {"name": "gemini-2.5-flash", "type": "generate", "tier": "FLASH"},
+            {"name": "gemini-2.5-pro", "type": "generate", "tier": "PRO"},
+            {"name": "gemini-embedding-001", "type": "embed", "tier": "EMBEDDING"},
+        ]
+
+        async def probe_candidate(item: Dict[str, str], client: httpx.AsyncClient) -> Dict[str, Any]:
+            model_name = item["name"]
+            req_type = item["type"]
+            tier = item["tier"]
+
+            if not probe_each:
+                return {
+                    "model": model_name,
+                    "tier": tier,
+                    "viable": True,
+                    "status": "UNCHECKED",
+                    "latency_ms": 0,
+                }
+
+            start_t = time.perf_counter()
+            try:
+                if req_type == "generate":
+                    probe_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={key}"
+                    probe_payload = {
+                        "contents": [{"parts": [{"text": "ping"}]}],
+                        "generationConfig": {"maxOutputTokens": 2, "temperature": 0.0},
+                    }
+                    resp = await client.post(probe_url, json=probe_payload, timeout=5.0)
+                else:
+                    probe_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:embedContent?key={key}"
+                    probe_payload = {
+                        "model": f"models/{model_name}",
+                        "content": {"parts": [{"text": "ping"}]},
+                        "outputDimensionality": 768,
+                    }
+                    resp = await client.post(probe_url, json=probe_payload, timeout=5.0)
+
+                latency_ms = round((time.perf_counter() - start_t) * 1000, 1)
+
+                if resp.status_code == 200:
+                    return {
+                        "model": model_name,
+                        "tier": tier,
+                        "viable": True,
+                        "status": "HEALTHY",
+                        "http_code": 200,
+                        "latency_ms": latency_ms,
+                    }
+                elif resp.status_code in (429, 503):
+                    return {
+                        "model": model_name,
+                        "tier": tier,
+                        "viable": False,
+                        "status": "OVERLOADED",
+                        "http_code": resp.status_code,
+                        "latency_ms": latency_ms,
+                        "error": f"HTTP {resp.status_code} (Alta demanda / sobrecarga)",
+                    }
+                elif resp.status_code == 404:
+                    return {
+                        "model": model_name,
+                        "tier": tier,
+                        "viable": False,
+                        "status": "NOT_FOUND",
+                        "http_code": 404,
+                        "latency_ms": latency_ms,
+                        "error": "HTTP 404 (Modelo inexistente)",
+                    }
+                else:
+                    return {
+                        "model": model_name,
+                        "tier": tier,
+                        "viable": False,
+                        "status": "ERROR",
+                        "http_code": resp.status_code,
+                        "latency_ms": latency_ms,
+                        "error": f"HTTP {resp.status_code}",
+                    }
+            except httpx.TimeoutException:
+                return {
+                    "model": model_name,
+                    "tier": tier,
+                    "viable": False,
+                    "status": "TIMEOUT",
+                    "http_code": 408,
+                    "latency_ms": 5000,
+                    "error": "Timeout (>5s)",
+                }
+            except Exception as exc:
+                return {
+                    "model": model_name,
+                    "tier": tier,
+                    "viable": False,
+                    "status": "ERROR",
+                    "http_code": 500,
+                    "latency_ms": 0,
+                    "error": str(exc),
+                }
+
+        async with httpx.AsyncClient() as client:
+            tasks = [probe_candidate(item, client) for item in candidates]
+            results = await asyncio.gather(*tasks)
+
+        viable_generative = [r for r in results if r.get("viable") and r.get("tier") in ("LITE", "FLASH", "PRO")]
+        viable_generative.sort(key=lambda x: x.get("latency_ms", 9999))
+
+        auto_remediated = False
+        remediation_details = {}
+
+        best_lite = next((r["model"] for r in viable_generative if r.get("tier") == "LITE"), None)
+        best_overall = viable_generative[0]["model"] if viable_generative else None
+
+        with self._lock:
+            for task_name, current_model in list(self.data.active_models.items()):
+                if task_name == "embedding":
+                    continue
+                # Se o modelo ativo atual falhou no probe (sobrecarregado 503, 429 ou 404)
+                failed_check = next((r for r in results if r["model"] == current_model and not r.get("viable")), None)
+                if failed_check and (best_lite or best_overall):
+                    replacement = best_lite or best_overall
+                    if current_model != replacement:
+                        self.data.active_models[task_name] = replacement
+                        remediation_details[task_name] = f"{current_model} ({failed_check['status']}) ➔ {replacement}"
+                        auto_remediated = True
+
+            if auto_remediated:
+                self._save()
+                logger.warning(f"🚨 [ModelRegistry] Auto-remediação executada: {remediation_details}")
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        healthy_count = sum(1 for r in results if r.get("viable"))
+
+        return {
+            "status": "success",
+            "timestamp": now_iso,
+            "summary": f"{healthy_count}/{len(results)} modelos viáveis",
+            "active_models": self.get_all_active_models(),
+            "model_checks": results,
+            "auto_remediated": auto_remediated,
+            "remediation_details": remediation_details,
         }
 
 

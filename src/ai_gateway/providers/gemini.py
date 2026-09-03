@@ -26,13 +26,15 @@ class GeminiProvider(BaseLLMProvider):
         """Mapeia nomes de modelo para as tags ativas suportadas na API pública do Gemini."""
         n = (name or "").lower().strip()
         if not n:
-            return "gemini-3.1-flash-lite"
-        # Se for modelo legado conhecido, mapeia para geração suportada
+            return "gemini-3.5-flash-lite"
+        # Se for modelo legado ou descontinuado conhecido, mapeia para geração ativa suportada
+        if "3.1-flash-lite" in n or "1.5-flash" in n or "1.5-pro" in n or "1.5" in n:
+            return "gemini-3.5-flash-lite"
         if "2.5-flash" in n:
-            return "gemini-3.6-flash"
-        if "1.5-flash" in n or "1.5-pro" in n or "1.5" in n:
-            return "gemini-3.1-flash-lite"
-        # Se for um nome direto da API (ex: gemini-3.5-flash-lite, gemini-3.7-flash, gemini-3.1-flash-lite), usa direto
+            return "gemini-2.5-flash"
+        if "2.5-pro" in n:
+            return "gemini-2.5-pro"
+        # Se for um nome direto da API (ex: gemini-3.5-flash-lite, gemini-3.7-flash), usa direto
         return name.strip()
 
     async def generate_text(
@@ -42,7 +44,7 @@ class GeminiProvider(BaseLLMProvider):
         temperature: float = 0.0,
         max_output_tokens: int | None = None,
     ) -> str:
-        """Chama a API do Gemini para gerar resposta."""
+        """Chama a API do Gemini para gerar resposta, com cascata automática de fallback."""
         if not self.api_key or self.api_key.startswith("sua_chave"):
             raise ValueError("GEMINI_API_KEY não configurada ou inválida.")
 
@@ -69,25 +71,45 @@ class GeminiProvider(BaseLLMProvider):
                 "parts": [{"text": system_instruction}]
             }
 
-        fallback_candidates = [
-            m for m in ["gemini-3.1-flash-lite", "gemini-3.6-flash", "gemini-flash-latest"]
-            if m != target_model
-        ]
+        # Modelos candidatos prioritários para fallback caso o target esteja sobrecarregado (503/429) ou inexistente (404)
+        fallback_order = ["gemini-3.5-flash-lite", "gemini-3.7-flash", "gemini-2.5-flash"]
+        fallback_candidates = [m for m in fallback_order if m != target_model]
 
         async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(url, json=payload)
-            # Se der 404 no modelo, tenta fallback para modelos estáveis conhecidos
-            if response.status_code == 404:
+            try:
+                response = await client.post(url, json=payload)
+            except Exception as req_exc:
+                logger.warning(f"Erro de rede ao chamar {target_model}: {req_exc}. Iniciando fallback...")
+                response = None
+
+            # Se der 503 (alta demanda), 429 (rate limit), 404 (inexistente) ou 5xx, aciona cascata de fallback
+            if response is None or response.status_code in (404, 429, 500, 502, 503, 504):
+                status_code = response.status_code if response is not None else "NETWORK_ERR"
+                resp_snippet = response.text[:120] if response is not None else "Sem resposta"
+                logger.warning(
+                    f"⚠️ Modelo {target_model} falhou com status {status_code} ({resp_snippet}). "
+                    f"Tentando cascata de fallback em: {fallback_candidates}"
+                )
                 for alt_model in fallback_candidates:
                     fallback_url = f"{self.BASE_URL}/{alt_model}:generateContent?key={self.api_key}"
-                    logger.warning(f"Modelo {target_model} retornou 404. Tentando fallback para {alt_model}.")
-                    response = await client.post(fallback_url, json=payload)
-                    if response.status_code == 200:
-                        break
+                    try:
+                        logger.info(f"🔄 Testando fallback no modelo {alt_model}...")
+                        fb_resp = await client.post(fallback_url, json=payload, timeout=35.0)
+                        if fb_resp.status_code == 200:
+                            logger.info(f"✅ Fallback bem-sucedido com o modelo {alt_model}!")
+                            response = fb_resp
+                            break
+                        else:
+                            logger.warning(f"Fallback {alt_model} retornou status {fb_resp.status_code}: {fb_resp.text[:100]}")
+                    except Exception as fb_exc:
+                        logger.warning(f"Exceção no fallback {alt_model}: {fb_exc}")
 
-            if response.status_code != 200:
-                logger.error(f"Erro na API do Gemini: {response.status_code} - {response.text}")
-                response.raise_for_status()
+            if response is None or response.status_code != 200:
+                err_msg = f"Erro na API do Gemini: {response.status_code} - {response.text}" if response is not None else "Todas as tentativas de fallback falharam"
+                logger.error(err_msg)
+                if response is not None:
+                    response.raise_for_status()
+                raise RuntimeError(err_msg)
 
             data = response.json()
             try:

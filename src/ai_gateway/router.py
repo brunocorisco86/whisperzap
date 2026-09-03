@@ -164,3 +164,16 @@ async def update_active_models(payload: UpdateActiveModelsPayload):
         "auto_adopt_best_lite": model_registry.data.auto_adopt_best_lite,
     }
 
+
+@router.get(
+    "/models/viable",
+    status_code=status.HTTP_200_OK,
+    summary="Conferência de viabilidade e latência de modelos de IA",
+    description="Testa a viabilidade em tempo real dos modelos (detecção de 503 sobrecarga / 429 rate limit) e auto-remedia se necessário.",
+)
+async def get_viable_models(probe: bool = True):
+    """Executa auditoria de viabilidade de modelos e retorna relatório."""
+    from src.ai_gateway.model_registry import model_registry
+    return await model_registry.check_viable_models(probe_each=probe)
+
+

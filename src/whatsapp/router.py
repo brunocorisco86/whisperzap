@@ -29,7 +29,6 @@ class SendTextMessageRequest(BaseModel):
 async def evolution_webhook(
     request: Request,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Recebe e processa eventos do WhatsApp da Evolution API de forma assíncrona, com resposta imediata e deduplicação."""
     try:
@@ -56,13 +55,13 @@ async def evolution_webhook(
     if any(raw_text.startswith(p) for p in BOT_PREFIXES):
         return {"status": "ignored", "reason": "bot_echo_response"}
 
-    # 5. Deduplicação atômica em memória e persistência
+    # 5. Deduplicação atômica em memória (não bloqueia esperando pool do Postgres)
     key_id = info["key_id"]
-    if whatsapp_service.is_key_duplicate_or_processing(key_id=key_id, db=db):
+    if whatsapp_service.is_key_duplicate_or_processing(key_id=key_id, db=None):
         logger.info(f"⏭️ Webhook duplicado ignorado para key_id={key_id}")
         return {"status": "ignored", "reason": "duplicate_key_id", "key_id": key_id}
 
-    # 6. Agendamento em background (Evolution API recebe 200 OK em <50ms sem timeout)
+    # 6. Agendamento em background (Evolution API recebe 200 OK em <2ms sem timeout)
     background_tasks.add_task(whatsapp_service.process_webhook_event_task, payload=payload, info=info)
     return {"status": "queued", "key_id": key_id}
 

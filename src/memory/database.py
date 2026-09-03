@@ -33,11 +33,20 @@ DATABASE_URL = get_database_url()
 
 # Cria o engine com configurações apropriadas
 connect_args = {"check_same_thread": False, "timeout": 15} if DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(
-    DATABASE_URL,
-    connect_args=connect_args,
-    echo=False,
-)
+engine_kwargs = {
+    "connect_args": connect_args,
+    "echo": False,
+}
+if not DATABASE_URL.startswith("sqlite"):
+    engine_kwargs.update({
+        "pool_size": 30,
+        "max_overflow": 20,
+        "pool_timeout": 30,
+        "pool_pre_ping": True,
+        "pool_recycle": 1800,
+    })
+
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
