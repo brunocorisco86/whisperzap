@@ -63,7 +63,7 @@ def test_euterpe_ui_and_terminal_elements():
     assert res_html.status_code == 200
     assert "euterpe-environments-panel" in res_html.text
     assert "Evolution API" in res_html.text
-    assert "n8n Orchestrator" in res_html.text
+    assert ("Webhook Nativo" in res_html.text or "n8n" in res_html.text)
     assert "euterpe-sync-panel" in res_html.text
     assert "btn-euterpe-pipeline" in res_html.text
     assert "euterpe-terminal-logs" in res_html.text

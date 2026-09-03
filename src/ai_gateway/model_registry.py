@@ -109,6 +109,11 @@ class ModelRegistry:
         with self._lock:
             return dict(self.data.active_models)
 
+    def list_models(self) -> List[Dict[str, Any]]:
+        """Retorna a lista de modelos descobertos."""
+        with self._lock:
+            return [m.model_dump() for m in self.data.discovered_models]
+
     def set_active_model(self, task: str, model_name: str) -> None:
         """Define o modelo ativo para uma tarefa específica."""
         with self._lock:

@@ -108,7 +108,8 @@ class GeminiProvider(BaseLLMProvider):
                 "model": f"models/{model_cand}",
                 "content": {
                     "parts": [{"text": text}]
-                }
+                },
+                "outputDimensionality": 768,
             }
 
             try:
@@ -116,11 +117,22 @@ class GeminiProvider(BaseLLMProvider):
                     response = await client.post(url, json=payload)
                     if response.status_code == 200:
                         data = response.json()
-                        return data["embedding"]["values"]
+                        values = data["embedding"]["values"]
+                        if len(values) == 768:
+                            return values
+                        if len(values) > 768:
+                            return values[:768]
+                        # Se vier menor que 768 por algum motivo, completa com 0.0
+                        return values + [0.0] * (768 - len(values))
                     logger.warning(f"Embedding model {model_cand} retornou status {response.status_code}: {response.text[:120]}")
             except Exception as e:
                 logger.error(f"Exceção ao chamar embedding Gemini ({model_cand}): {e}")
 
         # Fallback determinístico
-        return await super().generate_embedding(text)
+        fb = await super().generate_embedding(text)
+        if len(fb) == 768:
+            return fb
+        if len(fb) > 768:
+            return fb[:768]
+        return fb + [0.0] * (768 - len(fb))
 

@@ -231,6 +231,15 @@ class MemoryRepository:
                         raw_urgency=t.priority,
                         db=db,
                     )
+
+                    # Inferência de atributos estratégicos do módulo Terpsícore
+                    task_context_lower = f"{t.title} {source_msg_text}".lower()
+                    is_idea_flag = any(w in task_context_lower for w in ["ideia", "semente", "insight", "pensar em", "sugestão", "brainstorm", "talvez criar"])
+                    is_epic_flag = any(w in task_context_lower for w in ["épico", "epico", "projeto", "meta anual", "iniciativa", "reestruturação", "longo prazo"])
+                    is_fav_flag = any(w in task_context_lower for w in ["favorito", "favorita", "destaque", "importante", "estrela"])
+                    if any(w in task_context_lower for w in ["urgente", "crítico", "critico", "prioridade máxima", "urgência", "asap"]):
+                        weighted_task_priority = "URGENT"
+
                     task_rec = TaskRecord(
                         id=task_id,
                         message_id=msg_id,
@@ -240,10 +249,23 @@ class MemoryRepository:
                         due_date=t.due_date,
                         priority=weighted_task_priority,
                         status="PENDING",
+                        is_idea=is_idea_flag,
+                        is_epic=is_epic_flag,
+                        is_favorite=is_fav_flag,
+                        in_vault=False,
                     )
+                    # Verifica se o horizonte temporal segrega para o Baú (Vault > 7 dias)
+                    if self.is_task_in_vault(task_rec):
+                        task_rec.in_vault = True
+                        task_rec.vault_reason = "Horizonte superior a 7 dias detectado automaticamente"
+
                     db.add(task_rec)
                     t_dict = t.model_dump()
                     t_dict["priority"] = weighted_task_priority
+                    t_dict["is_idea"] = is_idea_flag
+                    t_dict["is_epic"] = is_epic_flag
+                    t_dict["is_favorite"] = is_fav_flag
+                    t_dict["in_vault"] = task_rec.in_vault
                     extracted_tasks_dicts.append(t_dict)
             else:
                 logger.info(f"📋 [Tarefas] Geração de tarefas ignorada para '{data.speaker}' (toggle de tarefas desativado no cartão).")

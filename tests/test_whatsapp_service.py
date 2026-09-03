@@ -302,3 +302,105 @@ def test_whatsapp_service_deduplication():
     # Segunda verificação imediata: deve retornar True (duplicado)
     assert whatsapp_service.is_key_duplicate_or_processing(key) is True
 
+
+def test_format_terpsicore_task_verbose_complete():
+    """Testa a renderização rica de tarefa Terpsícore com todos os atributos estratégicos."""
+    from src.whatsapp.service import format_terpsicore_task_verbose
+    from src.memory.models import TaskRecord
+
+    task = TaskRecord(
+        id="t-123",
+        title="Construir novo silo de secagem",
+        priority="URGENT",
+        due_date="2026-10-15",
+        assignee="Rafael Gerente",
+        is_favorite=True,
+        is_epic=True,
+        is_idea=True,
+        in_vault=True,
+        vault_reason="Aguardando liberação de crédito",
+        procrastination_factor="FINANCIAL",
+    )
+
+    formatted = format_terpsicore_task_verbose(task)
+    assert "🔴 *[URGENTE]*" in formatted
+    assert "Construir novo silo de secagem" in formatted
+    assert "⭐ *Favorito*" in formatted
+    assert "🏛️ *Objetivo Épico*" in formatted
+    assert "💡 *Ideia/Semente*" in formatted
+    assert "🗝️ *No Baú (Vault)* (Aguardando liberação de crédito)" in formatted
+    assert "📅 Prazo: 2026-10-15" in formatted
+    assert "👤 Resp: Rafael Gerente" in formatted
+    assert "⏱️ Radar: FINANCIAL" in formatted
+
+
+@pytest.mark.asyncio
+async def test_process_webhook_self_memo_voice_with_verbose_signaled_tasks():
+    """Testa que notas pessoais de voz com tarefas sinalizadas enviam texto rico no WhatsApp."""
+    dummy_base64 = "T2dnUwACAAAAAAAAAAA="
+
+    self_memo_payload = {
+        "data": {
+            "key": {"id": "self_memo_signaled_02", "remoteJid": "554497604925@s.whatsapp.net", "fromMe": True},
+            "pushName": "Bruno Conter",
+            "messageType": "audioMessage",
+            "message": {"audioMessage": {"seconds": 12}},
+        }
+    }
+
+    from src.ai_gateway.schemas import SemanticExtractionResponse, ExtractedTask
+    mock_extracted = SemanticExtractionResponse(
+        intent="TASK",
+        summary="Anotar ideia urgente para projeto de sensores",
+        sentiment="NEUTRAL",
+        sentiment_score=0.0,
+        tasks=[
+            ExtractedTask(
+                title="Implementar projeto anual dos sensores dos silos",
+                priority="URGENT",
+                due_date="2026-10-15",
+                assignee="Bruno",
+            )
+        ],
+        entities=[],
+        triples=[],
+        decisions=[],
+        ideas=["Ideia de sensores nos silos"],
+        topics=["Projetos"],
+        urgency="URGENT",
+        provider="mock",
+        model="mock",
+        processing_time_ms=10.0,
+    )
+
+    with patch.object(whatsapp_service, "get_media_base64", new_callable=AsyncMock) as mock_media, \
+         patch.object(whatsapp_service, "send_text_message", new_callable=AsyncMock) as mock_send, \
+         patch("src.transcriber.service.whisper_service.transcribe_audio", new_callable=AsyncMock) as mock_transcribe, \
+         patch("src.ai_gateway.extractor.semantic_extractor.extract", new_callable=AsyncMock) as mock_extract:
+
+        mock_media.return_value = dummy_base64
+        mock_extract.return_value = mock_extracted
+        from src.transcriber.prosody_analyzer import ProsodyAnalyzer
+        mock_transcribe.return_value = (
+            "anotar ideia urgente para o projeto anual dos sensores dos silos",
+            "pt",
+            0.99,
+            12.0,
+            [],
+            ProsodyAnalyzer.analyze_speech_prosody(12.0, [], "anotar ideia urgente para o projeto anual dos sensores dos silos"),
+        )
+        mock_send.return_value = True
+
+        res = await whatsapp_service.process_webhook_event(self_memo_payload)
+
+        assert res["status"] == "success"
+        assert res["type"] == "audio"
+        assert res["is_self_memo"] is True
+        mock_send.assert_called_once()
+        sent_text = mock_send.call_args[1]["text"]
+        assert "Nota Pessoal Gravada" in sent_text
+        assert "📋 *Tarefas Sinalizadas (Terpsícore):*" in sent_text
+        assert "🔴 *[URGENTE]* *Implementar projeto anual dos sensores dos silos*" in sent_text
+        assert "🏛️ *Objetivo Épico*" in sent_text or "💡 *Ideia/Semente*" in sent_text
+
+

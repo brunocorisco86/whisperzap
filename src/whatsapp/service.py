@@ -45,6 +45,54 @@ def sanitize_phone_number(jid_or_number: str) -> str:
     return re.sub(r"\D", "", clean)
 
 
+def format_terpsicore_task_verbose(task: TaskRecord) -> str:
+    """Gera representação detalhada e verbosa de uma tarefa com todos os atributos estratégicos de Terpsícore."""
+    prio = (task.priority or "MEDIUM").upper()
+    prio_map = {
+        "URGENT": "🔴 *[URGENTE]*",
+        "HIGH": "🟠 *[ALTA]*",
+        "MEDIUM": "🔵 *[MÉDIA]*",
+        "LOW": "⚪ *[BAIXA]*",
+    }
+    prio_label = prio_map.get(prio, f"📌 *[{prio}]*")
+
+    lines = [f"• {prio_label} *{task.title}*"]
+
+    # Marcadores estratégicos
+    badges = []
+    if getattr(task, "is_favorite", False):
+        badges.append("⭐ *Favorito*")
+    if getattr(task, "is_epic", False):
+        badges.append("🏛️ *Objetivo Épico*")
+    if getattr(task, "is_idea", False):
+        badges.append("💡 *Ideia/Semente*")
+
+    if badges:
+        lines.append(f"  └ {' │ '.join(badges)}")
+
+    # Segregação Baú (Vault) vs Fluxo Ativo Imediato
+    details = []
+    if getattr(task, "in_vault", False):
+        vault_reason_str = f" ({task.vault_reason})" if getattr(task, "vault_reason", None) else ""
+        details.append(f"🗝️ *No Baú (Vault)*{vault_reason_str}")
+    else:
+        details.append("⚡ *Fluxo Imediato*")
+
+    if task.due_date:
+        details.append(f"📅 Prazo: {task.due_date}")
+
+    if task.assignee:
+        details.append(f"👤 Resp: {task.assignee}")
+
+    if getattr(task, "procrastination_factor", None):
+        details.append(f"⏱️ Radar: {task.procrastination_factor}")
+
+    if details:
+        lines.append(f"  └ {' • '.join(details)}")
+
+    return "\n".join(lines)
+
+
 class WhatsAppService:
     """Motor central de comunicação e processamento de eventos do WhatsApp via Evolution API."""
 
@@ -449,11 +497,18 @@ class WhatsAppService:
 
                     if created_tasks:
                         reply_lines.append("")
-                        reply_lines.append("📋 *Tarefas Capturadas:*")
+                        has_signaled = any(
+                            getattr(t, "is_favorite", False)
+                            or getattr(t, "is_epic", False)
+                            or getattr(t, "is_idea", False)
+                            or getattr(t, "in_vault", False)
+                            or (str(t.priority or "").upper() in ["HIGH", "URGENT"])
+                            for t in created_tasks
+                        )
+                        section_title = "📋 *Tarefas Sinalizadas (Terpsícore):*" if has_signaled else "📋 *Tarefas Capturadas (Terpsícore):*"
+                        reply_lines.append(section_title)
                         for t in created_tasks:
-                            due_str = f" (📅 {t.due_date})" if t.due_date else ""
-                            prio_badge = f"[{t.priority}]" if t.priority else ""
-                            reply_lines.append(f"• 📌 *{prio_badge}* {t.title}{due_str}")
+                            reply_lines.append(format_terpsicore_task_verbose(t))
                     elif getattr(saved_msg, "intent", None) == "IDEA":
                         reply_lines.append("")
                         reply_lines.append("💡 *Classificação:* 🧠 Ideia / Insight Estratégico (salvo no Grafo)")
@@ -482,9 +537,10 @@ class WhatsAppService:
             if not raw_text:
                 return {"status": "ignored", "reason": "empty_text"}
 
-            # 1. Detecção de Pergunta para o Hermes Agent ('?', '/hermes', 'hermes,') - Apenas em Self-Memo recente
+            # 1. Detecção de Pergunta para o Hermes Agent ('?', '/hermes', 'hermes,') - Apenas em Self-Memo ou mensagem do proprietário
             hermes_match = re.match(r"^(\?|/hermes|hermes,)\s*(.*)", raw_text, flags=re.IGNORECASE)
-            if hermes_match and is_self_memo and not is_historic:
+            is_owner = is_owner_interaction(speaker=speaker_label, meta_info=info.get("raw_data"))
+            if hermes_match and (is_self_memo or is_owner) and not is_historic:
                 query_str = hermes_match.group(2).strip()
                 if not query_str:
                     query_str = "Quais são as tarefas pendentes mais recentes?"
@@ -498,6 +554,29 @@ class WhatsAppService:
                     db=db,
                 )
                 answer_text = answer_resp.answer
+
+                # Se a consulta for sobre tarefas, anexa bloco enriquecido com tarefas sinalizadas do Terpsícore
+                if any(w in query_str.lower() for w in ["tarefa", "tarefas", "pendencia", "pendência", "pendencias", "pendências", "fazer"]):
+                    signaled_tasks = (
+                        db.query(TaskRecord)
+                        .filter(
+                            TaskRecord.status == "PENDING",
+                            (
+                                (TaskRecord.is_favorite == True)
+                                | (TaskRecord.is_epic == True)
+                                | (TaskRecord.is_idea == True)
+                                | (TaskRecord.priority.in_(["HIGH", "URGENT"]))
+                            )
+                        )
+                        .order_by(TaskRecord.created_at.desc())
+                        .limit(5)
+                        .all()
+                    )
+                    if signaled_tasks:
+                        task_lines = ["\n\n📋 *Tarefas Sinalizadas no Radar (Terpsícore):*"]
+                        for st in signaled_tasks:
+                            task_lines.append(format_terpsicore_task_verbose(st))
+                        answer_text += "\n".join(task_lines)
 
                 # Envia resposta interativa EXCLUSIVAMENTE para o proprietário
                 await self.send_text_message(number=settings.USER_PHONE_NUMBER, text=answer_text)

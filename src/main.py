@@ -95,7 +95,8 @@ if os.path.exists(STATIC_DIR):
 # Inclusão dos roteadores de microsserviços
 app.include_router(web_router)
 app.include_router(transcriber_router)
-app.include_router(ai_router)
+app.include_router(ai_router, prefix="/api/v1/ai")
+app.include_router(ai_router, prefix="/ai", include_in_schema=False)
 app.include_router(dictionary_router)
 app.include_router(memory_router)
 app.include_router(contacts_router)
@@ -103,26 +104,6 @@ app.include_router(analytics_router)
 app.include_router(audit_router)
 app.include_router(audit_router, prefix="/api/audit", include_in_schema=False)
 app.include_router(whatsapp_router)
-
-
-@app.get("/ai/models", include_in_schema=False)
-async def legacy_ai_models():
-    from src.ai_gateway.model_registry import model_registry
-    from src.config import settings
-    return {
-        "status": "success",
-        "active_models": {
-            "default": getattr(settings, "MODEL_REVISE", "gemini-3.5-flash-lite"),
-            "revise": getattr(settings, "MODEL_REVISE", "gemini-3.5-flash-lite"),
-            "extract": getattr(settings, "MODEL_EXTRACT", "gemini-3.5-flash-lite"),
-            "summarize": getattr(settings, "MODEL_SUMMARIZE", "gemini-3.7-flash"),
-            "weekly": getattr(settings, "MODEL_WEEKLY", "gemini-3.7-flash"),
-            "hermes": getattr(settings, "MODEL_REVISE", "gemini-3.5-flash-lite"),
-            "embedding": settings.EMBEDDING_MODEL,
-        },
-        "registered_models": model_registry.list_models(),
-        "total_registered": len(model_registry.list_models()),
-    }
 
 
 

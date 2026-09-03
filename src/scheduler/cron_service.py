@@ -132,7 +132,7 @@ async def _background_scheduler_loop():
                     except Exception as e:
                         logger.error(f"❌ [Cron Domingo 02:00] Erro na descoberta semanal de modelos de IA: {e}")
 
-            # 4. Rotina Semanal de Domingo às 23:00 -> Agente 'Zeladora' (Faxina no Grafo)
+            # 5. Rotina Semanal de Domingo às 23:00 -> Agente 'Zeladora' (Faxina no Grafo)
             if now.weekday() == 6 and hour == 23 and minute < 5:
                 key = f"janitor_{today_str}"
                 if _last_executed_hour.get("janitor") != key:
@@ -144,6 +144,33 @@ async def _background_scheduler_loop():
                         logger.info(f"✅ [Cron Domingo 23:00] Zeladora finalizou a faxina: {report.summary}")
                     except Exception as e:
                         logger.error(f"❌ [Cron Domingo 23:00] Erro na faxina da Zeladora: {e}")
+
+            # 6. Watchdog Periódico de Conectividade WhatsApp (Evolution API / Baileys) a cada 15 minutos
+            if minute % 15 == 0:
+                key = f"wa_watchdog_{today_str}_{hour}_{minute}"
+                if _last_executed_hour.get("wa_watchdog") != key:
+                    _last_executed_hour["wa_watchdog"] = key
+                    try:
+                        import httpx
+                        from src.config import settings
+                        api_url = settings.EVOLUTION_API_URL.rstrip("/")
+                        instance = settings.EVOLUTION_INSTANCE
+                        api_key = settings.EVOLUTION_API_KEY
+                        async with httpx.AsyncClient(timeout=10.0) as client:
+                            resp = await client.get(
+                                f"{api_url}/instance/connectionState/{instance}",
+                                headers={"apikey": api_key}
+                            )
+                            if resp.status_code == 200:
+                                state = resp.json().get("instance", {}).get("state")
+                                if state != "open":
+                                    logger.warning(f"⚠️ [Watchdog WhatsApp] Instância '{instance}' fora do ar (state: {state}). Tentando reconexão...")
+                                    await client.get(
+                                        f"{api_url}/instance/connect/{instance}",
+                                        headers={"apikey": api_key}
+                                    )
+                    except Exception as e:
+                        logger.debug(f"Aviso no watchdog do WhatsApp Evolution API: {e}")
 
         except Exception as exc:
             logger.error(f"Aviso no loop do Background Scheduler: {exc}")
