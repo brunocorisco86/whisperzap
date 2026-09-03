@@ -160,6 +160,10 @@ class WhatsAppService:
         self._processed_keys: Dict[str, float] = {}
         self._keys_lock = Lock()
 
+    def format_viable_models_report(self, check_result: Dict[str, Any]) -> str:
+        """Formata relatório de viabilidade de modelos de IA com visual intuitivo para WhatsApp."""
+        return format_viable_models_report(check_result)
+
     def _clean_old_keys(self, ttl_seconds: float = 3600.0) -> None:
         """Remove identificadores de mensagens mais antigos que o TTL."""
         now = time.time()
