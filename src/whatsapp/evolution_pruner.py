@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Tuple
 from sqlalchemy import create_engine, text
 from src.config import settings
-from src.memory.timezone_utils import get_now_brt, TIMEZONE_BRT
+from src.memory.timezone_utils import get_now_brt, BRASILIA_TZ
 
 logger = logging.getLogger(__name__)
 
