@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import re
+import time
 import threading
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -49,12 +50,86 @@ class ModelRegistryData(BaseModel):
     history: List[Dict[str, Any]] = Field(default_factory=list)
 
 
+class CircuitState:
+    CLOSED = "CLOSED"        # Operação normal
+    OPEN = "OPEN"            # Modelo sobrecarregado/indisponível, requisições desviadas
+    HALF_OPEN = "HALF_OPEN"  # Testando recuperação após expiração do cooldown
+
+
+class ModelCircuitBreaker:
+    """Circuit Breaker reativo thread-safe para modelos de IA."""
+
+    def __init__(self, failure_threshold: int = 2, cooldown_seconds: float = 90.0):
+        self.failure_threshold = failure_threshold
+        self.cooldown_seconds = cooldown_seconds
+        self.failure_counts: Dict[str, int] = {}
+        self.circuit_state: Dict[str, str] = {}
+        self.last_failure_time: Dict[str, float] = {}
+        self._lock = threading.RLock()
+
+    def report_failure(self, model: str, status_code: int = 503) -> bool:
+        """Registra falha de execução. Se atingir o threshold, abre o circuito."""
+        with self._lock:
+            now = time.time()
+            self.failure_counts[model] = self.failure_counts.get(model, 0) + 1
+            self.last_failure_time[model] = now
+
+            if self.failure_counts[model] >= self.failure_threshold:
+                was_open = self.circuit_state.get(model) == CircuitState.OPEN
+                self.circuit_state[model] = CircuitState.OPEN
+                if not was_open:
+                    logger.warning(
+                        f"🚨 [CircuitBreaker] Modelo '{model}' entrou em OPEN após {self.failure_counts[model]} falhas (HTTP {status_code})."
+                    )
+                return True
+            return False
+
+    def report_success(self, model: str) -> None:
+        """Registra sucesso na chamada ao modelo, restabelecendo o circuito."""
+        with self._lock:
+            self.failure_counts[model] = 0
+            if self.circuit_state.get(model) != CircuitState.CLOSED:
+                logger.info(f"✅ [CircuitBreaker] Modelo '{model}' recuperado (circuito CLOSED).")
+            self.circuit_state[model] = CircuitState.CLOSED
+
+    def is_available(self, model: str) -> bool:
+        """Verifica se o modelo está liberado para tráfego."""
+        with self._lock:
+            state = self.circuit_state.get(model, CircuitState.CLOSED)
+            if state == CircuitState.CLOSED:
+                return True
+            if state == CircuitState.OPEN:
+                if time.time() - self.last_failure_time.get(model, 0) > self.cooldown_seconds:
+                    self.circuit_state[model] = CircuitState.HALF_OPEN
+                    logger.info(f"🔄 [CircuitBreaker] Cooldown expirado para '{model}'. Transicionado para HALF_OPEN.")
+                    return True
+                return False
+            return True
+
+    def get_status(self) -> Dict[str, Any]:
+        """Retorna telemetria consolidada de todos os modelos monitorados."""
+        with self._lock:
+            now = time.time()
+            res = {}
+            for m, state in self.circuit_state.items():
+                last_fail = self.last_failure_time.get(m, 0)
+                elapsed = now - last_fail if last_fail else 0
+                res[m] = {
+                    "state": state,
+                    "failure_count": self.failure_counts.get(m, 0),
+                    "seconds_since_last_failure": round(elapsed, 1),
+                    "cooldown_remaining": max(0.0, round(self.cooldown_seconds - elapsed, 1)) if state == CircuitState.OPEN else 0.0,
+                }
+            return res
+
+
 class ModelRegistry:
     """Gerenciador dinâmico thread-safe de modelos de IA."""
 
     def __init__(self, persistence_path: Optional[str] = None):
         self.persistence_path = persistence_path or os.path.join(settings.DATA_DIR or "data", "ai_model_registry.json")
         self._lock = threading.RLock()
+        self.circuit_breaker = ModelCircuitBreaker()
         self.data = self._load()
 
     def _load(self) -> ModelRegistryData:
@@ -132,6 +207,47 @@ class ModelRegistry:
             self._save()
             logger.info(f"✨ [ModelRegistry] Modelos ativos atualizados: {self.data.active_models}")
             return dict(self.data.active_models)
+
+    def get_viable_fallback_chain(self, current_model: str, task: str = "revise") -> List[str]:
+        """Retorna dinamicamente candidatos saudáveis do pool descoberto, excluindo modelos com circuito aberto."""
+        with self._lock:
+            # Pega candidatos descobertos ordenados por custo-benefício
+            discovered = [
+                m.name for m in self.data.discovered_models
+                if "generateContent" in m.supported_methods and m.tier in ("LITE", "FLASH") and m.cost_efficiency_score > 0
+            ]
+            viable = [
+                m for m in discovered
+                if m != current_model and self.circuit_breaker.is_available(m)
+            ]
+            if not viable:
+                # Se pool descoberto estiver vazio ou exaurido, usa candidatos de segurança padrão
+                safety = ["gemini-3.5-flash-lite", "gemini-3.7-flash", "gemini-flash-latest"]
+                viable = [m for m in safety if m != current_model and self.circuit_breaker.is_available(m)]
+            return viable
+
+    async def handle_runtime_failure(self, failed_model: str, task: str = "revise", status_code: int = 503) -> str:
+        """Acionado reativamente pelo provedor quando um modelo falha em produção (503/429/404/timeout)."""
+        self.circuit_breaker.report_failure(failed_model, status_code)
+
+        with self._lock:
+            fallbacks = self.get_viable_fallback_chain(failed_model, task=task)
+            if not fallbacks:
+                logger.warning("⚠️ Pool de modelos esgotado. Disparando descoberta dinâmica de emergência na API do Google...")
+                await self.discover_gemini_models(auto_adopt=False)
+                fallbacks = self.get_viable_fallback_chain(failed_model, task=task)
+
+            if fallbacks:
+                new_model = fallbacks[0]
+                old_model = self.data.active_models.get(task, failed_model)
+                self.data.active_models[task] = new_model
+                self._save()
+                logger.warning(
+                    f"⚡ [Auto-Remediação Instantânea] Tarefa '{task}' migrada de '{old_model}' para '{new_model}' "
+                    f"devido a falha (HTTP {status_code})."
+                )
+                return new_model
+            return failed_model
 
     def _extract_generation(self, model_name: str) -> float:
         """Extrai a geração numérica do modelo (ex: 'gemini-3.7-flash' -> 3.7)."""
@@ -358,13 +474,53 @@ class ModelRegistry:
                 "remediation_details": {},
             }
 
-        candidates = [
-            {"name": "gemini-3.5-flash-lite", "type": "generate", "tier": "LITE"},
-            {"name": "gemini-3.7-flash", "type": "generate", "tier": "FLASH"},
-            {"name": "gemini-2.5-flash", "type": "generate", "tier": "FLASH"},
-            {"name": "gemini-2.5-pro", "type": "generate", "tier": "PRO"},
-            {"name": "gemini-embedding-001", "type": "embed", "tier": "EMBEDDING"},
+        # Monta a lista dinâmica a partir dos modelos descobertos
+        discovered_gen = [
+            {"name": m.name, "type": "generate", "tier": m.tier}
+            for m in self.data.discovered_models
+            if "generateContent" in m.supported_methods and m.cost_efficiency_score > 0
         ]
+        discovered_emb = [
+            {"name": m.name, "type": "embed", "tier": m.tier}
+            for m in self.data.discovered_models
+            if "embedContent" in m.supported_methods and m.cost_efficiency_score > 0
+        ]
+
+        if not discovered_gen and key and not key.startswith("fake-test-key"):
+            try:
+                await self.discover_gemini_models(api_key=key, auto_adopt=False)
+                discovered_gen = [
+                    {"name": m.name, "type": "generate", "tier": m.tier}
+                    for m in self.data.discovered_models
+                    if "generateContent" in m.supported_methods and m.cost_efficiency_score > 0
+                ]
+                discovered_emb = [
+                    {"name": m.name, "type": "embed", "tier": m.tier}
+                    for m in self.data.discovered_models
+                    if "embedContent" in m.supported_methods and m.cost_efficiency_score > 0
+                ]
+            except Exception as disc_exc:
+                logger.debug(f"Aviso na descoberta dinâmica antes do probe: {disc_exc}")
+
+        # Garante a presença dos modelos base resilientes mais ativos
+        candidates_map: Dict[str, Dict[str, str]] = {
+            "gemini-3.5-flash-lite": {"name": "gemini-3.5-flash-lite", "type": "generate", "tier": "LITE"},
+            "gemini-3.7-flash": {"name": "gemini-3.7-flash", "type": "generate", "tier": "FLASH"},
+            "gemini-embedding-001": {"name": "gemini-embedding-001", "type": "embed", "tier": "EMBEDDING"},
+        }
+
+        # Incorpora modelos descobertos da API
+        for item in (discovered_gen[:6] + discovered_emb[:2]):
+            candidates_map[item["name"]] = item
+
+        # Assegura que os modelos atualmente ativos façam parte da lista de auditoria
+        for t, m_name in self.data.active_models.items():
+            if m_name and m_name not in candidates_map:
+                req_type = "embed" if t == "embedding" else "generate"
+                tier = "EMBEDDING" if t == "embedding" else ("LITE" if "lite" in m_name.lower() else "FLASH")
+                candidates_map[m_name] = {"name": m_name, "type": req_type, "tier": tier}
+
+        candidates = list(candidates_map.values())
 
         async def probe_candidate(item: Dict[str, str], client: httpx.AsyncClient) -> Dict[str, Any]:
             model_name = item["name"]
@@ -404,6 +560,7 @@ class ModelRegistry:
                     return {
                         "model": model_name,
                         "tier": tier,
+                        "generation": self._extract_generation(model_name),
                         "viable": True,
                         "status": "HEALTHY",
                         "http_code": 200,
@@ -465,7 +622,7 @@ class ModelRegistry:
             results = await asyncio.gather(*tasks)
 
         viable_generative = [r for r in results if r.get("viable") and r.get("tier") in ("LITE", "FLASH", "PRO")]
-        viable_generative.sort(key=lambda x: x.get("latency_ms", 9999))
+        viable_generative.sort(key=lambda x: (-x.get("generation", 1.0), x.get("latency_ms", 9999)))
 
         auto_remediated = False
         remediation_details = {}

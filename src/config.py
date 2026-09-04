@@ -86,3 +86,14 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def mask_token(token: str) -> str:
+    """Retorna o token mascarado para auditoria e logs seguros (ex: 'AIza...4xQ')."""
+    if not token or not isinstance(token, str):
+        return "NOT_CONFIGURED"
+    clean = token.strip()
+    if len(clean) <= 8 or clean.startswith("sua_chave"):
+        return "NOT_CONFIGURED"
+    return f"{clean[:4]}...{clean[-4:]}"
+

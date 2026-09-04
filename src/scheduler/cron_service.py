@@ -172,6 +172,24 @@ async def _background_scheduler_loop():
                     except Exception as e:
                         logger.debug(f"Aviso no watchdog do WhatsApp Evolution API: {e}")
 
+            # 7. Watchdog Autônomo de Saúde e Circuit Breaker de Modelos de IA a cada 30 minutos
+            if minute % 30 == 0:
+                key = f"ai_watchdog_{today_str}_{hour}_{minute}"
+                if _last_executed_hour.get("ai_watchdog") != key:
+                    _last_executed_hour["ai_watchdog"] = key
+                    try:
+                        from src.ai_gateway.model_registry import model_registry
+                        cb_status = model_registry.circuit_breaker.get_status()
+                        needs_probe = any(s.get("state") in ("OPEN", "HALF_OPEN") for s in cb_status.values())
+
+                        if needs_probe or not model_registry.data.last_discovery_at:
+                            logger.info("🤖 [Watchdog IA] Executando verificação autônoma de saúde e modelos viáveis...")
+                            probe_result = await model_registry.check_viable_models(probe_each=True)
+                            if probe_result.get("auto_remediated"):
+                                logger.warning(f"⚡ [Watchdog IA] Auto-remediação aplicada: {probe_result.get('remediation_details')}")
+                    except Exception as e:
+                        logger.debug(f"Aviso no Watchdog Autônomo de IA: {e}")
+
         except Exception as exc:
             logger.error(f"Aviso no loop do Background Scheduler: {exc}")
 

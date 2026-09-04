@@ -39,6 +39,13 @@ async def transcribe_audio_file(
             detail="Arquivo de áudio não fornecido ou inválido.",
         )
 
+    MAX_FILE_SIZE = 25 * 1024 * 1024  # 25 MB
+    if file.size and file.size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Arquivo de áudio excede o limite máximo permitido de 25 MB ({round(file.size / (1024*1024), 2)} MB).",
+        )
+
     assigned_id = audio_id or f"audio_{uuid.uuid4().hex[:10]}"
     file_extension = os.path.splitext(file.filename)[1] or ".ogg"
 

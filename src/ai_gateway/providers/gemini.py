@@ -48,7 +48,20 @@ class GeminiProvider(BaseLLMProvider):
         if not self.api_key or self.api_key.startswith("sua_chave"):
             raise ValueError("GEMINI_API_KEY não configurada ou inválida.")
 
+        from src.ai_gateway.model_registry import model_registry
+
         target_model = self._get_api_model_name(self.model_name)
+
+        # 1. Fast-Path Circuit Breaker: se o modelo atual está em OPEN (degradado), pula imediatamente
+        if not model_registry.circuit_breaker.is_available(target_model):
+            viable_chain = model_registry.get_viable_fallback_chain(target_model)
+            if viable_chain:
+                logger.info(
+                    f"⚡ [CircuitBreaker Fast-Path] Modelo '{target_model}' está em OPEN. "
+                    f"Desviando requisição diretamente para '{viable_chain[0]}'."
+                )
+                target_model = viable_chain[0]
+
         url = f"{self.BASE_URL}/{target_model}:generateContent?key={self.api_key}"
 
         gen_config: dict[str, Any] = {
@@ -71,41 +84,54 @@ class GeminiProvider(BaseLLMProvider):
                 "parts": [{"text": system_instruction}]
             }
 
-        # Modelos candidatos prioritários para fallback caso o target esteja sobrecarregado (503/429) ou inexistente (404)
-        fallback_order = ["gemini-3.5-flash-lite", "gemini-3.7-flash", "gemini-2.5-flash"]
-        fallback_candidates = [m for m in fallback_order if m != target_model]
-
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=25.0) as client:
             try:
                 response = await client.post(url, json=payload)
             except Exception as req_exc:
                 logger.warning(f"Erro de rede ao chamar {target_model}: {req_exc}. Iniciando fallback...")
                 response = None
 
-            # Se der 503 (alta demanda), 429 (rate limit), 404 (inexistente) ou 5xx, aciona cascata de fallback
-            if response is None or response.status_code in (404, 429, 500, 502, 503, 504):
-                status_code = response.status_code if response is not None else "NETWORK_ERR"
-                resp_snippet = response.text[:120] if response is not None else "Sem resposta"
+            # Se teve sucesso imediato, avisa o Circuit Breaker
+            if response is not None and response.status_code == 200:
+                model_registry.circuit_breaker.report_success(target_model)
+            else:
+                # Se falhou com 503, 429, 404 ou erro de rede: aciona Circuit Breaker e auto-remedia
+                status_code = response.status_code if response is not None else 504
+                resp_snippet = response.text[:120] if response is not None else "Erro de rede"
                 logger.warning(
                     f"⚠️ Modelo {target_model} falhou com status {status_code} ({resp_snippet}). "
-                    f"Tentando cascata de fallback em: {fallback_candidates}"
+                    "Notificando Circuit Breaker e acionando auto-remediação dinâmica..."
                 )
+                remediated_model = await model_registry.handle_runtime_failure(
+                    failed_model=target_model,
+                    task="revise",
+                    status_code=status_code,
+                )
+
+                # Busca candidatos dinâmicos do pool descoberto
+                fallback_candidates = [remediated_model] + [
+                    m for m in model_registry.get_viable_fallback_chain(target_model)
+                    if m != remediated_model
+                ]
+
                 for alt_model in fallback_candidates:
                     fallback_url = f"{self.BASE_URL}/{alt_model}:generateContent?key={self.api_key}"
                     try:
-                        logger.info(f"🔄 Testando fallback no modelo {alt_model}...")
-                        fb_resp = await client.post(fallback_url, json=payload, timeout=35.0)
+                        logger.info(f"🔄 Testando fallback no modelo dinâmico {alt_model}...")
+                        fb_resp = await client.post(fallback_url, json=payload, timeout=25.0)
                         if fb_resp.status_code == 200:
                             logger.info(f"✅ Fallback bem-sucedido com o modelo {alt_model}!")
+                            model_registry.circuit_breaker.report_success(alt_model)
                             response = fb_resp
                             break
                         else:
                             logger.warning(f"Fallback {alt_model} retornou status {fb_resp.status_code}: {fb_resp.text[:100]}")
+                            model_registry.circuit_breaker.report_failure(alt_model, fb_resp.status_code)
                     except Exception as fb_exc:
                         logger.warning(f"Exceção no fallback {alt_model}: {fb_exc}")
 
             if response is None or response.status_code != 200:
-                err_msg = f"Erro na API do Gemini: {response.status_code} - {response.text}" if response is not None else "Todas as tentativas de fallback falharam"
+                err_msg = f"Erro na API do Gemini: {response.status_code} - {response.text}" if response is not None else "Todas as tentativas de fallback dinâmico falharam"
                 logger.error(err_msg)
                 if response is not None:
                     response.raise_for_status()

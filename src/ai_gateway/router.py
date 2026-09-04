@@ -122,6 +122,7 @@ async def get_models_registry():
     return {
         "status": "success",
         "active_models": model_registry.get_all_active_models(),
+        "circuit_breaker": model_registry.circuit_breaker.get_status(),
         "auto_adopt_best_lite": model_registry.data.auto_adopt_best_lite,
         "last_discovery_at": model_registry.data.last_discovery_at,
         "discovered_models": [m.model_dump() for m in model_registry.data.discovered_models],

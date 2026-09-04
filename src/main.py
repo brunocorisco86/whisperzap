@@ -127,6 +127,25 @@ async def health_check():
 
 
 @app.get(
+    "/health/tokens",
+    status_code=status.HTTP_200_OK,
+    tags=["Health"],
+    summary="Auditoria de tokens de API e conectividade upstream",
+)
+@app.get(
+    "/api/v1/health/tokens",
+    status_code=status.HTTP_200_OK,
+    tags=["Health"],
+    include_in_schema=False,
+)
+async def health_tokens():
+    """Valida formato, presença, mascaramento e conectividade ativa das credenciais de API."""
+    from src.audit.router import check_tokens_health
+    return await check_tokens_health()
+
+
+
+@app.get(
     "/whatsapp-qr",
     response_class=Response,
     tags=["WhatsApp"],

@@ -1,5 +1,6 @@
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from src.ai_gateway.schemas import (
     DailySummaryRequest,
     DailySummaryResponse,
@@ -501,7 +502,15 @@ async def list_recent_messages(
             | (MessageRecord.speaker.ilike(search_term))
         )
 
-    records = query.order_by(MessageRecord.created_at.desc()).limit(limit).all()
+    records = (
+        query.options(
+            joinedload(MessageRecord.tasks),
+            joinedload(MessageRecord.entities),
+        )
+        .order_by(MessageRecord.created_at.desc())
+        .limit(limit)
+        .all()
+    )
     return [
         {
             "id": r.id,
@@ -774,15 +783,17 @@ async def export_vector_space_3d(
         for i, v in enumerate(raw_vectors):
             points_3d.append([float(v[0] if len(v) > 0 else 0) * scale, float(v[1] if len(v) > 1 else 0) * scale, float(v[2] if len(v) > 2 else 0) * scale])
     else:
-        # Aplica PCA via Singular Value Decomposition (SVD) de alta performance em NumPy
-        X = np.array(raw_vectors, dtype=np.float32)
-        X_centered = X - np.mean(X, axis=0)
-        U, S, Vt = np.linalg.svd(X_centered, full_matrices=False)
-        coords_3d = np.dot(X_centered, Vt[:3, :].T)
+        def _compute_svd_3d(vectors: list, sc: float) -> list:
+            X = np.array(vectors, dtype=np.float32)
+            X_centered = X - np.mean(X, axis=0)
+            U, S, Vt = np.linalg.svd(X_centered, full_matrices=False)
+            coords_3d = np.dot(X_centered, Vt[:3, :].T)
+            max_abs = np.max(np.abs(coords_3d)) or 1.0
+            normalized_coords = (coords_3d / max_abs) * sc
+            return normalized_coords.tolist()
 
-        max_abs = np.max(np.abs(coords_3d)) or 1.0
-        normalized_coords = (coords_3d / max_abs) * scale
-        points_3d = normalized_coords.tolist()
+        # Isola computação matemática CPU-bound em thread separada para não congelar o Event Loop
+        points_3d = await asyncio.to_thread(_compute_svd_3d, raw_vectors, scale)
 
     if format == "json":
         return {
