@@ -171,9 +171,13 @@ class MemoryRepository:
                 final_meta["prosody"] = prosody_obj.model_dump()
 
             # 3. Cria registro da mensagem
+            msg_created_at = data.created_at or datetime.now(timezone.utc)
+            if msg_created_at.tzinfo is not None:
+                msg_created_at = msg_created_at.astimezone(timezone.utc).replace(tzinfo=None)
+
             message = MessageRecord(
                 id=msg_id,
-                created_at=datetime.now(timezone.utc),
+                created_at=msg_created_at,
                 speaker=data.speaker,
                 raw_text=data.raw_text,
                 revised_text=data.revised_text,
@@ -198,11 +202,8 @@ class MemoryRepository:
                 from src.contacts.service import contact_service
                 speaker_val = (data.speaker or "").strip()
                 phone_val = ""
-                if isinstance(data.meta_info, dict):
-                    phone_val = str(data.meta_info.get("phone") or data.meta_info.get("sender_phone") or data.meta_info.get("remoteJid") or "")
-                if not phone_val:
-                    phone_val = speaker_val
-
+                if data.meta_info and isinstance(data.meta_info, dict):
+                    phone_val = data.meta_info.get("remoteJid") or data.meta_info.get("phone_number") or ""
                 contact_match = None
                 if phone_val:
                     contact_match = contact_service.get_contact_by_phone(phone_val, db=db)
@@ -216,6 +217,9 @@ class MemoryRepository:
                 from src.memory.task_sentiment_analyzer import task_sentiment_analyzer
                 source_msg_text = data.revised_text or data.raw_text or ""
 
+                # Carrega tarefas PENDENTES ativas para deduplicação semântica com spaCy
+                active_pending_tasks = db.query(TaskRecord).filter(TaskRecord.status == "PENDING").all()
+
                 for t in extracted.tasks:
                     is_actionable = task_sentiment_analyzer.is_actionable_task(
                         title=t.title,
@@ -223,6 +227,45 @@ class MemoryRepository:
                     )
                     if not is_actionable:
                         logger.info(f"🚫 [Tarefas] Candidata a tarefa '{t.title}' descartada pelo filtro spaCy NLP anti-ruído.")
+                        continue
+
+                    # Deduplicação Semântica com spaCy NLP contra tarefas pendentes existentes
+                    similar_match = task_sentiment_analyzer.find_similar_existing_task(
+                        candidate_title=t.title,
+                        candidate_context=source_msg_text,
+                        existing_tasks=active_pending_tasks,
+                        similarity_threshold=0.60,
+                    )
+                    if similar_match:
+                        existing_task, sim_score = similar_match
+                        logger.info(
+                            f"🤝 [Tarefas Terpsícore] Tarefa semelhante detectada com spaCy (sim={sim_score:.2f}): "
+                            f"'{t.title}' unificada com existente id={existing_task.id} ('{existing_task.title}')"
+                        )
+                        # Consolida a nova menção nas anotações da tarefa existente
+                        now_str = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M")
+                        mention_note = f"\n🔄 [Menção adicional em {now_str} por {data.speaker}]: {t.title} (Contexto: \"{source_msg_text[:120]}\")"
+                        if existing_task.notes:
+                            existing_task.notes = f"{existing_task.notes.strip()}{mention_note}"
+                        else:
+                            existing_task.notes = mention_note.strip()
+
+                        # Atualiza prioridade se a nova menção for de maior urgência
+                        p_weights = {"URGENT": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
+                        current_p_weight = p_weights.get(str(existing_task.priority or "").upper(), 2)
+                        new_p_weight = p_weights.get(str(t.priority or "").upper(), 2)
+                        if new_p_weight > current_p_weight:
+                            existing_task.priority = t.priority
+
+                        # Atualiza data limite se a nova trouxer especificação
+                        if t.due_date and not existing_task.due_date:
+                            existing_task.due_date = t.due_date
+
+                        t_dict = t.model_dump()
+                        t_dict["id"] = existing_task.id
+                        t_dict["priority"] = existing_task.priority
+                        t_dict["is_merged"] = True
+                        extracted_tasks_dicts.append(t_dict)
                         continue
 
                     task_id = str(uuid4())
@@ -243,7 +286,7 @@ class MemoryRepository:
                     task_rec = TaskRecord(
                         id=task_id,
                         message_id=msg_id,
-                        created_at=datetime.now(timezone.utc),
+                        created_at=msg_created_at,
                         title=t.title,
                         assignee=t.assignee,
                         due_date=t.due_date,
@@ -260,6 +303,7 @@ class MemoryRepository:
                         task_rec.vault_reason = "Horizonte superior a 7 dias detectado automaticamente"
 
                     db.add(task_rec)
+                    active_pending_tasks.append(task_rec)
                     t_dict = t.model_dump()
                     t_dict["priority"] = weighted_task_priority
                     t_dict["is_idea"] = is_idea_flag

@@ -360,5 +360,36 @@ class TaskSentimentAnalyzer:
         final_sim = (0.60 * jaccard_sim) + (0.40 * seq_sim)
         return round(final_sim, 4)
 
+    def find_similar_existing_task(
+        self,
+        candidate_title: str,
+        candidate_context: str,
+        existing_tasks: List[Any],
+        similarity_threshold: float = 0.60,
+    ) -> Optional[Tuple[Any, float]]:
+        """Busca entre as tarefas existentes uma que seja semanticamente equivalente usando spaCy.
+        
+        Retorna uma tupla (tarefa_existente, score_similaridade) ou None se não houver similaridade suficiente.
+        """
+        if not candidate_title or not existing_tasks:
+            return None
+
+        best_match = None
+        highest_sim = 0.0
+
+        for task in existing_tasks:
+            task_title = getattr(task, "title", "") or ""
+            task_notes = getattr(task, "notes", "") or ""
+            sim = self.compute_task_similarity(
+                candidate_title, candidate_context, task_title, task_notes
+            )
+            if sim >= similarity_threshold and sim > highest_sim:
+                highest_sim = sim
+                best_match = task
+
+        if best_match is not None:
+            return (best_match, highest_sim)
+        return None
+
 
 task_sentiment_analyzer = TaskSentimentAnalyzer()

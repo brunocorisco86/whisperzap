@@ -428,14 +428,20 @@ class WhatsAppService:
         # Detecta se é mídia ignorável (sticker, reação, localização)
         is_ignorable = any(ign in msg_type for ign in ["sticker", "reaction", "location", "contact"])
 
-        # Detecta se é mensagem histórica de sincronização (idade > 60s)
+        # Extrai timestamp real da mensagem e converte para datetime UTC
         raw_ts = data.get("messageTimestamp") or payload.get("messageTimestamp") or 0
+        msg_dt = None
         try:
             msg_ts = float(raw_ts)
-            # Se vier em milissegundos
             if msg_ts > 1000000000000:
                 msg_ts = msg_ts / 1000.0
-            is_historic = bool(msg_ts > 0 and (time.time() - msg_ts > 60.0))
+            if msg_ts > 0:
+                msg_dt = datetime.fromtimestamp(msg_ts, tz=timezone.utc)
+
+            # Para comandos interativos ('?'), tolerância de até 10 minutos para absorver lags de sync de rede
+            is_cmd_hint = str(text_content or "").strip().startswith(("?", "/hermes", "hermes,"))
+            time_limit = 600.0 if is_cmd_hint else 120.0
+            is_historic = bool(msg_ts > 0 and (time.time() - msg_ts > time_limit))
         except Exception:
             is_historic = False
 
@@ -443,11 +449,15 @@ class WhatsAppService:
         raw_number = sanitize_phone_number(remote_jid)
         owner_clean = sanitize_phone_number(settings.USER_PHONE_NUMBER)
         is_chat_with_self = bool(
-            raw_number and owner_clean and (
-                raw_number == owner_clean or raw_number.endswith(owner_clean[-8:]) or owner_clean.endswith(raw_number[-8:])
+            (from_me and not is_group) and (
+                "@lid" in remote_jid
+                or not raw_number
+                or (raw_number and owner_clean and (
+                    raw_number == owner_clean or raw_number.endswith(owner_clean[-8:]) or owner_clean.endswith(raw_number[-8:])
+                ))
             )
         )
-        is_self_memo = bool(from_me and is_chat_with_self)
+        is_self_memo = bool(is_chat_with_self)
 
         return {
             "key_id": key_id,
@@ -462,6 +472,7 @@ class WhatsAppService:
             "is_self_memo": is_self_memo,
             "text": str(text_content).strip(),
             "direct_base64": direct_base64.strip() if direct_base64 else "",
+            "created_at": msg_dt,
             "raw_data": data,
         }
 
@@ -610,6 +621,7 @@ class WhatsAppService:
                     audio_filename=f"{info['key_id']}.ogg",
                     audio_duration_s=float(duration or 0.0),
                     prosody_metrics=prosody_data,
+                    created_at=info.get("created_at"),
                     meta_info={
                         "source": "whatsapp",
                         "message_type": "audio",
@@ -786,6 +798,7 @@ class WhatsAppService:
                 speaker=speaker_label,
                 raw_text=raw_text,
                 revised_text=raw_text,
+                created_at=info.get("created_at"),
                 meta_info={
                     "source": "whatsapp",
                     "message_type": "text",

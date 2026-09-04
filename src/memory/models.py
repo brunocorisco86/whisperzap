@@ -355,6 +355,7 @@ class MessageCreate(BaseModel):
     audio_duration_s: Optional[float] = None
     audio_filename: Optional[str] = None
     meta_info: Optional[dict] = None
+    created_at: Optional[datetime] = None
 
 
 class SearchQuery(BaseModel):
