@@ -516,6 +516,7 @@ class MemoryRepository:
             from src.memory.semantic_cache import semantic_cache
             from src.memory.query_understanding import hermes_query_understanding
             from src.memory.timezone_utils import BRASILIA_TZ, format_brt, get_now_brt, to_local_tz
+            import re
             from datetime import datetime, time, timedelta, timezone
             from sqlalchemy import or_
 
