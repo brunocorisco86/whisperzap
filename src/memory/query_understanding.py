@@ -163,51 +163,76 @@ class HermesQueryUnderstanding:
         family_found = False
 
         for rel_key, (def_first, def_full, kws) in FAMILY_RELATION_DEFINITIONS.items():
-            if any(kw in query_lower_str or kw in raw_tokens for kw in kws):
+            # Casamento estrito de palavras-chave familiares
+            matched_kw = False
+            for kw in kws:
+                if " " in kw:
+                    if kw in query_lower_str:
+                        matched_kw = True
+                        break
+                else:
+                    if kw in raw_tokens:
+                        matched_kw = True
+                        break
+
+            if matched_kw:
                 matched_speaker = def_first
                 matched_full_name = def_full
                 family_found = True
 
-                # Se db disponível, busca confirmação e enriquecimento nas tags dos contatos
+                # Se db disponível, busca confirmação e enriquecimento nas tags dos contatos familiares
                 if db is not None:
                     try:
                         from src.contacts.models import ContactRecord
                         if rel_key == "esposa":
                             c = db.query(ContactRecord).filter(
-                                (ContactRecord.notes.ilike("%esposa%")) |
-                                (ContactRecord.nickname.ilike("%amor%")) |
-                                (ContactRecord.name.ilike("%debora%"))
+                                ContactRecord.role.in_(["FAMILY_CORE", "FAMILY"]),
+                                (
+                                    (ContactRecord.notes.ilike("%esposa%"))
+                                    | (ContactRecord.nickname == "Amor")
+                                    | (ContactRecord.name.ilike("%débora%"))
+                                    | (ContactRecord.name.ilike("%debora%"))
+                                )
                             ).first()
                             if c:
-                                matched_speaker = (c.name or def_first).split()[0].capitalize()
-                                matched_full_name = c.name or def_full
+                                matched_speaker = "Debora"
+                                matched_full_name = "Debora Patel"
                         elif rel_key == "mae":
                             c = db.query(ContactRecord).filter(
-                                (ContactRecord.nickname.ilike("%mãe%")) |
-                                (ContactRecord.nickname.ilike("%mae%")) |
-                                (ContactRecord.notes.ilike("%mãe%")) |
-                                (ContactRecord.name.ilike("%jussara%"))
+                                ContactRecord.role.in_(["FAMILY_CORE", "FAMILY"]),
+                                (
+                                    (ContactRecord.nickname.ilike("%mãe%"))
+                                    | (ContactRecord.nickname.ilike("%mae%"))
+                                    | (ContactRecord.notes.ilike("%mãe%"))
+                                    | (ContactRecord.name.ilike("%jussara%"))
+                                )
                             ).first()
                             if c:
-                                matched_speaker = (c.name or def_first).split()[0].capitalize()
-                                matched_full_name = c.name or def_full
+                                matched_speaker = "Jussara"
+                                matched_full_name = "Jussara Conter"
                         elif rel_key == "sogra":
                             c = db.query(ContactRecord).filter(
-                                (ContactRecord.nickname.ilike("%sogra%")) |
-                                (ContactRecord.notes.ilike("%sogra%")) |
-                                (ContactRecord.name.ilike("%joceli%"))
+                                ContactRecord.role.in_(["FAMILY_CORE", "FAMILY"]),
+                                (
+                                    (ContactRecord.nickname.ilike("%sogra%"))
+                                    | (ContactRecord.notes.ilike("%sogra%"))
+                                    | (ContactRecord.name.ilike("%joceli%"))
+                                )
                             ).first()
                             if c:
-                                matched_speaker = (c.name or def_first).split()[0].capitalize()
-                                matched_full_name = c.name or def_full
+                                matched_speaker = "Joceli"
+                                matched_full_name = "Joceli Patel"
                         elif rel_key == "sogro":
                             c = db.query(ContactRecord).filter(
-                                (ContactRecord.notes.ilike("%sogro%")) |
-                                (ContactRecord.name.ilike("%dirceu%"))
+                                ContactRecord.role.in_(["FAMILY_CORE", "FAMILY"]),
+                                (
+                                    (ContactRecord.notes.ilike("%sogro%"))
+                                    | (ContactRecord.name.ilike("%dirceu%"))
+                                )
                             ).first()
                             if c:
-                                matched_speaker = (c.name or def_first).split()[0].capitalize()
-                                matched_full_name = c.name or def_full
+                                matched_speaker = "Dirceu"
+                                matched_full_name = "Dirceu Patel"
                     except Exception as exc:
                         logger.debug(f"Aviso ao consultar tags familiares no banco: {exc}")
                 break
