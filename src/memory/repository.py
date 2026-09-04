@@ -229,12 +229,12 @@ class MemoryRepository:
                         logger.info(f"🚫 [Tarefas] Candidata a tarefa '{t.title}' descartada pelo filtro spaCy NLP anti-ruído.")
                         continue
 
-                    # Deduplicação Semântica com spaCy NLP contra tarefas pendentes existentes
+                    # Deduplicação Semântica com spaCy NLP e Polímnia contra tarefas pendentes existentes
                     similar_match = task_sentiment_analyzer.find_similar_existing_task(
                         candidate_title=t.title,
                         candidate_context=source_msg_text,
                         existing_tasks=active_pending_tasks,
-                        similarity_threshold=0.60,
+                        similarity_threshold=0.48,
                     )
                     if similar_match:
                         existing_task, sim_score = similar_match

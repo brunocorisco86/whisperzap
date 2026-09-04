@@ -118,6 +118,35 @@ async def _background_scheduler_loop():
                     except Exception as e:
                         logger.error(f"❌ [Cron 21:00] Erro ao enviar Fechamento Sereno: {e}")
 
+                # 3.1 Pruning Seguro do Histórico da Evolution API (D-2 até D0)
+                key_prune = f"evolution_prune_{today_str}"
+                if _last_executed_hour.get("evolution_prune") != key_prune and try_acquire_cron_lock(key_prune):
+                    logger.info("🧹 [Cron 21:00] Iniciando poda autônoma do histórico da Evolution API (D-2 a D0)...")
+                    _last_executed_hour["evolution_prune"] = key_prune
+                    try:
+                        from src.whatsapp.evolution_pruner import evolution_history_pruner
+                        res_prune = evolution_history_pruner.prune_history(days_to_keep=2)
+                        logger.info(f"✅ [Cron 21:00] Pruning Evolution concluído: {res_prune.get('status')} - {res_prune.get('deleted_count', 0)} msgs removidas.")
+                    except Exception as e:
+                        logger.error(f"❌ [Cron 21:00] Erro ao executar Pruning na Evolution API: {e}")
+
+                # 3.2 Racionalização de Tarefas Terpsícore com spaCy & Polímnia
+                key_rat = f"task_rationalize_{today_str}"
+                if _last_executed_hour.get("task_rationalize") != key_rat and try_acquire_cron_lock(key_rat):
+                    logger.info("🧠 [Cron 21:00] Iniciando racionalização semântica de tarefas PENDING (spaCy + Polímnia)...")
+                    _last_executed_hour["task_rationalize"] = key_rat
+                    try:
+                        from src.memory.task_sentiment_analyzer import task_sentiment_analyzer
+                        from src.memory.database import SessionLocal
+                        with SessionLocal() as db:
+                            res_rat = task_sentiment_analyzer.rationalize_pending_tasks(db, similarity_threshold=0.48)
+                            logger.info(
+                                f"✅ [Cron 21:00] Racionalização Terpsícore concluída: {res_rat.get('merged_count', 0)} duplicatas "
+                                f"fundidas de {res_rat.get('total_scanned', 0)} analisadas. {res_rat.get('remaining_pending', 0)} ativas restantes."
+                            )
+                    except Exception as e:
+                        logger.error(f"❌ [Cron 21:00] Erro na racionalização de tarefas Terpsícore: {e}")
+
             # 4. Rotina Semanal de Domingo às 20:00 -> Disparo do Relatório Semanal via WhatsApp
             if now.weekday() == 6 and hour == 20 and minute < 5:
                 key = f"weekly_report_{today_str}"

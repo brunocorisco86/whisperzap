@@ -360,25 +360,71 @@ class TaskSentimentAnalyzer:
             union = len(tokens_a.union(tokens_b))
             jaccard_sim = intersection / union if union > 0 else 0.0
 
-        # Bônus se compartilhar entidade central ou substantivo próprio (ex: mesmo interlocutor/projeto)
+        # Bônus se compartilhar entidade central ou substantivo próprio spaCy
         core_overlap = len(core_entities_a.intersection(core_entities_b))
-        entity_bonus = 0.15 if core_overlap >= 1 else 0.0
+        entity_bonus = 0.12 if core_overlap >= 1 else 0.0
 
-        # Ponderação híbrida: 60% Jaccard lemas + 40% SequenceMatcher + bônus de entidade
-        final_sim = min(1.0, (0.60 * jaccard_sim) + (0.40 * seq_sim) + entity_bonus)
+        # 3. Auxílio do Dicionário Léxico de Polímnia (Termos Canônicos de Domínio)
+        polimnia_terms_a = self.extract_polimnia_terms(text_a)
+        polimnia_terms_b = self.extract_polimnia_terms(text_b)
+        polimnia_overlap = len(polimnia_terms_a.intersection(polimnia_terms_b))
+        
+        polimnia_bonus = 0.0
+        if polimnia_overlap >= 2:
+            polimnia_bonus = 0.25
+        elif polimnia_overlap == 1:
+            polimnia_bonus = 0.15
+
+        # Ponderação híbrida: 50% Jaccard lemas + 30% SequenceMatcher + bônus Polímnia + bônus spaCy
+        final_sim = min(1.0, (0.50 * jaccard_sim) + (0.30 * seq_sim) + polimnia_bonus + entity_bonus)
         return round(final_sim, 4)
+
+    def extract_polimnia_terms(self, text: str) -> set[str]:
+        """Extrai termos canônicos do Dicionário Léxico de Polímnia presentes no texto."""
+        if not text:
+            return set()
+        from src.ai_gateway.bypass import normalize_text
+        norm_text = normalize_text(text)
+        matched = set()
+
+        try:
+            from src.dictionary.service import lexical_dictionary_service
+            terms = lexical_dictionary_service.get_all_terms()
+            for t in terms:
+                term_norm = normalize_text(t.term)
+                if term_norm and len(term_norm) >= 3:
+                    if re.search(r"\b" + re.escape(term_norm) + r"\b", norm_text):
+                        matched.add(t.term.lower())
+                        continue
+                for var in (t.phonetic_variations or []):
+                    var_norm = normalize_text(var)
+                    if var_norm and len(var_norm) >= 3:
+                        if re.search(r"\b" + re.escape(var_norm) + r"\b", norm_text):
+                            matched.add(t.term.lower())
+                            break
+        except Exception as e:
+            logger.debug(f"Erro ao extrair termos de Polímnia: {e}")
+
+        # Termos operacionais frequentes de homelab / C.Vale / agronegócio como reforço
+        adhoc_domain = [
+            "agrisolus", "e-aware", "eaware", "agrocenter", "mtech", "amino", "cvale",
+            "tag", "tags", "kml", "silo", "silos", "balanca", "balança", "firmware",
+            "palotina", "assis chateaubriand", "rastreamento", "veiculo", "caminhao"
+        ]
+        for adhoc in adhoc_domain:
+            if re.search(r"\b" + re.escape(adhoc) + r"\b", norm_text):
+                matched.add(adhoc)
+
+        return matched
 
     def find_similar_existing_task(
         self,
         candidate_title: str,
         candidate_context: str,
         existing_tasks: List[Any],
-        similarity_threshold: float = 0.45,
+        similarity_threshold: float = 0.48,
     ) -> Optional[Tuple[Any, float]]:
-        """Busca entre as tarefas existentes uma que seja semanticamente equivalente usando spaCy.
-        
-        Retorna uma tupla (tarefa_existente, score_similaridade) ou None se não houver similaridade suficiente.
-        """
+        """Busca entre as tarefas existentes uma que seja semanticamente equivalente usando spaCy e Polímnia."""
         if not candidate_title or not existing_tasks:
             return None
 
@@ -387,16 +433,13 @@ class TaskSentimentAnalyzer:
 
         for task in existing_tasks:
             task_title = getattr(task, "title", "") or ""
-            # Compara título a título para alta precisão
             title_sim = self.compute_task_similarity(
                 candidate_title, "", task_title, ""
             )
-            # Compara título com contexto/notas complementares
             task_notes = getattr(task, "notes", "") or ""
             context_sim = self.compute_task_similarity(
                 candidate_title, candidate_context, task_title, task_notes
             )
-            # Similaridade ponderada: prioridade para o título
             effective_sim = max(title_sim, (0.70 * title_sim) + (0.30 * context_sim))
 
             if effective_sim >= similarity_threshold and effective_sim > highest_sim:
@@ -407,5 +450,129 @@ class TaskSentimentAnalyzer:
             return (best_match, highest_sim)
         return None
 
+    def rationalize_pending_tasks(
+        self,
+        db,
+        similarity_threshold: float = 0.48,
+    ) -> Dict[str, Any]:
+        """Varre todas as tarefas com status PENDING e racionaliza/funde duplicatas usando spaCy e Polímnia."""
+        from src.memory.models import TaskRecord
+        from src.memory.timezone_utils import get_now_brt
+
+        pending_tasks = (
+            db.query(TaskRecord)
+            .filter(TaskRecord.status == "PENDING")
+            .order_by(TaskRecord.created_at.desc())
+            .all()
+        )
+
+        total_scanned = len(pending_tasks)
+        if total_scanned <= 1:
+            return {
+                "status": "NO_OP",
+                "total_scanned": total_scanned,
+                "merged_count": 0,
+                "remaining_pending": total_scanned,
+                "clusters": [],
+            }
+
+        priority_order = {"URGENT": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
+        merged_ids = set()
+        clusters = []
+
+        now_brt_str = get_now_brt().strftime("%d/%m/%Y %H:%M BRT")
+
+        for i in range(total_scanned):
+            task_a = pending_tasks[i]
+            if task_a.id in merged_ids:
+                continue
+
+            for j in range(i + 1, total_scanned):
+                task_b = pending_tasks[j]
+                if task_b.id in merged_ids:
+                    continue
+
+                sim_score = self.compute_task_similarity(
+                    task_a.title, task_a.notes or "", task_b.title, task_b.notes or ""
+                )
+
+                if sim_score >= similarity_threshold:
+                    # Eleição da Tarefa Primária:
+                    # 1. Maior prioridade
+                    # 2. Se empate, maior detalhamento textual (título + notas)
+                    prio_a = priority_order.get(str(task_a.priority).upper(), 2)
+                    prio_b = priority_order.get(str(task_b.priority).upper(), 2)
+
+                    len_a = len(task_a.title or "") + len(task_a.notes or "")
+                    len_b = len(task_b.title or "") + len(task_b.notes or "")
+
+                    if prio_a > prio_b:
+                        primary, duplicate = task_a, task_b
+                    elif prio_b > prio_a:
+                        primary, duplicate = task_b, task_a
+                    else:
+                        primary, duplicate = (task_a, task_b) if len_a >= len_b else (task_b, task_a)
+
+                    # Enriquece anotações da primária com o contexto da duplicata
+                    dup_notes = (duplicate.notes or "").strip()
+                    merge_note = (
+                        f"\n🔄 [Racionalizado por Terpsícore & Polímnia em {now_brt_str}]: "
+                        f"Unificado com tarefa '{duplicate.title}' (Sim: {sim_score:.2f})."
+                    )
+                    if dup_notes and dup_notes not in (primary.notes or ""):
+                        merge_note += f" Contexto adicional: \"{dup_notes[:200]}\""
+
+                    if primary.notes:
+                        primary.notes = f"{primary.notes.strip()}{merge_note}"
+                    else:
+                        primary.notes = merge_note.strip()
+
+                    # Atualiza prazo se a duplicata tiver prazo mais restrito
+                    if duplicate.due_date and (not primary.due_date or duplicate.due_date < primary.due_date):
+                        primary.due_date = duplicate.due_date
+
+                    # Atualiza responsável se primária não tiver
+                    if not primary.assignee and duplicate.assignee:
+                        primary.assignee = duplicate.assignee
+
+                    # Cancela a tarefa duplicada com rastreabilidade completa
+                    duplicate.status = "CANCELLED"
+                    duplicate.reassessment_notes = (
+                        f"Racionalizado por Terpsícore & Polímnia (Score: {sim_score:.2f}): "
+                        f"duplicata consolidada na tarefa #{primary.id} ('{primary.title}')"
+                    )
+
+                    merged_ids.add(duplicate.id)
+                    clusters.append({
+                        "primary_id": primary.id,
+                        "primary_title": primary.title,
+                        "duplicate_id": duplicate.id,
+                        "duplicate_title": duplicate.title,
+                        "similarity_score": sim_score,
+                    })
+
+                    logger.info(
+                        f"🤝 [Racionalização Terpsícore] Tarefa #{duplicate.id} ('{duplicate.title}') "
+                        f"consolidada na tarefa #{primary.id} ('{primary.title}') [Score: {sim_score:.2f}]"
+                    )
+
+        if merged_ids:
+            db.commit()
+
+        remaining_count = total_scanned - len(merged_ids)
+        logger.info(
+            f"✅ [Racionalização Terpsícore] Concluída: {len(merged_ids)} tarefas fundidas. "
+            f"Restantes ativas PENDING: {remaining_count}."
+        )
+
+        return {
+            "status": "SUCCESS",
+            "total_scanned": total_scanned,
+            "merged_count": len(merged_ids),
+            "remaining_pending": remaining_count,
+            "clusters": clusters,
+        }
+
 
 task_sentiment_analyzer = TaskSentimentAnalyzer()
+

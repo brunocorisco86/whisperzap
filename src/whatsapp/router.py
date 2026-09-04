@@ -116,3 +116,12 @@ async def restart_whatsapp_instance() -> Dict[str, Any]:
         "restarted": ok,
     }
 
+
+@router.post("/prune-history")
+async def prune_whatsapp_history(days_to_keep: int = 2) -> Dict[str, Any]:
+    """Expurga mensagens da Evolution API anteriores a D-2 (mantendo D-2 a D0) para reduzir overhead de contexto."""
+    from src.whatsapp.evolution_pruner import evolution_history_pruner
+    result = evolution_history_pruner.prune_history(days_to_keep=days_to_keep)
+    return result
+
+
