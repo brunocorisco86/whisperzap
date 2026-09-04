@@ -144,41 +144,140 @@ class HermesQueryUnderstanding:
         matched_speaker = None
         matched_full_name = None
 
-        if db is not None:
+        # 4.1 Resolução de Relações Familiares e Afetivas (Esposa, Mãe, Sogra, Sogro)
+        FAMILY_RELATION_DEFINITIONS = {
+            "esposa": ("Debora", "Debora Patel", ["esposa", "mulher", "patroa", "amor"]),
+            "mae": ("Jussara", "Jussara Conter", ["mãe", "mae", "mamae", "mamãe"]),
+            "sogra": ("Joceli", "Joceli Patel", ["sogra"]),
+            "sogro": ("Dirceu", "Dirceu Patel", ["sogro"]),
+        }
+        FAMILY_WORDS_SET = {
+            "esposa", "mulher", "patroa", "esposas", "mulheres",
+            "mãe", "mae", "maes", "mães", "mamae", "mamãe",
+            "sogra", "sogras", "sogro", "sogros",
+            "pai", "pais", "filho", "filha", "filhos", "filhas",
+            "irmão", "irmao", "irmã", "irma"
+        }
+
+        query_lower_str = raw_query.lower()
+        family_found = False
+
+        for rel_key, (def_first, def_full, kws) in FAMILY_RELATION_DEFINITIONS.items():
+            if any(kw in query_lower_str or kw in raw_tokens for kw in kws):
+                matched_speaker = def_first
+                matched_full_name = def_full
+                family_found = True
+
+                # Se db disponível, busca confirmação e enriquecimento nas tags dos contatos
+                if db is not None:
+                    try:
+                        from src.contacts.models import ContactRecord
+                        if rel_key == "esposa":
+                            c = db.query(ContactRecord).filter(
+                                (ContactRecord.notes.ilike("%esposa%")) |
+                                (ContactRecord.nickname.ilike("%amor%")) |
+                                (ContactRecord.name.ilike("%debora%"))
+                            ).first()
+                            if c:
+                                matched_speaker = (c.name or def_first).split()[0].capitalize()
+                                matched_full_name = c.name or def_full
+                        elif rel_key == "mae":
+                            c = db.query(ContactRecord).filter(
+                                (ContactRecord.nickname.ilike("%mãe%")) |
+                                (ContactRecord.nickname.ilike("%mae%")) |
+                                (ContactRecord.notes.ilike("%mãe%")) |
+                                (ContactRecord.name.ilike("%jussara%"))
+                            ).first()
+                            if c:
+                                matched_speaker = (c.name or def_first).split()[0].capitalize()
+                                matched_full_name = c.name or def_full
+                        elif rel_key == "sogra":
+                            c = db.query(ContactRecord).filter(
+                                (ContactRecord.nickname.ilike("%sogra%")) |
+                                (ContactRecord.notes.ilike("%sogra%")) |
+                                (ContactRecord.name.ilike("%joceli%"))
+                            ).first()
+                            if c:
+                                matched_speaker = (c.name or def_first).split()[0].capitalize()
+                                matched_full_name = c.name or def_full
+                        elif rel_key == "sogro":
+                            c = db.query(ContactRecord).filter(
+                                (ContactRecord.notes.ilike("%sogro%")) |
+                                (ContactRecord.name.ilike("%dirceu%"))
+                            ).first()
+                            if c:
+                                matched_speaker = (c.name or def_first).split()[0].capitalize()
+                                matched_full_name = c.name or def_full
+                    except Exception as exc:
+                        logger.debug(f"Aviso ao consultar tags familiares no banco: {exc}")
+                break
+
+        # 4.2 Se não for parentesco familiar, executa busca e ranking ponderado de contatos
+        if not family_found and db is not None:
             from src.contacts.models import ContactRecord
             from src.memory.models import MessageRecord
 
             all_contacts = db.query(ContactRecord).all()
             distinct_speakers = [s[0] for s in db.query(MessageRecord.speaker).distinct().all() if s[0]]
 
-            # 4.1 Prioriza pessoas extraídas pelo spaCy
             candidate_names = spacy_persons + clean_tokens
+            best_match = None
+            best_score = 0
 
             for cand in candidate_names:
                 cand_lower = cand.lower()
-                # Verifica tabela de contatos
-                for c in all_contacts:
-                    c_name_lower = (c.name or "").lower()
-                    c_first = c_name_lower.split()[0] if c_name_lower else ""
-                    c_nick = (c.nickname or "").lower()
+                if cand_lower in FAMILY_WORDS_SET or len(cand_lower) < 3:
+                    continue
 
-                    if cand_lower == c_first or cand_lower == c_nick or cand_lower == c_name_lower or (len(cand_lower) >= 4 and cand_lower in c_name_lower):
-                        matched_speaker = c_first.capitalize()
-                        matched_full_name = c.name
-                        break
-                if matched_speaker:
-                    break
-
-                # Verifica locutores já existentes nas mensagens
+                # A. Prioridade Máxima: locutores com mensagens já registradas
                 for spk in distinct_speakers:
                     spk_lower = spk.lower()
-                    spk_first = spk_lower.split()[0]
-                    if cand_lower == spk_first or cand_lower == spk_lower or (len(cand_lower) >= 4 and cand_lower in spk_lower):
-                        matched_speaker = spk_first.capitalize()
-                        matched_full_name = spk
-                        break
-                if matched_speaker:
-                    break
+                    spk_parts = spk_lower.split()
+                    spk_first = spk_parts[0] if spk_parts else ""
+
+                    if cand_lower == spk_lower:
+                        score = 150
+                    elif cand_lower == spk_first:
+                        score = 120
+                    elif len(cand_lower) >= 4 and any(cand_lower == p for p in spk_parts):
+                        score = 100
+                    else:
+                        score = 0
+
+                    if score > best_score:
+                        best_score = score
+                        best_match = (spk_first.capitalize(), spk)
+
+                # B. Contatos da Agenda (vCard e cadastrados)
+                for c in all_contacts:
+                    c_name_lower = (c.name or "").lower()
+                    c_parts = c_name_lower.split()
+                    c_first = c_parts[0] if c_parts else ""
+                    c_nick = (c.nickname or "").lower()
+
+                    score = 0
+                    chosen_first = c_first.capitalize()
+                    chosen_full = c.name
+
+                    if cand_lower == c_nick and c_nick:
+                        score = 140
+                    elif cand_lower == c_name_lower:
+                        score = 130
+                    elif cand_lower == c_first:
+                        score = 110
+                    elif len(cand_lower) >= 4 and any(cand_lower == p for p in c_parts):
+                        # Match em palavra intermediária do nome (ex: "Débora" em "Jair DEBORA SCHLEMMER")
+                        # NUNCA usa o primeiro nome prefixo do contato se a busca foi por outra palavra!
+                        score = 50
+                        chosen_first = cand.capitalize()
+                        chosen_full = f"{cand.capitalize()} ({c.name})"
+
+                    if score > best_score:
+                        best_score = score
+                        best_match = (chosen_first, chosen_full)
+
+            if best_match:
+                matched_speaker, matched_full_name = best_match
 
         # 5. Classificação de Intenção Global da Pergunta
         if matched_speaker and (dialogue_verb_detected or is_recent or not task_intent_detected):

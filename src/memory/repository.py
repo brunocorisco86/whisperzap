@@ -543,15 +543,24 @@ class MemoryRepository:
 
             # 2. Priorização por Interlocutor Identificado Dinamicamente
             if parsed.target_speaker_full_name or parsed.target_speaker:
-                spk_filter = (parsed.target_speaker_full_name or parsed.target_speaker).split()[0]
                 spk_name_label = parsed.target_speaker_full_name or parsed.target_speaker
+                parts = set()
+                if parsed.target_speaker:
+                    parts.add(parsed.target_speaker.strip())
+                if parsed.target_speaker_full_name:
+                    for p in re.findall(r"\w+", parsed.target_speaker_full_name):
+                        if len(p) >= 3 and p.lower() not in ("de", "da", "do", "dos", "das"):
+                            parts.add(p)
+
+                speaker_clauses = [MessageRecord.speaker.ilike(f"%{p}%") for p in parts]
+                speaker_cond = or_(*speaker_clauses) if speaker_clauses else MessageRecord.speaker.ilike(f"%{spk_name_label}%")
 
                 if parsed.is_today:
                     # Filtra estritamente o dia de hoje
                     target_messages = (
                         db.query(MessageRecord)
                         .filter(
-                            MessageRecord.speaker.ilike(f"%{spk_filter}%"),
+                            speaker_cond,
                             MessageRecord.created_at >= start_of_today,
                             MessageRecord.created_at <= end_of_today,
                         )
@@ -562,7 +571,7 @@ class MemoryRepository:
                         # Busca a última mensagem do histórico geral para contextualização
                         last_msg = (
                             db.query(MessageRecord)
-                            .filter(MessageRecord.speaker.ilike(f"%{spk_filter}%"))
+                            .filter(speaker_cond)
                             .order_by(MessageRecord.created_at.desc())
                             .first()
                         )
@@ -578,7 +587,7 @@ class MemoryRepository:
                     target_messages = (
                         db.query(MessageRecord)
                         .filter(
-                            MessageRecord.speaker.ilike(f"%{spk_filter}%"),
+                            speaker_cond,
                             MessageRecord.created_at >= start_of_yesterday,
                             MessageRecord.created_at <= end_of_yesterday,
                         )
@@ -588,7 +597,7 @@ class MemoryRepository:
                     if not target_messages:
                         last_msg = (
                             db.query(MessageRecord)
-                            .filter(MessageRecord.speaker.ilike(f"%{spk_filter}%"))
+                            .filter(speaker_cond)
                             .order_by(MessageRecord.created_at.desc())
                             .first()
                         )
@@ -603,7 +612,7 @@ class MemoryRepository:
                     # Sem restrição de dia específico: pega as mensagens mais recentes
                     target_messages = (
                         db.query(MessageRecord)
-                        .filter(MessageRecord.speaker.ilike(f"%{spk_filter}%"))
+                        .filter(speaker_cond)
                         .order_by(MessageRecord.created_at.desc())
                         .limit(10)
                         .all()

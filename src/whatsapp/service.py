@@ -267,6 +267,27 @@ class WhatsAppService:
 
         return False
 
+    async def send_presence(self, number: str, presence: str = "composing", delay: int = 1200) -> bool:
+        """Envia status de presença (ex: 'composing' para 'digitando...') para dar feedback imediato ao usuário."""
+        clean_number = sanitize_phone_number(number) or sanitize_phone_number(settings.USER_PHONE_NUMBER)
+        target_url = f"{self.api_url}/chat/sendPresence/{self.instance}"
+        headers = {
+            "apikey": self.api_key,
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "number": clean_number,
+            "presence": presence,
+            "delay": delay,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.post(target_url, json=payload, headers=headers)
+                return resp.status_code in (200, 201)
+        except Exception as exc:
+            logger.debug(f"Aviso ao enviar status de presença '{presence}': {exc}")
+        return False
+
     async def restart_instance(self) -> bool:
         """Reinicia a conexão do WhatsApp (Baileys socket) na Evolution API de forma autônoma."""
         target_url = f"{self.api_url}/instance/restart/{self.instance}"
@@ -693,46 +714,64 @@ class WhatsAppService:
 
                 logger.info(f"🧠 Consulta interativa ao Hermes Agent recebida do proprietário ({speaker_label}): '{query_str}'")
 
-                answer_resp = await memory_repository.query_hermes_rag(
-                    query=query_str,
-                    top_k=5,
-                    min_similarity=0.35,
-                    db=db,
-                )
-                answer_text = answer_resp.answer
+                # Feedback visual imediato anti-vácuo: 'digitando...'
+                await self.send_presence(number=settings.USER_PHONE_NUMBER, presence="composing")
 
-                # Se a consulta for sobre tarefas, anexa bloco enriquecido com tarefas sinalizadas do Terpsícore
-                if any(w in query_str.lower() for w in ["tarefa", "tarefas", "pendencia", "pendência", "pendencias", "pendências", "fazer"]):
-                    signaled_tasks = (
-                        db.query(TaskRecord)
-                        .filter(
-                            TaskRecord.status == "PENDING",
-                            (
-                                (TaskRecord.is_favorite == True)
-                                | (TaskRecord.is_epic == True)
-                                | (TaskRecord.is_idea == True)
-                                | (TaskRecord.priority.in_(["HIGH", "URGENT"]))
-                            )
-                        )
-                        .order_by(TaskRecord.created_at.desc())
-                        .limit(5)
-                        .all()
+                try:
+                    answer_resp = await memory_repository.query_hermes_rag(
+                        query=query_str,
+                        top_k=5,
+                        min_similarity=0.35,
+                        db=db,
                     )
-                    if signaled_tasks:
-                        task_lines = ["\n\n📋 *Tarefas Sinalizadas no Radar (Terpsícore):*"]
-                        for st in signaled_tasks:
-                            task_lines.append(format_terpsicore_task_verbose(st))
-                        answer_text += "\n".join(task_lines)
+                    answer_text = answer_resp.answer
 
-                # Envia resposta interativa EXCLUSIVAMENTE para o proprietário
-                await self.send_text_message(number=settings.USER_PHONE_NUMBER, text=answer_text)
+                    # Se a consulta for sobre tarefas, anexa bloco enriquecido com tarefas sinalizadas do Terpsícore
+                    if any(w in query_str.lower() for w in ["tarefa", "tarefas", "pendencia", "pendência", "pendencias", "pendências", "fazer"]):
+                        signaled_tasks = (
+                            db.query(TaskRecord)
+                            .filter(
+                                TaskRecord.status == "PENDING",
+                                (
+                                    (TaskRecord.is_favorite == True)
+                                    | (TaskRecord.is_epic == True)
+                                    | (TaskRecord.is_idea == True)
+                                    | (TaskRecord.priority.in_(["HIGH", "URGENT"]))
+                                )
+                            )
+                            .order_by(TaskRecord.created_at.desc())
+                            .limit(5)
+                            .all()
+                        )
+                        if signaled_tasks:
+                            task_lines = ["\n\n📋 *Tarefas Sinalizadas no Radar (Terpsícore):*"]
+                            for st in signaled_tasks:
+                                task_lines.append(format_terpsicore_task_verbose(st))
+                            answer_text += "\n".join(task_lines)
 
-                return {
-                    "status": "success",
-                    "type": "hermes_query",
-                    "query": query_str,
-                    "answer": answer_text,
-                }
+                    # Envia resposta interativa EXCLUSIVAMENTE para o proprietário
+                    await self.send_text_message(number=settings.USER_PHONE_NUMBER, text=answer_text)
+
+                    return {
+                        "status": "success",
+                        "type": "hermes_query",
+                        "query": query_str,
+                        "answer": answer_text,
+                    }
+                except Exception as query_exc:
+                    logger.error(f"❌ Erro ao processar consulta interativa do Hermes: {query_exc}", exc_info=True)
+                    error_feedback = (
+                        f"⚠️ *Hermes em Auto-Cura*\n\n"
+                        f"Recebi sua pergunta: *\"{query_str[:80]}\"*,\n"
+                        f"mas ocorreu uma oscilação temporária ao consultar a memória ({str(query_exc)[:60]}).\n\n"
+                        f"O canal já está sendo reestabelecido pelo watchdog autônomo."
+                    )
+                    await self.send_text_message(number=settings.USER_PHONE_NUMBER, text=error_feedback)
+                    return {
+                        "status": "error",
+                        "type": "hermes_query_error",
+                        "error": str(query_exc),
+                    }
 
             # 2. Detecção de Saudação / Phatic Bypass
             clean_t = re.sub(r"[^\w\s]", "", raw_text.lower()).strip()
