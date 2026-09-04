@@ -267,6 +267,48 @@ class WhatsAppService:
 
         return False
 
+    async def restart_instance(self) -> bool:
+        """Reinicia a conexão do WhatsApp (Baileys socket) na Evolution API de forma autônoma."""
+        target_url = f"{self.api_url}/instance/restart/{self.instance}"
+        headers = {
+            "apikey": self.api_key,
+            "Content-Type": "application/json",
+        }
+        try:
+            logger.info(f"🔄 [Watchdog WhatsApp] Reiniciando instância '{self.instance}' na Evolution API...")
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(target_url, headers=headers)
+                if resp.status_code in (200, 201):
+                    logger.info(f"✅ Instância '{self.instance}' reiniciada com sucesso.")
+                    return True
+                logger.error(f"❌ Falha ao reiniciar instância WhatsApp ({resp.status_code}): {resp.text}")
+        except Exception as exc:
+            logger.error(f"❌ Exceção ao reiniciar instância WhatsApp: {exc}")
+        return False
+
+    async def check_socket_health(self) -> dict:
+        """Verifica a saúde do socket WebSocket do WhatsApp e reinicia a instância se estiver instável/zumbi."""
+        target_url = f"{self.api_url}/instance/connectionState/{self.instance}"
+        headers = {"apikey": self.api_key}
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(target_url, headers=headers)
+                if resp.status_code == 200:
+                    state = resp.json().get("instance", {}).get("state")
+                    if state != "open":
+                        logger.warning(f"⚠️ [Watchdog WhatsApp] Instância em estado '{state}'. Disparando auto-reconexão...")
+                        restarted = await self.restart_instance()
+                        return {"healthy": False, "state": state, "auto_healed": restarted}
+                    return {"healthy": True, "state": "open"}
+                else:
+                    logger.warning(f"⚠️ [Watchdog WhatsApp] HTTP {resp.status_code} ao consultar connectionState. Tentando auto-reconexão...")
+                    restarted = await self.restart_instance()
+                    return {"healthy": False, "status_code": resp.status_code, "auto_healed": restarted}
+        except Exception as exc:
+            logger.warning(f"⚠️ [Watchdog WhatsApp] Falha ao contatar Evolution API ({exc}). Tentando reiniciar...")
+            restarted = await self.restart_instance()
+            return {"healthy": False, "error": str(exc), "auto_healed": restarted}
+
     async def get_media_base64(
         self,
         message_id: str,

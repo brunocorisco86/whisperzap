@@ -99,3 +99,20 @@ async def check_whatsapp_status() -> Dict[str, Any]:
     """Verifica a saúde da conexão do WhatsApp."""
     from src.web.router import get_whatsapp_status
     return await get_whatsapp_status()
+
+
+@router.post(
+    "/restart-instance",
+    summary="Reinicia a conexão do WhatsApp na Evolution API",
+    description="Força a reinicialização e auto-reconexão do socket do WhatsApp (Baileys) na Evolution API.",
+    status_code=status.HTTP_200_OK,
+)
+async def restart_whatsapp_instance() -> Dict[str, Any]:
+    """Reinicia o socket da instância na Evolution API."""
+    ok = await whatsapp_service.restart_instance()
+    return {
+        "status": "success" if ok else "error",
+        "instance": settings.EVOLUTION_INSTANCE,
+        "restarted": ok,
+    }
+

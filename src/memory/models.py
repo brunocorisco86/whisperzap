@@ -161,6 +161,17 @@ class WebhookKeyRecord(Base):
     status = Column(String(32), default="PROCESSING")
 
 
+class CronLockRecord(Base):
+    """Tabela de controle de idempotência e trava distribuída para rotinas agendadas (Cron)."""
+
+    __tablename__ = "cron_locks"
+
+    task_key = Column(String(128), primary_key=True, index=True)
+    executed_at = Column(DateTime, default=utc_now)
+    worker_pid = Column(Integer)
+
+
+
 
 # ===================== Schemas Pydantic da API =====================
 
