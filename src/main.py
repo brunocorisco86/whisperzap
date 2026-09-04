@@ -1,10 +1,17 @@
 import os
 import time
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from src.config import settings
+
+logging.basicConfig(
+    level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
 from src.ai_gateway.router import router as ai_router
 from src.transcriber.router import router as transcriber_router
 from src.dictionary.router import router as dictionary_router
