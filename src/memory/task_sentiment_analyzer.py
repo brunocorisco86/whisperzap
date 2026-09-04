@@ -336,6 +336,8 @@ class TaskSentimentAnalyzer:
         # 2. Similaridade de Jaccard sobre lemas / tokens significativos
         tokens_a = set()
         tokens_b = set()
+        core_entities_a = set()
+        core_entities_b = set()
 
         if self.nlp:
             try:
@@ -343,6 +345,8 @@ class TaskSentimentAnalyzer:
                 doc_b = self.nlp(text_b)
                 tokens_a = {t.lemma_.lower() for t in doc_a if not t.is_stop and not t.is_punct and len(t.text) > 2}
                 tokens_b = {t.lemma_.lower() for t in doc_b if not t.is_stop and not t.is_punct and len(t.text) > 2}
+                core_entities_a = {t.lemma_.lower() for t in doc_a if t.pos_ in ("PROPN", "NOUN") and len(t.text) > 2}
+                core_entities_b = {t.lemma_.lower() for t in doc_b if t.pos_ in ("PROPN", "NOUN") and len(t.text) > 2}
             except Exception:
                 tokens_a = {w for w in norm_a.split() if len(w) > 2}
                 tokens_b = {w for w in norm_b.split() if len(w) > 2}
@@ -356,8 +360,12 @@ class TaskSentimentAnalyzer:
             union = len(tokens_a.union(tokens_b))
             jaccard_sim = intersection / union if union > 0 else 0.0
 
-        # Ponderação híbrida: 60% Jaccard lemas + 40% SequenceMatcher
-        final_sim = (0.60 * jaccard_sim) + (0.40 * seq_sim)
+        # Bônus se compartilhar entidade central ou substantivo próprio (ex: mesmo interlocutor/projeto)
+        core_overlap = len(core_entities_a.intersection(core_entities_b))
+        entity_bonus = 0.15 if core_overlap >= 1 else 0.0
+
+        # Ponderação híbrida: 60% Jaccard lemas + 40% SequenceMatcher + bônus de entidade
+        final_sim = min(1.0, (0.60 * jaccard_sim) + (0.40 * seq_sim) + entity_bonus)
         return round(final_sim, 4)
 
     def find_similar_existing_task(
@@ -365,7 +373,7 @@ class TaskSentimentAnalyzer:
         candidate_title: str,
         candidate_context: str,
         existing_tasks: List[Any],
-        similarity_threshold: float = 0.60,
+        similarity_threshold: float = 0.45,
     ) -> Optional[Tuple[Any, float]]:
         """Busca entre as tarefas existentes uma que seja semanticamente equivalente usando spaCy.
         
@@ -379,12 +387,20 @@ class TaskSentimentAnalyzer:
 
         for task in existing_tasks:
             task_title = getattr(task, "title", "") or ""
+            # Compara título a título para alta precisão
+            title_sim = self.compute_task_similarity(
+                candidate_title, "", task_title, ""
+            )
+            # Compara título com contexto/notas complementares
             task_notes = getattr(task, "notes", "") or ""
-            sim = self.compute_task_similarity(
+            context_sim = self.compute_task_similarity(
                 candidate_title, candidate_context, task_title, task_notes
             )
-            if sim >= similarity_threshold and sim > highest_sim:
-                highest_sim = sim
+            # Similaridade ponderada: prioridade para o título
+            effective_sim = max(title_sim, (0.70 * title_sim) + (0.30 * context_sim))
+
+            if effective_sim >= similarity_threshold and effective_sim > highest_sim:
+                highest_sim = effective_sim
                 best_match = task
 
         if best_match is not None:
