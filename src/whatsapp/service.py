@@ -616,7 +616,11 @@ class WhatsAppService:
 
             # 1. Detecção de Pergunta para o Hermes Agent ('?', '/hermes', 'hermes,') - Apenas em Self-Memo ou mensagem do proprietário
             hermes_match = re.match(r"^(\?|/hermes|hermes,)\s*(.*)", raw_text, flags=re.IGNORECASE)
-            is_owner = is_owner_interaction(speaker=speaker_label, meta_info=info.get("raw_data"))
+            is_owner = bool(
+                info.get("from_me")
+                or is_self_memo
+                or is_owner_interaction(speaker=speaker_label, meta_info=info.get("raw_data"))
+            )
             stripped_text = raw_text.strip().lower()
 
             # Atalhos diretos sem prefixo '?' para comando de status dos modelos
@@ -645,7 +649,7 @@ class WhatsAppService:
                 if not query_str:
                     query_str = "Quais são as tarefas pendentes mais recentes?"
 
-                logger.info(f"🧠 Consulta interativa ao Hermes Agent recebida do proprietário: '{query_str}'")
+                logger.info(f"🧠 Consulta interativa ao Hermes Agent recebida do proprietário ({speaker_label}): '{query_str}'")
 
                 answer_resp = await memory_repository.query_hermes_rag(
                     query=query_str,

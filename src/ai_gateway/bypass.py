@@ -126,10 +126,18 @@ def is_owner_interaction(speaker: Optional[str] = None, meta_info: Optional[Dict
 
     # 1. Verifica flag fromMe do WhatsApp
     if meta_info and isinstance(meta_info, dict):
-        if meta_info.get("fromMe") is True or meta_info.get("fromMe") == 1 or meta_info.get("from_me") is True:
+        key_obj = meta_info.get("key") if isinstance(meta_info.get("key"), dict) else {}
+        if (
+            meta_info.get("fromMe") is True
+            or meta_info.get("fromMe") == 1
+            or meta_info.get("from_me") is True
+            or key_obj.get("fromMe") is True
+            or key_obj.get("fromMe") == 1
+            or key_obj.get("from_me") is True
+        ):
             return True
 
-        remote_jid = str(meta_info.get("remoteJid") or meta_info.get("remote_jid") or "")
+        remote_jid = str(meta_info.get("remoteJid") or meta_info.get("remote_jid") or key_obj.get("remoteJid") or key_obj.get("remote_jid") or "")
         sender_phone = str(meta_info.get("phone") or meta_info.get("sender_phone") or "")
         push_name = str(meta_info.get("pushName") or "").strip().lower()
 

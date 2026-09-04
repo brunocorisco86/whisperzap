@@ -41,6 +41,12 @@ async def evolution_webhook(
     if not info:
         return {"status": "ignored", "reason": "unhandled_event_or_invalid_payload"}
 
+    logger.info(
+        f"📨 Webhook recebido: key_id={info['key_id']}, from_me={info.get('from_me')}, "
+        f"self_memo={info.get('is_self_memo')}, has_audio={info.get('has_audio')}, "
+        f"text='{info.get('text')[:60]}'"
+    )
+
     # 2. Descarte rápido de grupos e broadcast
     if info["is_group"]:
         return {"status": "ignored", "reason": "group_or_broadcast"}

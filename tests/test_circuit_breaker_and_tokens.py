@@ -119,3 +119,55 @@ def test_health_tokens_endpoint():
         assert "gemini" in data["tokens"]
         assert "evolution_api" in data["tokens"]
         assert "masked_key" in data["tokens"]["gemini"]
+
+
+def test_is_owner_interaction_with_nested_key():
+    """Valida detecção de autoria com payloads da Evolution API v2 (key.fromMe)."""
+    from src.ai_gateway.bypass import is_owner_interaction
+
+    # Caso 1: fromMe direto no meta_info
+    assert is_owner_interaction(None, {"fromMe": True}) is True
+
+    # Caso 2: fromMe aninhado dentro de key (Evolution API v2 Baileys)
+    payload_nested = {
+        "key": {
+            "remoteJid": "554599999999@s.whatsapp.net",
+            "fromMe": True,
+            "id": "TEST_3EB0123",
+        },
+        "pushName": None,
+        "message": {"conversation": "? teste"},
+    }
+    assert is_owner_interaction(None, payload_nested) is True
+
+    # Caso 3: mensagem de terceiro (fromMe False)
+    payload_third_party = {
+        "key": {
+            "remoteJid": "554588888888@s.whatsapp.net",
+            "fromMe": False,
+            "id": "THIRD_PARTY_1",
+        },
+        "pushName": "Contato Externo",
+        "message": {"conversation": "olá"},
+    }
+    assert is_owner_interaction("Contato Externo", payload_third_party) is False
+
+
+def test_knowledge_graph_save_atomic(tmp_path):
+    """Testa salvamento atômico do grafo sem colisão de arquivos temporários."""
+    from src.memory.graph import KnowledgeGraph
+
+    graph_file = str(tmp_path / "hermes_graph.json")
+    kg = KnowledgeGraph(persistence_path=graph_file)
+    kg.add_node("Larissa", category="PERSON")
+    kg.add_node("Rafael", category="PERSON")
+    kg.add_edge("Larissa", "Rafael", relation="TALK_TO")
+
+    assert kg.graph.number_of_nodes() == 2
+    assert kg.graph.number_of_edges() == 1
+
+    # Recarrega em nova instância para confirmar persistência
+    kg2 = KnowledgeGraph(persistence_path=graph_file)
+    assert kg2.graph.number_of_nodes() == 2
+    assert kg2.graph.number_of_edges() == 1
+

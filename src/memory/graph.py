@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import threading
+import uuid
 from typing import Any
 import networkx as nx
 from src.config import settings
@@ -21,7 +22,7 @@ class KnowledgeGraph:
         self._load()
 
     def _load(self) -> None:
-        """Carrega o grafo salvo do disco ou inicializa novo grafo."""
+        """Carrega o grafo do disco se existir."""
         with self._lock:
             if os.path.exists(self.persistence_path):
                 try:
@@ -36,13 +37,13 @@ class KnowledgeGraph:
             self.graph = nx.DiGraph()
 
     def _save(self) -> None:
-        """Serializa o grafo para JSON de forma atômica e thread-safe."""
+        """Serializa o grafo para JSON de forma atômica, thread-safe e multi-processo."""
         with self._lock:
             try:
                 os.makedirs(os.path.dirname(self.persistence_path) or ".", exist_ok=True)
                 data = nx.node_link_data(self.graph, edges="links")
-                # Escreve via arquivo temporário para escrita atômica no filesystem
-                tmp_path = f"{self.persistence_path}.tmp"
+                # Escreve via arquivo temporário único para escrita atômica no filesystem sem colisão entre workers
+                tmp_path = f"{self.persistence_path}.{os.getpid()}_{uuid.uuid4().hex[:6]}.tmp"
                 with open(tmp_path, "w", encoding="utf-8") as f:
                     json.dump(data, f, ensure_ascii=False, indent=2)
                 os.replace(tmp_path, self.persistence_path)
