@@ -412,7 +412,8 @@ class TaskSentimentAnalyzer:
             "palotina", "assis chateaubriand", "rastreamento", "veiculo", "caminhao"
         ]
         for adhoc in adhoc_domain:
-            if re.search(r"\b" + re.escape(adhoc) + r"\b", norm_text):
+            adhoc_norm = normalize_text(adhoc)
+            if adhoc_norm and re.search(r"\b" + re.escape(adhoc_norm) + r"\b", norm_text):
                 matched.add(adhoc)
 
         return matched
