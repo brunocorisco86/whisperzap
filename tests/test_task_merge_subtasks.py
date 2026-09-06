@@ -121,3 +121,28 @@ def test_task_rationalization_merged_status():
     assert parsed["has_subtasks"] is True
     assert parsed["total"] == 2
     mock_db.commit.assert_called_once()
+
+
+def test_subtask_service_remove_subtask():
+    """Testa remoção de subtarefa ao desfazer a unificação."""
+    initial_notes = (
+        "### 📋 Subtarefas (0/2 concluídas - 0%):\n"
+        "- [ ] Tarefa Principal (🎙️ Ref: msg-01)\n"
+        "- [ ] Subtarefa Adicional (🎙️ Ref: msg-02)\n\n"
+        "Notas normais do usuário"
+    )
+
+    # Remove por audio_ref
+    updated = subtask_service.remove_subtask(initial_notes, audio_ref="msg-02")
+    parsed = subtask_service.parse_subtasks(updated)
+    assert parsed["total"] == 1
+    assert parsed["items"][0]["title"] == "Tarefa Principal"
+    assert "Notas normais do usuário" in updated
+    assert "msg-02" not in updated
+
+    # Remove a única subtarefa restante
+    updated_final = subtask_service.remove_subtask(updated, audio_ref="msg-01")
+    parsed_final = subtask_service.parse_subtasks(updated_final)
+    assert parsed_final["has_subtasks"] is False
+    assert updated_final.strip() == "Notas normais do usuário"
+

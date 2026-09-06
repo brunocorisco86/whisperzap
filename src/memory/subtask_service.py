@@ -159,5 +159,58 @@ class SubtaskService:
             return self.HEADER_REGEX.sub(new_header, updated_notes, count=1)
         return updated_notes
 
+    def remove_subtask(self, notes: str, audio_ref: Optional[str] = None, title: Optional[str] = None) -> str:
+        """Remove uma subtarefa das anotações pelo audio_ref ou título e recalcula o progresso."""
+        if not notes:
+            return ""
+
+        parsed = self.parse_subtasks(notes)
+        items = parsed["items"]
+        if not items:
+            return notes
+
+        remaining_items = []
+        for it in items:
+            # Compara audio_ref se fornecido
+            if audio_ref and it.get("audio_ref") and it["audio_ref"].strip() == audio_ref.strip():
+                continue
+            # Compara título se fornecido
+            if title and it.get("title") and it["title"].strip().lower() == title.strip().lower():
+                continue
+            remaining_items.append(it)
+
+        # Se nenhuma subtarefa foi removida, retorna inalterado
+        if len(remaining_items) == len(items):
+            return notes
+
+        # Remove todas as linhas antigas de subtarefas e cabeçalho
+        non_subtask_lines = []
+        for line in notes.splitlines():
+            if self.HEADER_REGEX.match(line) or self.SUBTASK_REGEX.match(line):
+                continue
+            non_subtask_lines.append(line)
+
+        trailing_notes = "\n".join(non_subtask_lines).strip()
+
+        if not remaining_items:
+            return trailing_notes
+
+        completed = sum(1 for it in remaining_items if it["completed"])
+        total = len(remaining_items)
+        header = self.format_progress_header(completed, total)
+
+        checklist_lines = []
+        for it in remaining_items:
+            box = "[x]" if it["completed"] else "[ ]"
+            line_str = f"- {box} {it['title']}"
+            if it.get("audio_ref"):
+                line_str += f" (🎙️ Ref: {it['audio_ref']})"
+            checklist_lines.append(line_str)
+
+        block = f"{header}\n" + "\n".join(checklist_lines)
+        if trailing_notes:
+            return f"{block}\n\n{trailing_notes}"
+        return block
+
 
 subtask_service = SubtaskService()

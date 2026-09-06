@@ -309,6 +309,20 @@ async def unmerge_task(task_id: str, db: Session = Depends(get_db)):
 
     task.status = "PENDING"
     task.reassessment_notes = f"Desfeita unificação em {datetime.now(timezone.utc).strftime('%d/%m/%Y %H:%M')}"
+
+    # Remove a subtarefa de qualquer tarefa primária onde ela tenha sido consolidada
+    from src.memory.subtask_service import subtask_service
+    potential_primaries = db.query(TaskRecord).filter(TaskRecord.notes.like("%### 📋 Subtarefas%")).all()
+    for prim in potential_primaries:
+        if prim.id != task.id and prim.notes:
+            updated_notes = subtask_service.remove_subtask(
+                prim.notes,
+                audio_ref=task.message_id,
+                title=task.title,
+            )
+            if updated_notes != prim.notes:
+                prim.notes = updated_notes
+
     db.commit()
     db.refresh(task)
     return task

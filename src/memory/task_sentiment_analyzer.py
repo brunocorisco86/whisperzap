@@ -310,26 +310,43 @@ class TaskSentimentAnalyzer:
 
         return tags[:5]
 
-    def extract_task_features(self, title: str, notes: str) -> Dict[str, Any]:
-        """Extrai lemas, entidades e termos de Polímnia de uma tarefa em uma única passagem."""
-        from src.ai_gateway.bypass import normalize_text
-        text = f"{title or ''} {notes or ''}".strip()
     TOPIC_CLUSTERS = {
         "tags": ["tag", "tags", "cadastro de tag", "cadastros das tags"],
-        "veiculos_rastreamento": ["veiculo", "veiculos", "caminhao", "caminhoes", "rastreamento", "rastreio", "frota", "voucher"],
+        "veiculos_rastreamento": ["veiculo", "veiculos", "caminhao", "caminhoes", "rastreamento", "rastreio", "frota"],
+        "voucher_produtor": ["voucher", "link do voucher", "envio do voucher"],
         "racao_nutricao": ["racao", "nutricao", "eprodutor", "pedido de racao", "fabrica de racao"],
         "balanca_pesagem": ["balanca", "balancas", "pesagem", "assis chateaubriand", "palotina"],
-        "documento_sandra": ["sandra", "agrisolus", "documento para sandra", "diretrizes"],
+        "documento_sandra": ["sandra", "documento para sandra", "diretrizes"],
         "firmware": ["firmware"],
         "kml": ["kml"],
         "tms": ["tms"],
         "mtech": ["mtech", "amino", "brim", "fmim"],
     }
 
-    def extract_task_features(self, title: str, notes: str) -> Dict[str, Any]:
+    def clean_task_text_for_analysis(self, title: str, notes: str = "") -> str:
+        """Descarta metadados históricos de merge e subtarefas para evitar contaminação temática."""
+        clean_lines = []
+        if notes:
+            for line in notes.splitlines():
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                if (
+                    stripped.startswith("### 📋 Subtarefas")
+                    or stripped.startswith("- [ ]")
+                    or stripped.startswith("- [x]")
+                    or stripped.startswith("🔄 [")
+                    or stripped.startswith("📌 [")
+                ):
+                    continue
+                clean_lines.append(stripped)
+        notes_clean = " ".join(clean_lines)
+        return f"{title or ''} {notes_clean}".strip()
+
+    def extract_task_features(self, title: str, notes: str = "") -> Dict[str, Any]:
         """Extrai lemas, entidades, termos de Polímnia e tópicos temáticos de uma tarefa em uma única passagem."""
         from src.ai_gateway.bypass import normalize_text
-        text = f"{title or ''} {notes or ''}".strip()
+        text = self.clean_task_text_for_analysis(title, notes)
         norm = normalize_text(text)
         tokens = set()
         core_entities = set()
