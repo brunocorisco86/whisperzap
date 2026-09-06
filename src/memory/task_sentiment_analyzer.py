@@ -317,67 +317,70 @@ class TaskSentimentAnalyzer:
         title_b: str,
         notes_b: str,
     ) -> float:
-        """Calcula similaridade lexical e semântica entre duas tarefas com spaCy e SequenceMatcher."""
-        import difflib
+    def extract_task_features(self, title: str, notes: str) -> Dict[str, Any]:
+        """Extrai lemas, entidades e termos de Polímnia de uma tarefa em uma única passagem."""
         from src.ai_gateway.bypass import normalize_text
+        text = f"{title or ''} {notes or ''}".strip()
+        norm = normalize_text(text)
+        tokens = set()
+        core_entities = set()
 
-        text_a = f"{title_a or ''} {notes_a or ''}".strip()
-        text_b = f"{title_b or ''} {notes_b or ''}".strip()
+        if self.nlp and text:
+            try:
+                doc = self.nlp(text)
+                tokens = {t.lemma_.lower() for t in doc if not t.is_stop and not t.is_punct and len(t.text) > 2}
+                core_entities = {t.lemma_.lower() for t in doc if t.pos_ in ("PROPN", "NOUN") and len(t.text) > 2}
+            except Exception:
+                tokens = {w for w in norm.split() if len(w) > 2}
+        else:
+            tokens = {w for w in norm.split() if len(w) > 2}
 
-        if not text_a or not text_b:
+        polimnia_terms = self.extract_polimnia_terms(text)
+        return {
+            "norm": norm,
+            "tokens": tokens,
+            "core_entities": core_entities,
+            "polimnia_terms": polimnia_terms,
+        }
+
+    def compute_similarity_from_features(self, feat_a: Dict[str, Any], feat_b: Dict[str, Any]) -> float:
+        """Calcula similaridade ultrarrápida (micro-segundos) a partir de features pré-extraídas."""
+        import difflib
+        norm_a = feat_a.get("norm", "")
+        norm_b = feat_b.get("norm", "")
+        if not norm_a or not norm_b:
             return 0.0
 
-        norm_a = normalize_text(text_a)
-        norm_b = normalize_text(text_b)
-
-        # 1. Similaridade direta de caracteres (SequenceMatcher)
         seq_sim = difflib.SequenceMatcher(None, norm_a, norm_b).ratio()
 
-        # 2. Similaridade de Jaccard sobre lemas / tokens significativos
-        tokens_a = set()
-        tokens_b = set()
-        core_entities_a = set()
-        core_entities_b = set()
-
-        if self.nlp:
-            try:
-                doc_a = self.nlp(text_a)
-                doc_b = self.nlp(text_b)
-                tokens_a = {t.lemma_.lower() for t in doc_a if not t.is_stop and not t.is_punct and len(t.text) > 2}
-                tokens_b = {t.lemma_.lower() for t in doc_b if not t.is_stop and not t.is_punct and len(t.text) > 2}
-                core_entities_a = {t.lemma_.lower() for t in doc_a if t.pos_ in ("PROPN", "NOUN") and len(t.text) > 2}
-                core_entities_b = {t.lemma_.lower() for t in doc_b if t.pos_ in ("PROPN", "NOUN") and len(t.text) > 2}
-            except Exception:
-                tokens_a = {w for w in norm_a.split() if len(w) > 2}
-                tokens_b = {w for w in norm_b.split() if len(w) > 2}
-        else:
-            tokens_a = {w for w in norm_a.split() if len(w) > 2}
-            tokens_b = {w for w in norm_b.split() if len(w) > 2}
-
+        tokens_a = feat_a.get("tokens", set())
+        tokens_b = feat_b.get("tokens", set())
         jaccard_sim = 0.0
         if tokens_a and tokens_b:
             intersection = len(tokens_a.intersection(tokens_b))
             union = len(tokens_a.union(tokens_b))
             jaccard_sim = intersection / union if union > 0 else 0.0
 
-        # Bônus se compartilhar entidade central ou substantivo próprio spaCy
-        core_overlap = len(core_entities_a.intersection(core_entities_b))
+        core_overlap = len(feat_a.get("core_entities", set()).intersection(feat_b.get("core_entities", set())))
         entity_bonus = 0.12 if core_overlap >= 1 else 0.0
 
-        # 3. Auxílio do Dicionário Léxico de Polímnia (Termos Canônicos de Domínio)
-        polimnia_terms_a = self.extract_polimnia_terms(text_a)
-        polimnia_terms_b = self.extract_polimnia_terms(text_b)
-        polimnia_overlap = len(polimnia_terms_a.intersection(polimnia_terms_b))
-        
-        polimnia_bonus = 0.0
-        if polimnia_overlap >= 2:
-            polimnia_bonus = 0.25
-        elif polimnia_overlap == 1:
-            polimnia_bonus = 0.15
+        polimnia_overlap = len(feat_a.get("polimnia_terms", set()).intersection(feat_b.get("polimnia_terms", set())))
+        polimnia_bonus = 0.25 if polimnia_overlap >= 2 else (0.15 if polimnia_overlap == 1 else 0.0)
 
-        # Ponderação híbrida: 50% Jaccard lemas + 30% SequenceMatcher + bônus Polímnia + bônus spaCy
         final_sim = min(1.0, (0.50 * jaccard_sim) + (0.30 * seq_sim) + polimnia_bonus + entity_bonus)
         return round(final_sim, 4)
+
+    def compute_task_similarity(
+        self,
+        title_a: str,
+        notes_a: str,
+        title_b: str,
+        notes_b: str,
+    ) -> float:
+        """Calcula similaridade lexical e semântica entre duas tarefas com spaCy e Polímnia."""
+        feat_a = self.extract_task_features(title_a, notes_a)
+        feat_b = self.extract_task_features(title_b, notes_b)
+        return self.compute_similarity_from_features(feat_a, feat_b)
 
     def extract_polimnia_terms(self, text: str) -> set[str]:
         """Extrai termos canônicos do Dicionário Léxico de Polímnia presentes no texto."""
@@ -407,7 +410,7 @@ class TaskSentimentAnalyzer:
 
         # Termos operacionais frequentes de homelab / C.Vale / agronegócio como reforço
         adhoc_domain = [
-            "agrisolus", "e-aware", "eaware", "agrocenter", "mtech", "amino", "cvale",
+            "agrisolus", "e-aware", "e aware", "eaware", "agrocenter", "mtech", "amino", "cvale",
             "tag", "tags", "kml", "silo", "silos", "balanca", "balança", "firmware",
             "palotina", "assis chateaubriand", "rastreamento", "veiculo", "caminhao"
         ]
@@ -423,7 +426,7 @@ class TaskSentimentAnalyzer:
         candidate_title: str,
         candidate_context: str,
         existing_tasks: List[Any],
-        similarity_threshold: float = 0.48,
+        similarity_threshold: float = 0.40,
     ) -> Optional[Tuple[Any, float]]:
         """Busca entre as tarefas existentes uma que seja semanticamente equivalente usando spaCy e Polímnia."""
         if not candidate_title or not existing_tasks:
@@ -431,17 +434,14 @@ class TaskSentimentAnalyzer:
 
         best_match = None
         highest_sim = 0.0
+        cand_feat = self.extract_task_features(candidate_title, candidate_context)
 
         for task in existing_tasks:
             task_title = getattr(task, "title", "") or ""
-            title_sim = self.compute_task_similarity(
-                candidate_title, "", task_title, ""
-            )
             task_notes = getattr(task, "notes", "") or ""
-            context_sim = self.compute_task_similarity(
-                candidate_title, candidate_context, task_title, task_notes
-            )
-            effective_sim = max(title_sim, (0.70 * title_sim) + (0.30 * context_sim))
+            task_feat = self.extract_task_features(task_title, task_notes)
+            
+            effective_sim = self.compute_similarity_from_features(cand_feat, task_feat)
 
             if effective_sim >= similarity_threshold and effective_sim > highest_sim:
                 highest_sim = effective_sim
@@ -454,9 +454,9 @@ class TaskSentimentAnalyzer:
     def rationalize_pending_tasks(
         self,
         db,
-        similarity_threshold: float = 0.48,
+        similarity_threshold: float = 0.40,
     ) -> Dict[str, Any]:
-        """Varre todas as tarefas com status PENDING e racionaliza/funde duplicatas usando spaCy e Polímnia."""
+        """Varre todas as tarefas com status PENDING e racionaliza/funde duplicatas com performance O(N) e Polímnia."""
         from src.memory.models import TaskRecord
         from src.memory.timezone_utils import get_now_brt
 
@@ -477,6 +477,12 @@ class TaskSentimentAnalyzer:
                 "clusters": [],
             }
 
+        logger.info(f"⚡ [Terpsícore Racionalização] Pré-extraindo features para {total_scanned} tarefas...")
+        task_features = [
+            self.extract_task_features(t.title, t.notes or "")
+            for t in pending_tasks
+        ]
+
         priority_order = {"URGENT": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
         merged_ids = set()
         clusters = []
@@ -488,19 +494,18 @@ class TaskSentimentAnalyzer:
             if task_a.id in merged_ids:
                 continue
 
+            feat_a = task_features[i]
+
             for j in range(i + 1, total_scanned):
                 task_b = pending_tasks[j]
                 if task_b.id in merged_ids:
                     continue
 
-                sim_score = self.compute_task_similarity(
-                    task_a.title, task_a.notes or "", task_b.title, task_b.notes or ""
-                )
+                feat_b = task_features[j]
+
+                sim_score = self.compute_similarity_from_features(feat_a, feat_b)
 
                 if sim_score >= similarity_threshold:
-                    # Eleição da Tarefa Primária:
-                    # 1. Maior prioridade
-                    # 2. Se empate, maior detalhamento textual (título + notas)
                     prio_a = priority_order.get(str(task_a.priority).upper(), 2)
                     prio_b = priority_order.get(str(task_b.priority).upper(), 2)
 
@@ -514,7 +519,6 @@ class TaskSentimentAnalyzer:
                     else:
                         primary, duplicate = (task_a, task_b) if len_a >= len_b else (task_b, task_a)
 
-                    # Enriquece anotações da primária com o contexto da duplicata
                     dup_notes = (duplicate.notes or "").strip()
                     merge_note = (
                         f"\n🔄 [Racionalizado por Terpsícore & Polímnia em {now_brt_str}]: "
@@ -528,15 +532,12 @@ class TaskSentimentAnalyzer:
                     else:
                         primary.notes = merge_note.strip()
 
-                    # Atualiza prazo se a duplicata tiver prazo mais restrito
                     if duplicate.due_date and (not primary.due_date or duplicate.due_date < primary.due_date):
                         primary.due_date = duplicate.due_date
 
-                    # Atualiza responsável se primária não tiver
                     if not primary.assignee and duplicate.assignee:
                         primary.assignee = duplicate.assignee
 
-                    # Cancela a tarefa duplicada com rastreabilidade completa
                     duplicate.status = "CANCELLED"
                     duplicate.reassessment_notes = (
                         f"Racionalizado por Terpsícore & Polímnia (Score: {sim_score:.2f}): "

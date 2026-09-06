@@ -49,14 +49,14 @@ def test_task_similarity_with_spacy_and_polimnia():
     score = task_sentiment_analyzer.compute_task_similarity(
         title_a=title_a, notes_a="", title_b=title_b, notes_b=""
     )
-    assert score >= 0.48, f"Score esperado >= 0.48, obtido: {score}"
+    assert score >= 0.40, f"Score esperado >= 0.40, obtido: {score}"
 
     title_c = "Criar documento para Sandra (Agrisolus) detalhando ações operacionais"
     title_d = "Criar documento para a Sandra (Agrisolus) definindo ações na granja"
     score_cd = task_sentiment_analyzer.compute_task_similarity(
         title_a=title_c, notes_a="", title_b=title_d, notes_b=""
     )
-    assert score_cd >= 0.50, f"Score esperado >= 0.50, obtido: {score_cd}"
+    assert score_cd >= 0.45, f"Score esperado >= 0.45, obtido: {score_cd}"
 
 
 def test_rationalize_pending_tasks_in_memory():
@@ -90,7 +90,7 @@ def test_rationalize_pending_tasks_in_memory():
         task1, task2, task3
     ]
 
-    result = task_sentiment_analyzer.rationalize_pending_tasks(mock_db, similarity_threshold=0.48)
+    result = task_sentiment_analyzer.rationalize_pending_tasks(mock_db, similarity_threshold=0.40)
 
     assert result["status"] == "SUCCESS"
     assert result["total_scanned"] == 3

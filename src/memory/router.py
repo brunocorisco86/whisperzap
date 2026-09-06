@@ -258,12 +258,13 @@ async def merge_similar_tasks(
 
 @router.post("/tasks/rationalize")
 async def rationalize_pending_tasks_endpoint(
-    similarity_threshold: float = Query(default=0.48, ge=0.2, le=1.0, description="Limiar de corte híbrido (spaCy + Polímnia)"),
+    similarity_threshold: float = Query(default=0.40, ge=0.2, le=1.0, description="Limiar de corte híbrido (spaCy + Polímnia)"),
     db: Session = Depends(get_db),
 ):
     """Racionaliza e consolida tarefas PENDING redundantes utilizando triagem sintática do spaCy e o glossário de Polímnia."""
     from src.memory.task_sentiment_analyzer import task_sentiment_analyzer
     return task_sentiment_analyzer.rationalize_pending_tasks(db=db, similarity_threshold=similarity_threshold)
+
 
 
 
