@@ -1359,9 +1359,66 @@ function renderTasks() {
   if (btnPrev) btnPrev.disabled = tasksCurrentPage <= 1;
   if (btnNext) btnNext.disabled = tasksCurrentPage >= totalPages || tasksPageSize === 'all';
 
+  function renderSubtasksWidget(task) {
+    if (!task.notes) return '';
+    const lines = task.notes.split('\n');
+    const subtasks = [];
+    lines.forEach((line) => {
+      const m = line.match(/^\s*-\s*\[([ xX])\]\s*(.+)$/);
+      if (m) {
+        subtasks.push({
+          completed: m[1].toLowerCase() === 'x',
+          rawText: m[2].trim()
+        });
+      }
+    });
+
+    if (subtasks.length === 0) return '';
+
+    const total = subtasks.length;
+    const completed = subtasks.filter(s => s.completed).length;
+    const pct = Math.round((completed / total) * 100);
+
+    const itemsHtml = subtasks.map((s, idx) => {
+      const audioMatch = s.rawText.match(/🎙️\s*(?:Áudio|Ref|Msg):\s*([a-zA-Z0-9_\-]+)/);
+      const audioRef = audioMatch ? audioMatch[1] : null;
+      const cleanText = s.rawText.replace(/\(🎙️.*?\)/, '').trim();
+
+      return `
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; margin-bottom: 5px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1; font-size: 0.82rem; margin: 0; ${s.completed ? 'text-decoration: line-through; opacity: 0.6;' : ''}">
+            <input type="checkbox" ${s.completed ? 'checked' : ''} onchange="window.toggleSubtaskCheck('${task.id}', ${idx}, this.checked)" style="cursor: pointer; width: 16px; height: 16px; accent-color: #3b82f6;">
+            <span>${cleanText}</span>
+          </label>
+          ${audioRef ? `
+            <button class="btn btn-secondary btn-xs" type="button" onclick="window.playSubtaskAudio('${audioRef}')" title="Ouvir áudio original da demanda" style="margin-left: 8px; font-size: 0.68rem; padding: 2px 6px;">
+              🎙️ Ouvir
+            </button>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div style="margin-top: 10px; margin-bottom: 12px; padding: 10px 12px; background: rgba(59, 130, 246, 0.04); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.78rem;">
+          <span>📋 <b>Subtarefas Consolidadas:</b></span>
+          <span style="font-weight: 700; color: ${pct === 100 ? '#10b981' : '#60a5fa'};">${completed}/${total} (${pct}%)</span>
+        </div>
+        <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin-bottom: 8px;">
+          <div style="width: ${pct}%; height: 100%; background: ${pct === 100 ? '#10b981' : 'linear-gradient(90deg, #3b82f6, #60a5fa)'}; transition: width 0.3s ease;"></div>
+        </div>
+        <div>
+          ${itemsHtml}
+        </div>
+      </div>
+    `;
+  }
+
   tasksContainer.innerHTML = displayedList.map(t => {
     const isDone = t.status === 'DONE';
     const isCancelled = t.status === 'CANCELLED';
+    const isMerged = t.status === 'MERGED';
     const priorityColor = t.priority === 'URGENT' ? '#ef4444' : t.priority === 'HIGH' ? '#f59e0b' : '#10b981';
     const speakerName = t.speaker || 'Desconhecido';
     const initials = speakerName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
@@ -1385,6 +1442,7 @@ function renderTasks() {
     let cardClass = 'task-card';
     if (isDone) cardClass += ' task-done';
     if (isCancelled) cardClass += ' task-cancelled';
+    if (isMerged) cardClass += ' task-merged';
 
     // Formatadores do Baú
     let vaultBannerHtml = '';
@@ -1415,6 +1473,8 @@ function renderTasks() {
       `;
     }
 
+    const subtasksWidgetHtml = renderSubtasksWidget(t);
+
     return `
       <div class="${cardClass}" id="task-card-${t.id}">
         <!-- Topo: Título da Tarefa, Ações Estratégicas e Solicitante (Gatilho) -->
@@ -1435,9 +1495,18 @@ function renderTasks() {
             </div>
 
             <div class="task-title">
+              ${isMerged ? '<span class="badge" style="background: rgba(139, 92, 246, 0.2); color: #c084fc; font-size: 0.75rem; margin-right: 0.4rem;">🔗 UNIFICADA</span>' : ''}
               ${isCancelled ? '<span style="color: #ef4444; font-size: 0.85rem; margin-right: 0.4rem;">[IGNORADA]</span>' : ''}
               ${t.title}
             </div>
+
+            ${isMerged ? `
+              <div style="margin-top: 6px; margin-bottom: 4px;">
+                <button class="btn btn-secondary btn-xs" type="button" onclick="window.unmergeTask('${t.id}')" title="Desfazer unificação e restaurar para Pendente">
+                  ↩️ Desfazer Unificação
+                </button>
+              </div>
+            ` : ''}
 
             ${(t.tags && t.tags.length > 0) ? `
               <div class="task-tags-container">
@@ -1521,6 +1590,8 @@ function renderTasks() {
             ` : ''}
           </div>
         </div>
+
+        ${subtasksWidgetHtml}
 
         <!-- Caixa de Anotações & Observações Futuras -->
         <div class="task-notes-section">
@@ -3239,6 +3310,92 @@ async function saveTaskNotes(taskId) {
   }
 }
 window.saveTaskNotes = saveTaskNotes;
+
+async function toggleSubtaskCheck(taskId, subtaskIndex, isChecked) {
+  try {
+    const res = await fetch(`/api/v1/memory/tasks/${taskId}/toggle-subtask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subtask_index: subtaskIndex, completed: isChecked })
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      const idx = allTasks.findIndex(x => x.id === taskId);
+      if (idx !== -1) {
+        allTasks[idx] = updated;
+      }
+      renderTasks();
+      showToast('Subtarefa atualizada!');
+    }
+  } catch (err) {
+    console.error('Erro ao alternar subtarefa:', err);
+    showToast('Falha ao atualizar subtarefa', true);
+  }
+}
+window.toggleSubtaskCheck = toggleSubtaskCheck;
+
+async function unmergeTask(taskId) {
+  if (!confirm('Deseja desfazer a unificação desta tarefa e restaurá-la para Pendente?')) return;
+  try {
+    const res = await fetch(`/api/v1/memory/tasks/${taskId}/unmerge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (res.ok) {
+      showToast('Unificação desfeita! Tarefa restaurada para Pendente.');
+      await loadTasks();
+    } else {
+      showToast('Erro ao desfazer unificação da tarefa', true);
+    }
+  } catch (err) {
+    console.error('Erro ao desfazer unificação:', err);
+    showToast('Falha de comunicação com o servidor', true);
+  }
+}
+window.unmergeTask = unmergeTask;
+
+async function playSubtaskAudio(audioRef) {
+  if (!audioRef) return;
+  try {
+    const res = await fetch(`/api/v1/memory/messages/${audioRef}`);
+    if (res.ok) {
+      const msg = await res.json();
+      if (msg.audio_filename) {
+        const audio = new Audio(`/api/v1/transcriber/audio/${msg.audio_filename}`);
+        audio.play();
+        showToast(`Reproduzindo áudio original de ${msg.speaker || 'Gatilho'}...`);
+        return;
+      }
+    }
+    showToast(`Áudio associado: ${audioRef}`);
+  } catch (e) {
+    showToast(`Áudio associado: ${audioRef}`);
+  }
+}
+window.playSubtaskAudio = playSubtaskAudio;
+
+async function rationalizeTasksInteractive() {
+  if (!confirm('Deseja iniciar a Racionalização Inteligente de Tarefas com o Guardião Temático de Não-Colisão?')) return;
+  try {
+    showToast('Executando racionalização de subtarefas...');
+    const res = await fetch('/api/v1/memory/tasks/rationalize?similarity_threshold=0.55', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      showToast(`Racionalização concluída! ${data.merged_count || 0} tarefas consolidadas em subtarefas.`);
+      await loadTasks();
+    } else {
+      showToast('Erro ao executar racionalização de tarefas', true);
+    }
+  } catch (err) {
+    console.error('Erro na racionalização:', err);
+    showToast('Falha ao comunicar com o servidor', true);
+  }
+}
+window.rationalizeTasksInteractive = rationalizeTasksInteractive;
+
 
 // --- Live Hermes Query Testing ---
 

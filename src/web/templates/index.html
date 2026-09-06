@@ -277,6 +277,7 @@
             <option value="">Todos os Status</option>
             <option value="PENDING" selected>Pendentes (PENDING)</option>
             <option value="DONE">Concluídas (DONE)</option>
+            <option value="MERGED">🔗 Unificadas (MERGED)</option>
             <option value="CANCELLED">Ignoradas (CANCELLED)</option>
           </select>
           <select id="tasks-filter-priority">
@@ -286,6 +287,9 @@
             <option value="MEDIUM">Média (MEDIUM)</option>
             <option value="LOW">Baixa (LOW)</option>
           </select>
+          <button class="btn btn-secondary btn-sm" id="btn-rationalize-tasks" title="Racionalizar e consolidar tarefas redundantes em subtarefas interativas com Anti-Collision Gate" onclick="window.rationalizeTasksInteractive()">
+            🧠 Racionalizar em Subtarefas
+          </button>
           <button class="btn btn-secondary btn-sm" id="btn-merge-tasks" title="Mesclar tarefas semelhantes agrupadas por pessoa de origem (somente pendentes)" onclick="window.mergeSimilarTasks()">
             🔀 Mesclar Semelhantes
           </button>

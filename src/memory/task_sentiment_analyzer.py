@@ -314,6 +314,22 @@ class TaskSentimentAnalyzer:
         """Extrai lemas, entidades e termos de Polímnia de uma tarefa em uma única passagem."""
         from src.ai_gateway.bypass import normalize_text
         text = f"{title or ''} {notes or ''}".strip()
+    TOPIC_CLUSTERS = {
+        "tags": ["tag", "tags", "cadastro de tag", "cadastros das tags"],
+        "veiculos_rastreamento": ["veiculo", "veiculos", "caminhao", "caminhoes", "rastreamento", "rastreio", "frota", "voucher"],
+        "racao_nutricao": ["racao", "nutricao", "eprodutor", "pedido de racao", "fabrica de racao"],
+        "balanca_pesagem": ["balanca", "balancas", "pesagem", "assis chateaubriand", "palotina"],
+        "documento_sandra": ["sandra", "agrisolus", "documento para sandra", "diretrizes"],
+        "firmware": ["firmware"],
+        "kml": ["kml"],
+        "tms": ["tms"],
+        "mtech": ["mtech", "amino", "brim", "fmim"],
+    }
+
+    def extract_task_features(self, title: str, notes: str) -> Dict[str, Any]:
+        """Extrai lemas, entidades, termos de Polímnia e tópicos temáticos de uma tarefa em uma única passagem."""
+        from src.ai_gateway.bypass import normalize_text
+        text = f"{title or ''} {notes or ''}".strip()
         norm = normalize_text(text)
         tokens = set()
         core_entities = set()
@@ -329,16 +345,34 @@ class TaskSentimentAnalyzer:
             tokens = {w for w in norm.split() if len(w) > 2}
 
         polimnia_terms = self.extract_polimnia_terms(text)
+
+        # Mapeamento estrito de tópicos temáticos para o Guardião de Não-Colisão
+        topics = set()
+        for topic_name, kws in self.TOPIC_CLUSTERS.items():
+            for kw in kws:
+                if re.search(r"\b" + re.escape(kw) + r"\b", norm):
+                    topics.add(topic_name)
+                    break
+
         return {
             "norm": norm,
             "tokens": tokens,
             "core_entities": core_entities,
             "polimnia_terms": polimnia_terms,
+            "topics": topics,
         }
 
     def compute_similarity_from_features(self, feat_a: Dict[str, Any], feat_b: Dict[str, Any]) -> float:
-        """Calcula similaridade ultrarrápida (micro-segundos) a partir de features pré-extraídas."""
+        """Calcula similaridade ultrarrápida com Guardião Temático de Não-Colisão (Anti-Collision Gate)."""
         import difflib
+
+        # 🛡️ GUARDIÃO TEMÁTICO DE NÃO-COLISÃO (Anti-Collision Gate)
+        # Se ambas as tarefas possuem tópicos mapeados e NÃO compartilham nenhum tópico, bloqueia categoricamente
+        topics_a = feat_a.get("topics", set())
+        topics_b = feat_b.get("topics", set())
+        if topics_a and topics_b and not topics_a.intersection(topics_b):
+            return 0.0
+
         norm_a = feat_a.get("norm", "")
         norm_b = feat_b.get("norm", "")
         if not norm_a or not norm_b:
@@ -358,9 +392,12 @@ class TaskSentimentAnalyzer:
         entity_bonus = 0.12 if core_overlap >= 1 else 0.0
 
         polimnia_overlap = len(feat_a.get("polimnia_terms", set()).intersection(feat_b.get("polimnia_terms", set())))
-        polimnia_bonus = 0.25 if polimnia_overlap >= 2 else (0.15 if polimnia_overlap == 1 else 0.0)
+        polimnia_bonus = 0.20 if polimnia_overlap >= 2 else (0.10 if polimnia_overlap == 1 else 0.0)
 
-        final_sim = min(1.0, (0.50 * jaccard_sim) + (0.30 * seq_sim) + polimnia_bonus + entity_bonus)
+        topic_overlap = len(topics_a.intersection(topics_b))
+        topic_bonus = 0.15 if topic_overlap >= 1 else 0.0
+
+        final_sim = min(1.0, (0.45 * jaccard_sim) + (0.25 * seq_sim) + polimnia_bonus + entity_bonus + topic_bonus)
         return round(final_sim, 4)
 
     def compute_task_similarity(
@@ -419,7 +456,7 @@ class TaskSentimentAnalyzer:
         candidate_title: str,
         candidate_context: str,
         existing_tasks: List[Any],
-        similarity_threshold: float = 0.40,
+        similarity_threshold: float = 0.55,
     ) -> Optional[Tuple[Any, float]]:
         """Busca entre as tarefas existentes uma que seja semanticamente equivalente usando spaCy e Polímnia."""
         if not candidate_title or not existing_tasks:
@@ -447,11 +484,12 @@ class TaskSentimentAnalyzer:
     def rationalize_pending_tasks(
         self,
         db,
-        similarity_threshold: float = 0.40,
+        similarity_threshold: float = 0.55,
     ) -> Dict[str, Any]:
-        """Varre todas as tarefas com status PENDING e racionaliza/funde duplicatas com performance O(N) e Polímnia."""
+        """Varre todas as tarefas PENDING e consolida duplicatas em subtarefas com status MERGED e agregação de áudio."""
         from src.memory.models import TaskRecord
         from src.memory.timezone_utils import get_now_brt
+        from src.memory.subtask_service import subtask_service
 
         pending_tasks = (
             db.query(TaskRecord)
@@ -470,7 +508,7 @@ class TaskSentimentAnalyzer:
                 "clusters": [],
             }
 
-        logger.info(f"⚡ [Terpsícore Racionalização] Pré-extraindo features para {total_scanned} tarefas...")
+        logger.info(f"⚡ [Terpsícore Racionalização] Pré-extraindo features para {total_scanned} tarefas com Anti-Collision Gate...")
         task_features = [
             self.extract_task_features(t.title, t.notes or "")
             for t in pending_tasks
@@ -512,29 +550,31 @@ class TaskSentimentAnalyzer:
                     else:
                         primary, duplicate = (task_a, task_b) if len_a >= len_b else (task_b, task_a)
 
-                    dup_notes = (duplicate.notes or "").strip()
-                    merge_note = (
-                        f"\n🔄 [Racionalizado por Terpsícore & Polímnia em {now_brt_str}]: "
-                        f"Unificado com tarefa '{duplicate.title}' (Sim: {sim_score:.2f})."
+                    # 1. Estruturação em Subtarefas Interativas com Referência de Áudio
+                    audio_ref_primary = getattr(primary, "message_id", None)
+                    audio_ref_duplicate = getattr(duplicate, "message_id", None)
+
+                    primary.notes = subtask_service.add_or_merge_subtask(
+                        existing_notes=primary.notes,
+                        primary_title=primary.title,
+                        primary_audio_ref=audio_ref_primary,
+                        duplicate_title=duplicate.title,
+                        duplicate_audio_ref=audio_ref_duplicate,
                     )
-                    if dup_notes and dup_notes not in (primary.notes or ""):
-                        merge_note += f" Contexto adicional: \"{dup_notes[:200]}\""
 
-                    if primary.notes:
-                        primary.notes = f"{primary.notes.strip()}{merge_note}"
-                    else:
-                        primary.notes = merge_note.strip()
-
+                    # 2. Atualiza prazo se a duplicata tiver prazo mais restrito
                     if duplicate.due_date and (not primary.due_date or duplicate.due_date < primary.due_date):
                         primary.due_date = duplicate.due_date
 
+                    # 3. Atualiza responsável se primária não tiver
                     if not primary.assignee and duplicate.assignee:
                         primary.assignee = duplicate.assignee
 
-                    duplicate.status = "CANCELLED"
+                    # 4. Define status como MERGED (não CANCELLED!) com link para a primária
+                    duplicate.status = "MERGED"
                     duplicate.reassessment_notes = (
-                        f"Racionalizado por Terpsícore & Polímnia (Score: {sim_score:.2f}): "
-                        f"duplicata consolidada na tarefa #{primary.id} ('{primary.title}')"
+                        f"Consolidado por Terpsícore & Polímnia (Score: {sim_score:.2f}) "
+                        f"como subtarefa na tarefa #{primary.id} ('{primary.title}')"
                     )
 
                     merged_ids.add(duplicate.id)
@@ -548,7 +588,7 @@ class TaskSentimentAnalyzer:
 
                     logger.info(
                         f"🤝 [Racionalização Terpsícore] Tarefa #{duplicate.id} ('{duplicate.title}') "
-                        f"consolidada na tarefa #{primary.id} ('{primary.title}') [Score: {sim_score:.2f}]"
+                        f"consolidada como SUBTAREFA na tarefa #{primary.id} ('{primary.title}') [Score: {sim_score:.2f}]"
                     )
 
         if merged_ids:
@@ -556,7 +596,7 @@ class TaskSentimentAnalyzer:
 
         remaining_count = total_scanned - len(merged_ids)
         logger.info(
-            f"✅ [Racionalização Terpsícore] Concluída: {len(merged_ids)} tarefas fundidas. "
+            f"✅ [Racionalização Terpsícore] Concluída: {len(merged_ids)} tarefas consolidadas em subtarefas (status MERGED). "
             f"Restantes ativas PENDING: {remaining_count}."
         )
 

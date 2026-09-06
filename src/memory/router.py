@@ -258,12 +258,59 @@ async def merge_similar_tasks(
 
 @router.post("/tasks/rationalize")
 async def rationalize_pending_tasks_endpoint(
-    similarity_threshold: float = Query(default=0.40, ge=0.2, le=1.0, description="Limiar de corte híbrido (spaCy + Polímnia)"),
+    similarity_threshold: float = Query(default=0.55, ge=0.2, le=1.0, description="Limiar de corte híbrido (spaCy + Polímnia)"),
     db: Session = Depends(get_db),
 ):
     """Racionaliza e consolida tarefas PENDING redundantes utilizando triagem sintática do spaCy e o glossário de Polímnia."""
     from src.memory.task_sentiment_analyzer import task_sentiment_analyzer
     return task_sentiment_analyzer.rationalize_pending_tasks(db=db, similarity_threshold=similarity_threshold)
+
+
+class ToggleSubtaskRequest(BaseModel):
+    subtask_index: int = Field(..., ge=0, description="Índice da subtarefa a ser alternada")
+    completed: Optional[bool] = Field(default=None, description="Estado alvo ou None para alternar")
+
+
+@router.post("/tasks/{task_id}/toggle-subtask", response_model=TaskResponse)
+async def toggle_task_subtask(task_id: str, payload: ToggleSubtaskRequest, db: Session = Depends(get_db)):
+    """Alterna o checkbox de uma subtarefa em markdown e recalcula o percentual de progresso."""
+    from src.memory.subtask_service import subtask_service
+    from src.memory.models import TaskRecord
+
+    task = db.query(TaskRecord).filter(TaskRecord.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+
+    new_notes = subtask_service.toggle_subtask(
+        notes=task.notes or "",
+        subtask_index=payload.subtask_index,
+        target_state=payload.completed,
+    )
+    task.notes = new_notes
+    db.commit()
+    db.refresh(task)
+    return task
+
+
+@router.post("/tasks/{task_id}/unmerge", response_model=TaskResponse)
+async def unmerge_task(task_id: str, db: Session = Depends(get_db)):
+    """Restaura uma tarefa com status MERGED de volta para PENDING."""
+    from src.memory.models import TaskRecord
+    from datetime import datetime, timezone
+
+    task = db.query(TaskRecord).filter(TaskRecord.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+
+    if task.status != "MERGED":
+        raise HTTPException(status_code=400, detail="Apenas tarefas com status MERGED podem ser desfeitas")
+
+    task.status = "PENDING"
+    task.reassessment_notes = f"Desfeita unificação em {datetime.now(timezone.utc).strftime('%d/%m/%Y %H:%M')}"
+    db.commit()
+    db.refresh(task)
+    return task
+
 
 
 
