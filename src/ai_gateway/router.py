@@ -1,5 +1,4 @@
-"""Rotas FastAPI para o serviço AI Gateway."""
-
+import asyncio
 import time
 import logging
 from typing import Optional
@@ -18,6 +17,9 @@ from src.ai_gateway.providers import get_ai_provider
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["AI Gateway"])
+
+# Semáforo global para limitar concorrência e evitar rate limits / cascading latency
+_ai_concurrency_semaphore = asyncio.Semaphore(5)
 
 
 @router.post(
@@ -57,11 +59,12 @@ async def revise_transcription(request: ReviseRequest) -> ReviseResponse:
         provider = get_ai_provider(task="revise")
         provider_name = provider.provider_name
         model_name = provider.model_name
-        revised_text = await provider.generate_text(
-            prompt=prompt,
-            system_instruction=REVISE_SYSTEM_PROMPT,
-            temperature=0.0,
-        )
+        async with _ai_concurrency_semaphore:
+            revised_text = await provider.generate_text(
+                prompt=prompt,
+                system_instruction=REVISE_SYSTEM_PROMPT,
+                temperature=0.0,
+            )
     except Exception as exc:
         logger.warning(
             f"⚠️ [AI Gateway Revise] Falha ao comunicar com provedor de IA ({provider_name}): {exc}. "
@@ -101,7 +104,8 @@ async def extract_semantics(request: SemanticExtractionRequest) -> SemanticExtra
     try:
         from src.ai_gateway.extractor import semantic_extractor
 
-        return await semantic_extractor.extract(request)
+        async with _ai_concurrency_semaphore:
+            return await semantic_extractor.extract(request)
     except Exception as exc:
         logger.error(f"Erro ao processar extração semântica: {exc}")
         raise HTTPException(

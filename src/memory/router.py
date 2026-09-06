@@ -584,6 +584,7 @@ async def list_recent_messages(
         )
         .order_by(MessageRecord.created_at.desc())
         .limit(limit)
+        .unique()
         .all()
     )
     return [
