@@ -1,4 +1,6 @@
 import asyncio
+from typing import Optional
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session, joinedload
 from src.ai_gateway.schemas import (
