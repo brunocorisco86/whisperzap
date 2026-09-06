@@ -49,11 +49,13 @@ class SubtaskService:
             # Extrai referência de áudio se presente (ex: "🎙️ Áudio: msg_123" ou "🎙️ Ref: msg_123")
             audio_match = re.search(r"🎙️\s*(?:Áudio|Ref|Msg):\s*([a-zA-Z0-9_\-]+)", item_text)
             audio_ref = audio_match.group(1) if audio_match else None
+            clean_title = re.sub(r"\(🎙️\s*(?:Áudio|Ref|Msg):\s*[a-zA-Z0-9_\-]+\)", "", item_text).strip()
 
             subtasks.append({
                 "index": idx,
                 "completed": is_done,
                 "text": item_text,
+                "title": clean_title,
                 "audio_ref": audio_ref,
             })
 
@@ -165,7 +167,7 @@ class SubtaskService:
             return ""
 
         parsed = self.parse_subtasks(notes)
-        items = parsed["items"]
+        items = parsed.get("subtasks", [])
         if not items:
             return notes
 
@@ -175,7 +177,10 @@ class SubtaskService:
             if audio_ref and it.get("audio_ref") and it["audio_ref"].strip() == audio_ref.strip():
                 continue
             # Compara título se fornecido
-            if title and it.get("title") and it["title"].strip().lower() == title.strip().lower():
+            if title and (
+                (it.get("title") and it["title"].strip().lower() == title.strip().lower())
+                or (it.get("text") and title.strip().lower() in it["text"].strip().lower())
+            ):
                 continue
             remaining_items.append(it)
 
@@ -202,10 +207,7 @@ class SubtaskService:
         checklist_lines = []
         for it in remaining_items:
             box = "[x]" if it["completed"] else "[ ]"
-            line_str = f"- {box} {it['title']}"
-            if it.get("audio_ref"):
-                line_str += f" (🎙️ Ref: {it['audio_ref']})"
-            checklist_lines.append(line_str)
+            checklist_lines.append(f"- {box} {it['text']}")
 
         block = f"{header}\n" + "\n".join(checklist_lines)
         if trailing_notes:

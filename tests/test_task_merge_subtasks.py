@@ -136,7 +136,7 @@ def test_subtask_service_remove_subtask():
     updated = subtask_service.remove_subtask(initial_notes, audio_ref="msg-02")
     parsed = subtask_service.parse_subtasks(updated)
     assert parsed["total"] == 1
-    assert parsed["items"][0]["title"] == "Tarefa Principal"
+    assert parsed["subtasks"][0]["title"] == "Tarefa Principal"
     assert "Notas normais do usuário" in updated
     assert "msg-02" not in updated
 
