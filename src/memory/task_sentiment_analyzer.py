@@ -310,13 +310,6 @@ class TaskSentimentAnalyzer:
 
         return tags[:5]
 
-    def compute_task_similarity(
-        self,
-        title_a: str,
-        notes_a: str,
-        title_b: str,
-        notes_b: str,
-    ) -> float:
     def extract_task_features(self, title: str, notes: str) -> Dict[str, Any]:
         """Extrai lemas, entidades e termos de Polímnia de uma tarefa em uma única passagem."""
         from src.ai_gateway.bypass import normalize_text
