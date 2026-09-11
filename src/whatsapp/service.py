@@ -835,6 +835,25 @@ class WhatsAppService:
                     if pdf_caption:
                         reply_lines.append(f"💬 *Legenda:* \"{pdf_caption}\"")
 
+                    # Síntese Executiva / Do que se trata (Sempre exibido com threshold de 250 a 400 caracteres)
+                    doc_summary = (saved_msg.summary if saved_msg and saved_msg.summary else "").strip()
+                    if not doc_summary:
+                        # Fallback extrativo com primeiras sentenças textuais ricas
+                        meaningful_lines = [
+                            line.strip().lstrip("-*# ").strip()
+                            for line in extracted_markdown.splitlines()
+                            if line.strip() and not line.strip().startswith("|") and len(line.strip()) > 25
+                        ]
+                        doc_summary = " ".join(meaningful_lines[:3])
+
+                    if doc_summary:
+                        # Calibração do threshold ideal para celular (máximo ~380 caracteres com reticências limpas)
+                        if len(doc_summary) > 400:
+                            doc_summary = doc_summary[:397].rsplit(" ", 1)[0] + "..."
+                        reply_lines.append("")
+                        reply_lines.append("📝 *Do que se trata:*")
+                        reply_lines.append(doc_summary)
+
                     if created_tasks:
                         reply_lines.append("")
                         reply_lines.append("📋 *Tarefas Identificadas no Documento:*")
@@ -842,14 +861,6 @@ class WhatsAppService:
                             due_str = f" (📅 {t.due_date})" if t.due_date else ""
                             prio_badge = f"[{t.priority}]" if t.priority else ""
                             reply_lines.append(f"• 📌 *{prio_badge}* {t.title}{due_str}")
-                    else:
-                        # Breve preview das primeiras 3 linhas do Markdown extraído
-                        first_lines = [line for line in extracted_markdown.splitlines() if line.strip() and not line.startswith("#")][:3]
-                        if first_lines:
-                            preview = "\n".join(f"> {l[:100]}" for l in first_lines)
-                            reply_lines.append("")
-                            reply_lines.append("📝 *Resumo do Conteúdo:*")
-                            reply_lines.append(preview)
 
                     reply_text = "\n".join(reply_lines)
                     logger.info(f"📤 [PDF] Enviando confirmação formatada via WhatsApp para o proprietário...")

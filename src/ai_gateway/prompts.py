@@ -53,7 +53,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido seguindo a estrutura:
 ```json
 {
   "intent": "TASK",
-  "summary": "Resumo em 1 frase",
+  "summary": "Resumo executivo em 2 a 3 frases (250 a 380 caracteres) explicando claramente o assunto, escopo e objetivo/impacto do texto ou documento",
   "sentiment": "NEUTRAL",
   "sentiment_score": 0.0,
   "tasks": [

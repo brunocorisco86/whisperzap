@@ -187,6 +187,7 @@ async def test_whatsapp_service_process_webhook_pdf_success():
         sent_text = mock_send.call_args[1]["text"]
         assert "Documento" in sent_text
         assert "relatorio_iep.pdf" in sent_text
+        assert "Do que se trata" in sent_text
 
 
 @pytest.mark.asyncio
