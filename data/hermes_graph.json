@@ -5,7 +5,7 @@
   "nodes": [
     {
       "category": "PERSON",
-      "mentions": 416,
+      "mentions": 418,
       "role": "UNKNOWN",
       "phone": "",
       "company": "",
@@ -23252,19 +23252,19 @@
     },
     {
       "category": "PERSON",
-      "mentions": 332,
+      "mentions": 353,
       "role": "OWNER",
       "phone": "554497604925",
       "company": "Hermes Memory / Homelab",
       "weight": 1.0,
       "can_generate_tasks": false,
-      "last_interaction_at": "2026-08-29T02:38:14.819270",
-      "details": "Remetente da nota",
+      "last_interaction_at": "2026-09-11T03:51:33.599548",
+      "details": "Remetente da nota pessoal",
       "id": "Bruno Conter"
     },
     {
       "category": "LOCATION",
-      "mentions": 239,
+      "mentions": 246,
       "id": "Hermes Memory / Homelab"
     },
     {
@@ -23405,8 +23405,8 @@
     },
     {
       "category": "CONCEPT",
-      "mentions": 2,
-      "details": "Entidade externa de suprimentos",
+      "mentions": 3,
+      "details": "Fornecedor responsável pela entrega de insumos de ração",
       "id": "Fornecedor de ração"
     },
     {
@@ -23429,6 +23429,35 @@
       "category": "CONCEPT",
       "mentions": 1,
       "id": "Processo Operacional"
+    },
+    {
+      "category": "CONCEPT",
+      "mentions": 3,
+      "details": "Índice de Eficiência Produtiva - Média de 395",
+      "id": "Iep"
+    },
+    {
+      "category": "PERSON",
+      "mentions": 8,
+      "role": "UNKNOWN",
+      "phone": "554499881122",
+      "company": "",
+      "weight": 0.4,
+      "can_generate_tasks": false,
+      "last_interaction_at": "2026-09-11T03:51:28.093161",
+      "details": "Remetente da solicitação de ração",
+      "id": "Debora Patel"
+    },
+    {
+      "category": "EQUIPMENT",
+      "mentions": 2,
+      "details": "Local de destino para a entrega de ração",
+      "id": "Silo 2"
+    },
+    {
+      "category": "CONCEPT",
+      "mentions": 1,
+      "id": "relatorio_iep.pdf"
     }
   ],
   "links": [
@@ -25090,7 +25119,7 @@
     },
     {
       "relation": "AFFILIATED_AS_OWNER",
-      "weight": 239.0,
+      "weight": 246.0,
       "source": "Bruno Conter",
       "target": "Hermes Memory / Homelab"
     },
@@ -25114,13 +25143,13 @@
     },
     {
       "relation": "ASSIGNED_WITH",
-      "weight": 6.0,
+      "weight": 10.0,
       "source": "Bruno Conter",
       "target": "Fornecedor de ração"
     },
     {
       "relation": "RESPONSIBLE_FOR",
-      "weight": 3.0,
+      "weight": 4.0,
       "source": "Bruno Conter",
       "target": "Ligar para o fornecedor de ração"
     },
@@ -25129,6 +25158,18 @@
       "weight": 11.0,
       "source": "Bruno Conter",
       "target": "Fornecedor de Ração"
+    },
+    {
+      "relation": "CO_OCCURRED",
+      "weight": 8.0,
+      "source": "Bruno Conter",
+      "target": "Iep"
+    },
+    {
+      "relation": "DELEGATED_TO",
+      "weight": 2.0,
+      "source": "Bruno Conter",
+      "target": "Bruno"
     },
     {
       "relation": "MENTIONED",
@@ -25207,6 +25248,24 @@
       "weight": 1.0,
       "source": "Colaborador não identificação",
       "target": "Processo Operacional"
+    },
+    {
+      "relation": "RESPONSIBLE_FOR",
+      "weight": 6.0,
+      "source": "Debora Patel",
+      "target": "Silo 2"
+    },
+    {
+      "relation": "INSTANCE_OF",
+      "weight": 1.5,
+      "source": "Silo 2",
+      "target": "Silo"
+    },
+    {
+      "relation": "CONTAINS",
+      "weight": 1.0,
+      "source": "relatorio_iep.pdf",
+      "target": "Iep"
     }
   ]
 }

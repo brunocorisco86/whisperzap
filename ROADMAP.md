@@ -200,6 +200,25 @@ FASE 6: Deploy em Produção (VPS Alpine Linux + Raspberry Pi 3B) [CONCLUÍDO]
 - [x] Endpoints `POST /api/v1/memory/graph/clean` e `GET /api/v1/memory/graph/janitor/logs`.
 - [x] Suíte de testes automatizados [`tests/test_graph_janitor.py`](file:///home/brunoconter/Documentos/4_HOMELAB/9_Voice_Assistant/tests/test_graph_janitor.py).
 
+### 🟢 Sidequest 3: Processamento Multimodal de Documentos PDF & Extração Cascata 3-Tier [CONCLUÍDO]
+- [x] **Ingestão Direta no WhatsApp (Evolution API)**:
+  - Interceptação de `documentMessage`, `documentWithCaptionMessage`, `ephemeralMessage` e `viewOnceMessage`.
+  - Download automático de binários em Base64 com bypass de 24h para mensagens encaminhadas ao próprio número (`is_historic`).
+- [x] **Cascata de Extração em 3 Tiers com Fallback Gracioso**:
+  - **Tier 1 (Nativo Multimodal LLM)**: `gemini-3.5-flash-lite` (via endpoint v1beta com `inlineData`), convertendo relatórios em GitHub Flavored Markdown (GFM) estruturado (tabelas, títulos, listas).
+  - **Tier 2 (Fallback LLM)**: `gemini-2.5-flash` automático em caso de rate limit (429) ou indisponibilidade da API.
+  - **Tier 3 (Contingência Local Emergencial)**: `pymupdf4llm` em memória local, assegurando conversão estruturada mesmo sem internet ou sem créditos de API.
+- [x] **Trava de Segurança de Memória (15 MB)**:
+  - Bloqueio estrito de arquivos acima de 15 MB antes de decodificação ou envio para LLM, protegendo o limite de RAM da VPS Hostinger (KVM 1 / 4 GB).
+- [x] **Resumo Executivo Incondicional ("Do que se trata:")**:
+  - Calibração fina de threshold: 250 a 400 caracteres (~2 a 3 frases densas e executivas).
+  - Exibição incondicional no retorno do WhatsApp antes das tarefas identificadas.
+- [x] **Enriquecimento do Grafo e Memória**:
+  - Extração de tarefas prioritárias, entidades e síntese, alimentando PostgreSQL e o Grafo NetworkX.
+- [x] **Testes Automatizados & Validação em Produção**:
+  - 7 testes automatizados com 100% de cobertura em `tests/test_pdf_extractor.py`.
+  - Validação ponta a ponta na VPS com PDF executivo de saneamento de 4 páginas enviado via WhatsApp.
+
 ---
 
 ## 🏗️ Fase 8: Monólito Hermes Unificado (Appliance Pessoal de Baixo Consumo) [CONCLUÍDO]

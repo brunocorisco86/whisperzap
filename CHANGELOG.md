@@ -4,6 +4,29 @@ Todas as mudanças notáveis, refatorações arquiteturais, motores de IA e otim
 
 ---
 
+## [v2.8.0] — 2026-09-11 — Release: PDF Document Intelligence & 3-Tier Cascading Extractor
+
+### 📄 1. Processamento Multimodal de Documentos PDF via WhatsApp
+- **Recepção e Desempacotamento de Mídia**: Inspeciona e extrai documentos transmitidos via Evolution API v2 (`documentMessage`, `documentWithCaptionMessage`, `ephemeralMessage` e `viewOnceMessage`).
+- **Download e Conversão Direta**: Recuperação de binários em Base64 através do endpoint `/chat/findMedia` da Evolution API.
+- **Tolerância Temporal a Mensagens Encaminhadas**: Ajustada a verificação de `is_historic` para conceder janela de até 24 horas para documentos PDF enviados pelo proprietário para si mesmo, evitando que mensagens encaminhadas sejam descartadas pelo timestamp antigo.
+
+### ⚡ 2. Cascata de Extração em 3 Tiers com Fallback Gracioso (`src/ai_gateway/pdf_extractor.py`)
+- **Tier 1 (Nativo Multimodal LLM)**: Processamento via `gemini-3.5-flash-lite` utilizando a API v1beta do Google Gemini com payload estruturado `inlineData` (`application/pdf`), convertendo o PDF diretamente em GitHub Flavored Markdown (GFM) rico (tabelas com alinhamento, cabeçalhos, marcadores de lista).
+- **Tier 2 (Fallback LLM)**: Chaveamento automático e transparente para `gemini-2.5-flash` em cenários de instabilidade, rate limiting ou indisponibilidade temporária.
+- **Tier 3 (Contingência Local Emergencial)**: Fallback em memória via `pymupdf4llm` e `fitz` (PyMuPDF), garantindo que o documento seja convertido mesmo na ausência de conexão com APIs externas ou exaustão de quota.
+
+### 🛡️ 3. Trava de Segurança de Memória e Calibração de Síntese
+- **Proteção Estrita de RAM (15 MB)**: Rejeição graciosa prévia para PDFs com tamanho superior a 15 MB, protegendo os limites de hardware da VPS Hostinger (KVM 1 / 4 GB) contra picos de consumo e incidentes de OOM.
+- **Resumo Executivo Incondicional ("Do que se trata:")**: Resumo sintético padronizado e posicionado antes da listagem de tarefas no retorno do WhatsApp. Calibração fina no intervalo de **250 a 400 caracteres** (~2 a 3 frases densas), ideal para leitura instantânea no mobile sem poluição visual.
+- **Enriquecimento do Grafo de Conhecimento e Tarefas**: O conteúdo extraído alimenta o pipeline semântico do AI Gateway, registrando tarefas pendentes em Terpsícore e entidades no Grafo Relacional NetworkX.
+
+### 🧪 4. Suíte de Testes e Validação em Produção
+- **Nova Suíte `tests/test_pdf_extractor.py`**: 7 testes cobrindo rejeição de arquivos > 15 MB, fluxos de sucesso e fallback em cada Tier (1, 2 e 3) e integração end-to-end do webhook do WhatsApp.
+- **Validação com Dados Reais**: Testado com sucesso na VPS de produção com relatório executivo de 4 páginas de saneamento de BPs e Geotags.
+
+---
+
 ## [v2.7.0] — 2026-08-27 — Release: Timezone Alignment & Background Scheduler Accuracy
 
 ### 🕒 1. Alinhamento de Fuso Horário (Horário Oficial de Brasília — BRT / UTC-3)

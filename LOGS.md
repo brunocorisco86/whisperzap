@@ -418,8 +418,51 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
      - Atualização da base de conhecimento com `graphify update .` (1962 nós e 131 comunidades).
 - **Resultado**: Sistema operando com 100% de autonomia e latência < 1ms na nuvem, com observabilidade completa e documentação sincronizada.
 
+---
 
+### ADR 015 — Extração Multimodal de Documentos PDF com Cascata 3-Tier, Proteção de RAM e Tolerância Temporal a Mensagens Encaminhadas
+- **Data**: 2026-09-11
+- **Status**: Aprovado e Implementado
+- **Contexto**: O usuário encaminha frequentemente relatórios executivos, planos de ação e contratos em formato PDF no WhatsApp. A VPS de produção (Hostinger KVM 1 / 4 GB RAM) possui margem de RAM livre de 800 MB a 1.1 GB. O processamento de PDFs pesados ou corrompidos pode esgotar a RAM caso não haja travas estritas. Além disso, no WhatsApp, quando o usuário encaminha um documento de outro chat para si mesmo, a Evolution API preserva o timestamp original de envio da mensagem, fazendo com que a rotina `is_historic` do Whisperzap descartasse a mensagem silenciosamente. Por fim, para consumo ágil no celular, o usuário necessita de um resumo executivo prévio ("Do que se trata:") antes das tarefas acionáveis extraídas.
+- **Decisão**:
+  1. Adotar arquitetura de extração em cascata de 3 Tiers (`src/ai_gateway/pdf_extractor.py`):
+     - **Tier 1 (Nativo Multimodal LLM)**: `gemini-3.5-flash-lite` via endpoint v1beta com payload estruturado `inlineData` (`application/pdf`), produzindo GitHub Flavored Markdown (GFM) completo com tabelas, cabeçalhos e notas de rodapé;
+     - **Tier 2 (Fallback LLM)**: `gemini-2.5-flash` automático em caso de rate-limit (429) ou instabilidade de API;
+     - **Tier 3 (Contingência Local Emergencial)**: `pymupdf4llm` em memória local com PyMuPDF (`fitz`), garantindo conversão mesmo em colapso total de rede externa ou de provedor.
+  2. Implementar trava de segurança estrita de 15 MB: rejeição imediata com notificação amigável via WhatsApp antes de qualquer decodificação ou envio para LLM, prevenindo picos de memória e falhas OOM na VPS.
+  3. Estender a tolerância temporal de `is_historic` para 24 horas (86.400 segundos) para documentos PDF e comandos interativos de self-memo enviados pelo proprietário para seu próprio número, viabilizando o processamento de PDFs encaminhados.
+  4. Incorporar no feedback do WhatsApp uma seção incondicional `📝 *Do que se trata:*` antes da listagem de tarefas `📋 *Tarefas Identificadas:*`, com calibração de threshold ideal de **250 a 400 caracteres** (~2 a 3 frases densas), além de fallback extrativo a partir das primeiras sentenças do documento.
 
+---
 
+## 📅 Log de Sessão — 11 de Setembro de 2026
 
-
+- **Objetivo**: Implementar a funcionalidade de extração e conversão de documentos `.pdf` para Markdown limpo (GFM) integrado ao WhatsApp (Evolution API) e AI Gateway, assegurando resiliência em 3 Tiers, proteção estrita de memória na VPS, suporte a mensagens encaminhadas e resumo executivo padronizado.
+- **Ações Realizadas**:
+  1. **Criação do Módulo de Extração de PDFs (`src/ai_gateway/pdf_extractor.py`)**:
+     - Arquitetura de fallback em 3 Tiers: Tier 1 (`gemini-3.5-flash-lite`), Tier 2 (`gemini-2.5-flash`) e Tier 3 local (`pymupdf4llm`).
+     - Trava de 15 MB para proteção de memória RAM.
+  2. **Envio Multimodal Inline no Provedor Gemini (`src/ai_gateway/providers/gemini.py`)**:
+     - Implementado o método `generate_from_inline_data` no provedor Gemini para envio direto de base64 via API v1beta do Google.
+  3. **Registro de Modelos & Prompts Especializados**:
+     - Configuração de `pdf_extract` e `pdf_fallback` no `src/ai_gateway/model_registry.py`.
+     - Prompts estritos em `src/ai_gateway/prompts.py` instruindo geração de GFM e síntese executiva em 250 a 380 caracteres.
+  4. **Roteamento e Ingestão de Documentos no WhatsApp Service (`src/whatsapp/service.py`)**:
+     - Desempacotamento de invólucros (`ephemeralMessage`, `documentWithCaptionMessage`, `viewOnceMessage`).
+     - Integração de download de base64 com a Evolution API (`/chat/findMedia`).
+     - Tolerância estendida de 24h para `is_historic` em documentos encaminhados.
+     - Formatação de mensagem de resposta com metadados do arquivo, motor utilizado, seção incondicional `📝 *Do que se trata:*` (threshold de 250-400 caracteres) e tarefas extraídas com datas e prioridades.
+  5. **Suíte de Testes Automatizados (`tests/test_pdf_extractor.py`)**:
+     - Escrita de 7 testes cobrindo todos os Tiers de execução, rejeição de arquivos grandes (> 15 MB) e fluxos de webhook do WhatsApp.
+     - 100% de testes aprovados (19/19 testes no conjunto WhatsApp + PDF).
+  6. **Deploy e Validação em Produção (VPS Hostinger)**:
+     - Instalação de dependências `pymupdf` e `pymupdf4llm` via `docker exec -u 0 hermes-api pip install ...`.
+     - Atualização do repositório (`git pull origin main`) e reinicialização de `hermes-api`.
+     - Teste e validação com PDF real enviado pelo usuário (*Relatório Executivo e Plano de Ação - Saneamento de BPs e Geotags eProdutor.pdf*), gerando resumo e 6 tarefas com sucesso.
+  7. **Sincronização de Conhecimento**:
+     - Execução de `graphify update .` para atualização do grafo relacional AST (2.242 nós e 164 comunidades).
+- **Aprendizados Chave**:
+  - **Preservação de Timestamps no Encaminhamento do WhatsApp**: Mensagens encaminhadas mantêm o timestamp original da conversa de origem. Trava de mensagens históricas estrita (ex: < 120s) descartava documentos legítimos encaminhados. Janela ampliada para 24h em documentos e comandos próprios resolve o problema com segurança.
+  - **Calibração de Threshold de Síntese Mobile**: Resumos de 250 a 400 caracteres fornecem densidade executiva suficiente sem exigir scroll no smartphone, preservando a visibilidade imediata das tarefas identificadas.
+  - **Execução Não-Root em Contêineres de Produção**: Para instalar pacotes em contêineres que rodam com usuário não-privilegiado (`hermes`), é mandatório passar a flag `-u 0` no comando `docker exec`.
+- **Resultado**: Módulo de inteligência de documentos PDF 100% operacional, resiliente a falhas e em produção na VPS.

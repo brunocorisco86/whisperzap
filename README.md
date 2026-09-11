@@ -68,6 +68,7 @@ O Hermes é a solução corporativa definitiva:
 - 🧹 **Agente Zeladora (`GraphJanitor`)**: Faxina autônoma semanal que remove ruídos temporais e funde aliases automaticamente.
 - 🎙️ **Resiliência Extrema em Áudios Longos & Zero 502**: Fallback gracioso automático no AI Gateway (`POST /ai/revise`). Se o provedor de IA oscilar ou demorar, o WhatsApp recebe instantaneamente a transcrição pura do Whisper sem travar a pipeline.
 - 📌 **Pós-Processamento Executivo de Áudios Extensos**: Áudios com mais de 350 caracteres recebem automaticamente formatação em tópicos acompanhada de uma síntese de **Destaques do Áudio** e **Ações Identificadas**, acelerando a tomada de decisão no WhatsApp.
+- 📄 **Processamento Multimodal de Documentos PDF (Cascata 3-Tier)**: Ingestão direta de PDFs via WhatsApp, convertendo relatórios e contratos em GitHub Flavored Markdown (GFM) via Gemini 3.5 Flash-Lite com fallback para Gemini 2.5 Flash e contingência emergencial local em memória com `pymupdf4llm`. Extrai tarefas acionáveis e gera síntese executiva calibrada (250–400 caracteres) com trava de segurança estrita de 15 MB para estabilidade de RAM.
 - 🔒 **Privacidade & Soberania de Dados**: Deploy em infraestrutura híbrida privada (Homelab no Raspberry Pi + VPS dedicada).
 
 ---
@@ -129,6 +130,7 @@ flowchart TD
 | **Linguagem & Runtime** | Python 3.12+ / Linux | Desempenho nativo com suporte a tipagem estrita e asyncio |
 | **API Framework** | FastAPI + Uvicorn | Servidor assíncrono de alto throughput com OpenAPI e endpoints RESTful |
 | **Transcrição Local** | Faster-Whisper (CTranslate2) | Transcrição ultra-rápida de áudio (OGG/MP3/WAV/Base64) em CPU/GPU |
+| **Documentos & PDF** | Gemini Multimodal + PyMuPDF4LLM | Extração de PDFs em GFM com cascata 3-Tier e síntese executiva |
 | **AI Gateway** | Google Gemini 3.1 Flash-Lite / 3.7 Flash | Extração de entidades (`NER`), classificação de intenções e RAG Híbrido |
 | **Banco Relacional & Vetorial** | PostgreSQL 16 + pgvector | Persistência unificada de mensagens, contatos, tarefas e embeddings |
 | **Grafo Relacional** | NetworkX + Graphify | Modelagem de conexões inter-pessoais, detecção de comunidades e clusterização |
