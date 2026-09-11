@@ -145,6 +145,65 @@ class GeminiProvider(BaseLLMProvider):
                 logger.error(f"Formato inesperado na resposta do Gemini: {data}")
                 raise ValueError("Resposta vazia ou inválida retornada pelo Gemini.") from exc
 
+    async def generate_from_inline_data(
+        self,
+        data_base64: str,
+        mime_type: str,
+        prompt: str,
+        system_instruction: str | None = None,
+        temperature: float = 0.0,
+        max_output_tokens: int | None = None,
+        model_name: str | None = None,
+        timeout: float = 60.0,
+    ) -> str:
+        """Envia dados binários codificados em base64 com prompt e system_instruction para o Gemini."""
+        if not self.api_key or self.api_key.startswith("sua_chave"):
+            raise ValueError("GEMINI_API_KEY não configurada ou inválida.")
+
+        target_model = self._get_api_model_name(model_name or self.model_name)
+        url = f"{self.BASE_URL}/{target_model}:generateContent?key={self.api_key}"
+
+        gen_config: dict[str, Any] = {
+            "temperature": temperature,
+        }
+        if max_output_tokens:
+            gen_config["maxOutputTokens"] = max_output_tokens
+
+        payload: dict[str, Any] = {
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "inlineData": {
+                                "mimeType": mime_type,
+                                "data": data_base64,
+                            }
+                        },
+                        {"text": prompt},
+                    ]
+                }
+            ],
+            "generationConfig": gen_config,
+        }
+
+        if system_instruction:
+            payload["systemInstruction"] = {
+                "parts": [{"text": system_instruction}]
+            }
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(url, json=payload)
+            if response.status_code != 200:
+                logger.warning(f"Erro na API Gemini ({target_model}): {response.status_code} - {response.text[:200]}")
+                response.raise_for_status()
+
+            data = response.json()
+            try:
+                return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            except (KeyError, IndexError) as exc:
+                logger.error(f"Formato inesperado na resposta do Gemini: {data}")
+                raise ValueError("Resposta vazia ou inválida retornada pelo Gemini.") from exc
+
     async def generate_embedding(self, text: str) -> list[float]:
         """Gera embedding vetorial usando a API do Gemini (gemini-embedding-001 ou fallback)."""
         if not self.api_key or self.api_key.startswith("sua_chave"):

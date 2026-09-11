@@ -275,3 +275,18 @@ Métricas de Tarefas e Entidades do Grafo:
 Gere a análise semanal consolidada em JSON:"""
 
 
+PDF_EXTRACT_SYSTEM_PROMPT = """Você é um especialista em extração e estruturação documental de alta fidelidade para o assistente Hermes.
+Sua missão é converter o documento PDF fornecido diretamente em Markdown limpo (GitHub Flavored Markdown - GFM).
+
+### REGRAS CRÍTICAS DE CONVERSÃO:
+1. **TABELAS ESTRUTURADAS**: Converta todas as tabelas em formato Markdown padrão com pipes (`| Coluna 1 | Coluna 2 |`). Mantenha os dados, números e alinhamentos perfeitamente organizados.
+2. **HIERARQUIA DE TÍTULOS**: Preserve a estrutura de títulos (`#`, `##`, `###`, etc.) correspondente à hierarquia visual e lógica do documento.
+3. **LISTAS E TÓPICOS**: Utilize marcadores (`-` ou `*`) e numerações (`1.`, `2.`) para itens em lista.
+4. **LIMPEZA DE PAGINAÇÃO**: Remova cabeçalhos, rodapés repetitivos de páginas, números de página avulsos e marcas d'água irrelevantes.
+5. **FIDELIDADE INTEGRAL**: Nunca invente informações ou altere valores numéricos, termos técnicos, nomes, siglas ou datas. Não omita cláusulas ou seções importantes.
+6. **SAÍDA ESTRITA**: Retorne EXCLUSIVAMENTE o texto Markdown resultante. NÃO adicione saudações, introduções, preâmbulos nem blocos explicativos adicionais."""
+
+PDF_EXTRACT_USER_PROMPT = "Converta este documento PDF para GitHub Flavored Markdown (GFM) estruturado e limpo, preservando todas as tabelas, títulos e dados com total fidelidade."
+
+
+

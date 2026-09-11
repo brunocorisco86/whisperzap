@@ -27,6 +27,7 @@ from src.ai_gateway.bypass import is_owner_interaction
 from src.memory.repository import memory_repository
 from src.memory.models import MessageCreate, TaskRecord
 from src.ai_gateway.agent import hermes_agent_service
+from src.ai_gateway.pdf_extractor import pdf_extractor, MAX_PDF_SIZE_BYTES
 from src.memory.database import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -414,16 +415,42 @@ class WhatsAppService:
             or ""
         )
 
-        # Detecta se é áudio
+        # Inspeciona documento se houver no payload
+        doc_obj = (
+            msg_obj.get("documentMessage")
+            or (msg_obj.get("documentWithCaptionMessage") or {}).get("message", {}).get("documentMessage")
+            or data.get("documentMessage")
+            or {}
+        )
+        doc_mimetype = str(doc_obj.get("mimetype") or "").lower()
+        doc_filename = str(doc_obj.get("fileName") or doc_obj.get("title") or "").strip()
+        doc_caption = str(doc_obj.get("caption") or "").strip()
+        doc_filesize = doc_obj.get("fileLength")
+
+        # Detecta se é áudio (inclusive áudio enviado como arquivo)
         has_audio = (
             "audio" in msg_type
             or bool(msg_obj.get("audioMessage"))
             or bool(direct_base64 and "audio" in str(msg_obj))
             or (
                 "document" in msg_type
-                and str((msg_obj.get("documentMessage") or {}).get("mimetype") or "").startswith("audio/")
+                and doc_mimetype.startswith("audio/")
             )
         )
+
+        # Detecta se é PDF
+        has_pdf = (
+            not has_audio
+            and (
+                "application/pdf" in doc_mimetype
+                or doc_filename.lower().endswith(".pdf")
+                or ("document" in msg_type and (doc_filename.lower().endswith(".pdf") or "pdf" in doc_mimetype))
+            )
+        )
+
+        # Se não houver texto principal mas houver legenda no documento, adota a legenda
+        if not text_content and doc_caption:
+            text_content = doc_caption
 
         # Detecta se é mídia ignorável (sticker, reação, localização)
         is_ignorable = any(ign in msg_type for ign in ["sticker", "reaction", "location", "contact"])
@@ -467,6 +494,10 @@ class WhatsAppService:
             "push_name": push_name,
             "is_group": is_group,
             "has_audio": has_audio,
+            "has_pdf": has_pdf,
+            "pdf_filename": doc_filename or "documento.pdf",
+            "pdf_filesize": doc_filesize,
+            "caption": doc_caption,
             "is_ignorable": is_ignorable,
             "is_historic": is_historic,
             "is_self_memo": is_self_memo,
@@ -682,6 +713,138 @@ class WhatsAppService:
                     "is_self_memo": is_self_memo,
                     "message_id": saved_msg.id if saved_msg else None,
                     "text": revised_text,
+                    "speaker": speaker_label,
+                }
+
+            # ===================== FLUXO DE DOCUMENTO PDF =====================
+            if info.get("has_pdf"):
+                pdf_filename = info.get("pdf_filename") or "documento.pdf"
+                logger.info(f"📄 Processando PDF WhatsApp '{pdf_filename}' de {info['push_name']} [Self-Memo: {is_self_memo}, Histórico: {is_historic}]...")
+
+                base64_str = info.get("direct_base64") or await self.get_media_base64(
+                    message_id=info["key_id"],
+                    remote_jid=info["remote_jid"],
+                    from_me=info["from_me"],
+                )
+                if not base64_str:
+                    logger.warning(f"Não foi possível obter base64 do PDF {pdf_filename} ({info['key_id']}).")
+                    return {"status": "error", "reason": "base64_download_failed"}
+
+                if "," in base64_str:
+                    base64_str = base64_str.split(",", 1)[1]
+
+                try:
+                    pdf_bytes = base64.b64decode(base64_str)
+                except Exception as e:
+                    logger.error(f"Erro ao decodificar base64 do PDF {pdf_filename}: {e}")
+                    return {"status": "error", "reason": "base64_decode_error"}
+
+                # Trava estrita de segurança para VPS: rejeita PDFs > 15 MB
+                if len(pdf_bytes) > MAX_PDF_SIZE_BYTES:
+                    size_mb = len(pdf_bytes) / (1024 * 1024)
+                    logger.warning(f"🚨 PDF {pdf_filename} rejeitado: {size_mb:.2f} MB (limite: 15 MB).")
+                    if not is_historic and (is_self_memo or self._is_owner_number(info.get("phone_number", ""))):
+                        await self.send_text_message(
+                            number=settings.USER_PHONE_NUMBER,
+                            text=f"⚠️ *Documento Não Processado*\nO arquivo *{pdf_filename}* possui {size_mb:.1f} MB e excede a trava de segurança de 15 MB para evitar estouro de memória no container.",
+                        )
+                    return {"status": "error", "reason": "pdf_too_large"}
+
+                # Extração e conversão para Markdown GFM via PDFExtractor (Cascata Tier 1 -> Tier 2 -> Tier 3)
+                try:
+                    extraction = await pdf_extractor.extract(
+                        pdf_input=pdf_bytes,
+                        filename=pdf_filename,
+                    )
+                except Exception as e:
+                    logger.error(f"Erro na extração de PDF {pdf_filename}: {e}", exc_info=True)
+                    return {"status": "error", "reason": "pdf_extraction_failed", "error": str(e)}
+
+                extracted_markdown = extraction.markdown
+                if not extracted_markdown or not extracted_markdown.strip():
+                    logger.warning(f"PDF {pdf_filename} não gerou conteúdo textual.")
+                    return {"status": "processed", "type": "pdf", "text": "", "reason": "empty_pdf_content"}
+
+                # Se houver legenda (caption) no PDF, anexa contextualmente
+                pdf_caption = info.get("caption", "").strip()
+                full_content = f"### [Documento: {pdf_filename}]\n"
+                if pdf_caption:
+                    full_content += f"**Legenda:** {pdf_caption}\n\n"
+                full_content += extracted_markdown
+
+                # Salva na Memória e Grafo (executa extração semântica de tarefas, entidades e intenções)
+                msg_in = MessageCreate(
+                    speaker=speaker_label,
+                    raw_text=full_content,
+                    revised_text=full_content,
+                    meta_info={
+                        "source": "whatsapp",
+                        "message_type": "document_pdf",
+                        "filename": pdf_filename,
+                        "extraction_tier": extraction.tier_used,
+                        "extraction_model": extraction.model_name,
+                        "page_count": extraction.page_count,
+                        "size_bytes": extraction.size_bytes,
+                        "caption": pdf_caption,
+                        "is_self_memo": is_self_memo,
+                        "remoteJid": info["remote_jid"],
+                        "pushName": info["push_name"],
+                        "key_id": info["key_id"],
+                    },
+                )
+                saved_msg = await memory_repository.save_message(data=msg_in, db=db)
+
+                # Feedback no WhatsApp EXCLUSIVAMENTE para o proprietário se for mensagem recente
+                if not is_historic:
+                    tier_badge = "⚡ Gemini 3.5 Flash Lite" if "tier1" in extraction.tier_used else (
+                        f"🔄 Gemini Fallback ({extraction.model_name})" if "tier2" in extraction.tier_used else "📦 PyMuPDF (Local)"
+                    )
+                    created_tasks = []
+                    if saved_msg:
+                        created_tasks = db.query(TaskRecord).filter(TaskRecord.message_id == saved_msg.id).all()
+
+                    contact_name = info.get("push_name") or "Contato"
+                    contact_phone = sanitize_phone_number(info.get("remote_jid", ""))
+                    phone_badge = f" ({contact_phone})" if contact_phone and contact_phone != contact_name else ""
+
+                    header = "📄 *Documento Pessoal Processado:*" if is_self_memo else f"📄 *Documento Recebido de:* {contact_name}{phone_badge}"
+                    reply_lines = [
+                        header,
+                        f"📁 *Arquivo:* `{pdf_filename}` ({extraction.page_count} pág{'s' if extraction.page_count > 1 else ''})",
+                        f"⚙️ *Motor:* {tier_badge}",
+                    ]
+                    if pdf_caption:
+                        reply_lines.append(f"💬 *Legenda:* \"{pdf_caption}\"")
+
+                    if created_tasks:
+                        reply_lines.append("")
+                        reply_lines.append("📋 *Tarefas Identificadas no Documento:*")
+                        for t in created_tasks:
+                            due_str = f" (📅 {t.due_date})" if t.due_date else ""
+                            prio_badge = f"[{t.priority}]" if t.priority else ""
+                            reply_lines.append(f"• 📌 *{prio_badge}* {t.title}{due_str}")
+                    else:
+                        # Breve preview das primeiras 3 linhas do Markdown extraído
+                        first_lines = [line for line in extracted_markdown.splitlines() if line.strip() and not line.startswith("#")][:3]
+                        if first_lines:
+                            preview = "\n".join(f"> {l[:100]}" for l in first_lines)
+                            reply_lines.append("")
+                            reply_lines.append("📝 *Resumo do Conteúdo:*")
+                            reply_lines.append(preview)
+
+                    reply_text = "\n".join(reply_lines)
+                    await self.send_text_message(number=settings.USER_PHONE_NUMBER, text=reply_text)
+                else:
+                    logger.info(f"📄 PDF histórico '{pdf_filename}' arquivado silenciosamente na memória passiva.")
+
+                return {
+                    "status": "success",
+                    "type": "pdf",
+                    "filename": pdf_filename,
+                    "is_self_memo": is_self_memo,
+                    "message_id": saved_msg.id if saved_msg else None,
+                    "tier_used": extraction.tier_used,
+                    "model_name": extraction.model_name,
                     "speaker": speaker_label,
                 }
 

@@ -43,6 +43,8 @@ class ModelRegistryData(BaseModel):
         "weekly": "gemini-3.5-flash-lite",
         "hermes": "gemini-3.5-flash-lite",
         "embedding": "gemini-embedding-001",
+        "pdf_extract": "gemini-3.5-flash-lite",
+        "pdf_fallback": "gemini-2.5-flash",
     })
     auto_adopt_best_lite: bool = True
     last_discovery_at: Optional[str] = None
@@ -138,7 +140,12 @@ class ModelRegistry:
             try:
                 with open(self.persistence_path, "r", encoding="utf-8") as f:
                     raw = json.load(f)
-                    return ModelRegistryData(**raw)
+                    loaded = ModelRegistryData(**raw)
+                    defaults = ModelRegistryData().active_models
+                    for k, v in defaults.items():
+                        if k not in loaded.active_models:
+                            loaded.active_models[k] = v
+                    return loaded
             except Exception as e:
                 logger.warning(f"Erro ao carregar {self.persistence_path}: {e}. Inicializando com padrões.")
 
@@ -174,10 +181,12 @@ class ModelRegistry:
     def get_active_model(self, task: str = "default", fallback: Optional[str] = None) -> str:
         """Retorna dinamicamente o modelo configurado para uma determinada tarefa."""
         with self._lock:
-            active = self.data.active_models.get(task) or self.data.active_models.get("default")
+            active = self.data.active_models.get(task)
             if active:
                 return active
-            return fallback or settings.AI_DEFAULT_MODEL or "gemini-3.1-flash-lite"
+            if fallback:
+                return fallback
+            return self.data.active_models.get("default") or settings.AI_DEFAULT_MODEL or "gemini-3.1-flash-lite"
 
     def get_all_active_models(self) -> Dict[str, str]:
         """Retorna todos os modelos ativos para todas as tarefas."""
