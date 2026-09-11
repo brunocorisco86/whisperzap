@@ -394,6 +394,13 @@ class WhatsAppService:
         is_group = bool(data.get("isGroup") or key.get("participant") or "@g.us" in remote_jid or "@broadcast" in remote_jid)
 
         msg_obj = data.get("message") or {}
+        # Desempacota invólucros comuns da Evolution API / WhatsApp (mensagens temporárias, visualização única, etc.)
+        for wrap_key in ["ephemeralMessage", "viewOnceMessage", "viewOnceMessageV2", "documentWithCaptionMessage"]:
+            if wrap_key in msg_obj and isinstance(msg_obj[wrap_key], dict):
+                inner = msg_obj[wrap_key].get("message") or msg_obj[wrap_key]
+                if isinstance(inner, dict):
+                    msg_obj = {**msg_obj, **inner}
+
         msg_type = str(data.get("messageType") or payload.get("messageType") or "").lower()
 
         # Extrai áudio em base64 direto se fornecido pelo webhook da Evolution API
@@ -465,9 +472,9 @@ class WhatsAppService:
             if msg_ts > 0:
                 msg_dt = datetime.fromtimestamp(msg_ts, tz=timezone.utc)
 
-            # Para comandos interativos ('?'), tolerância de até 10 minutos para absorver lags de sync de rede
+            # Para comandos interativos ('?') e PDFs encaminhados, tolerância de até 24h para não descartar encaminhamentos
             is_cmd_hint = str(text_content or "").strip().startswith(("?", "/hermes", "hermes,"))
-            time_limit = 600.0 if is_cmd_hint else 120.0
+            time_limit = 86400.0 if (is_cmd_hint or has_pdf) else 120.0
             is_historic = bool(msg_ts > 0 and (time.time() - msg_ts > time_limit))
         except Exception:
             is_historic = False
@@ -719,15 +726,19 @@ class WhatsAppService:
             # ===================== FLUXO DE DOCUMENTO PDF =====================
             if info.get("has_pdf"):
                 pdf_filename = info.get("pdf_filename") or "documento.pdf"
-                logger.info(f"📄 Processando PDF WhatsApp '{pdf_filename}' de {info['push_name']} [Self-Memo: {is_self_memo}, Histórico: {is_historic}]...")
+                logger.info(
+                    f"📄 [PDF] Documento detectado: '{pdf_filename}' | Remetente: {info['push_name']} | "
+                    f"Self-Memo: {is_self_memo} | Histórico: {is_historic} | KeyID: {info['key_id']}"
+                )
 
+                logger.info(f"📄 [PDF] Obtendo base64 do documento '{pdf_filename}'...")
                 base64_str = info.get("direct_base64") or await self.get_media_base64(
                     message_id=info["key_id"],
                     remote_jid=info["remote_jid"],
                     from_me=info["from_me"],
                 )
                 if not base64_str:
-                    logger.warning(f"Não foi possível obter base64 do PDF {pdf_filename} ({info['key_id']}).")
+                    logger.warning(f"❌ [PDF] Não foi possível obter base64 do PDF {pdf_filename} ({info['key_id']}).")
                     return {"status": "error", "reason": "base64_download_failed"}
 
                 if "," in base64_str:
@@ -735,14 +746,15 @@ class WhatsAppService:
 
                 try:
                     pdf_bytes = base64.b64decode(base64_str)
+                    logger.info(f"📄 [PDF] Base64 decodificado com sucesso: {len(pdf_bytes)} bytes ({len(pdf_bytes)/(1024*1024):.2f} MB).")
                 except Exception as e:
-                    logger.error(f"Erro ao decodificar base64 do PDF {pdf_filename}: {e}")
+                    logger.error(f"❌ [PDF] Erro ao decodificar base64 do PDF {pdf_filename}: {e}")
                     return {"status": "error", "reason": "base64_decode_error"}
 
                 # Trava estrita de segurança para VPS: rejeita PDFs > 15 MB
                 if len(pdf_bytes) > MAX_PDF_SIZE_BYTES:
                     size_mb = len(pdf_bytes) / (1024 * 1024)
-                    logger.warning(f"🚨 PDF {pdf_filename} rejeitado: {size_mb:.2f} MB (limite: 15 MB).")
+                    logger.warning(f"🚨 [PDF] Arquivo {pdf_filename} rejeitado: {size_mb:.2f} MB excede limite de 15 MB.")
                     if not is_historic and (is_self_memo or self._is_owner_number(info.get("phone_number", ""))):
                         await self.send_text_message(
                             number=settings.USER_PHONE_NUMBER,
@@ -751,19 +763,25 @@ class WhatsAppService:
                     return {"status": "error", "reason": "pdf_too_large"}
 
                 # Extração e conversão para Markdown GFM via PDFExtractor (Cascata Tier 1 -> Tier 2 -> Tier 3)
+                logger.info(f"⚡ [PDF] Acionando PDFExtractor com cascata Tier 1 (Gemini 3.5) -> Tier 2 (Gemini 2.5) -> Tier 3 (PyMuPDF)...")
                 try:
                     extraction = await pdf_extractor.extract(
                         pdf_input=pdf_bytes,
                         filename=pdf_filename,
                     )
                 except Exception as e:
-                    logger.error(f"Erro na extração de PDF {pdf_filename}: {e}", exc_info=True)
+                    logger.error(f"❌ [PDF] Erro na extração de PDF {pdf_filename}: {e}", exc_info=True)
                     return {"status": "error", "reason": "pdf_extraction_failed", "error": str(e)}
 
                 extracted_markdown = extraction.markdown
                 if not extracted_markdown or not extracted_markdown.strip():
-                    logger.warning(f"PDF {pdf_filename} não gerou conteúdo textual.")
+                    logger.warning(f"⚠️ [PDF] Documento {pdf_filename} não gerou conteúdo textual.")
                     return {"status": "processed", "type": "pdf", "text": "", "reason": "empty_pdf_content"}
+
+                logger.info(
+                    f"✅ [PDF] Extração bem-sucedida! Motor: '{extraction.tier_used}' ({extraction.model_name}) | "
+                    f"Páginas: {extraction.page_count} | Markdown gerado: {len(extracted_markdown)} caracteres"
+                )
 
                 # Se houver legenda (caption) no PDF, anexa contextualmente
                 pdf_caption = info.get("caption", "").strip()
@@ -773,6 +791,7 @@ class WhatsAppService:
                 full_content += extracted_markdown
 
                 # Salva na Memória e Grafo (executa extração semântica de tarefas, entidades e intenções)
+                logger.info(f"💾 [PDF] Salvando conteúdo textual no Grafo e Memória Cognitiva...")
                 msg_in = MessageCreate(
                     speaker=speaker_label,
                     raw_text=full_content,
@@ -833,9 +852,10 @@ class WhatsAppService:
                             reply_lines.append(preview)
 
                     reply_text = "\n".join(reply_lines)
+                    logger.info(f"📤 [PDF] Enviando confirmação formatada via WhatsApp para o proprietário...")
                     await self.send_text_message(number=settings.USER_PHONE_NUMBER, text=reply_text)
                 else:
-                    logger.info(f"📄 PDF histórico '{pdf_filename}' arquivado silenciosamente na memória passiva.")
+                    logger.info(f"📄 [PDF] Documento histórico '{pdf_filename}' arquivado silenciosamente na memória passiva (is_historic=True).")
 
                 return {
                     "status": "success",

@@ -44,6 +44,7 @@ async def evolution_webhook(
     logger.info(
         f"📨 Webhook recebido: key_id={info['key_id']}, from_me={info.get('from_me')}, "
         f"self_memo={info.get('is_self_memo')}, has_audio={info.get('has_audio')}, "
+        f"has_pdf={info.get('has_pdf')}, pdf_name='{info.get('pdf_filename')}', "
         f"text='{info.get('text')[:60]}'"
     )
 
