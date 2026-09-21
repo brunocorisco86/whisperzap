@@ -445,4 +445,47 @@ async def test_process_webhook_modelos_diagnostic_command():
         assert "Auto-Recuperação Acionada" in sent_text
 
 
+@pytest.mark.asyncio
+async def test_process_webhook_bot_echo_detection():
+    """Valida descarte estrito de eco quando o bot responde (por prefixo, assinatura ou chave enviada)."""
+    # 1. Eco por prefixo padrão
+    echo_prefix_payload = {
+        "data": {
+            "key": {"id": "echo_01", "remoteJid": "554497604925@s.whatsapp.net", "fromMe": True},
+            "pushName": "Você",
+            "message": {"conversation": "📋 *Tarefas Identificadas no Documento:* • Teste"},
+        }
+    }
+    res1 = await whatsapp_service.process_webhook_event(echo_prefix_payload)
+    assert res1["status"] == "ignored"
+    assert res1["reason"] == "bot_echo_response"
+
+    # 2. Eco por assinatura no corpo (ex: resposta RAG que começou com saudação personalizada)
+    echo_rag_payload = {
+        "data": {
+            "key": {"id": "echo_02", "remoteJid": "554497604925@s.whatsapp.net", "fromMe": True},
+            "pushName": "Você",
+            "message": {"conversation": "Bruno, o sistema está limpo. Não há pendências.\n\n📋 *Tarefas Sinalizadas no Radar (Terpsícore):*\n• Passar problema"},
+        }
+    }
+    res2 = await whatsapp_service.process_webhook_event(echo_rag_payload)
+    assert res2["status"] == "ignored"
+    assert res2["reason"] == "bot_echo_response"
+
+    # 3. Eco por rastreio de chave enviada
+    with whatsapp_service._keys_lock:
+        whatsapp_service._sent_bot_keys["bot_key_123"] = 9999999999.0
+
+    echo_key_payload = {
+        "data": {
+            "key": {"id": "bot_key_123", "remoteJid": "554497604925@s.whatsapp.net", "fromMe": True},
+            "pushName": "Você",
+            "message": {"conversation": "Texto genérico qualquer sem marcadores"},
+        }
+    }
+    res3 = await whatsapp_service.process_webhook_event(echo_key_payload)
+    assert res3["status"] == "ignored"
+    assert res3["reason"] == "bot_echo_response"
+
+
 

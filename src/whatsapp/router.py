@@ -57,9 +57,7 @@ async def evolution_webhook(
         return {"status": "ignored", "reason": "ignorable_media_type"}
 
     # 4. Prevenção estrita de loop de eco de respostas do bot
-    raw_text = info["text"]
-    BOT_PREFIXES = ("🎙️", "📋", "🤖", "💡", "⚖️", "📝", "🌙", "📊", "✅", "Salve,")
-    if any(raw_text.startswith(p) for p in BOT_PREFIXES):
+    if whatsapp_service.is_bot_echo(info):
         return {"status": "ignored", "reason": "bot_echo_response"}
 
     # 5. Deduplicação atômica em memória (não bloqueia esperando pool do Postgres)

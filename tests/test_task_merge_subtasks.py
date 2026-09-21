@@ -146,3 +146,37 @@ def test_subtask_service_remove_subtask():
     assert parsed_final["has_subtasks"] is False
     assert updated_final.strip() == "Notas normais do usuário"
 
+
+def test_subtask_service_no_duplicate_when_merging_identical_title():
+    """Valida que mesclar tarefa com o mesmo título não cria subtarefas duplicadas repetidas."""
+    title = "Passar o problema para a equipe de desenvolvimento"
+    notes = subtask_service.add_or_merge_subtask(
+        existing_notes="",
+        primary_title=title,
+        primary_audio_ref="msg_1",
+        duplicate_title=title,
+        duplicate_audio_ref="msg_2",
+    )
+    parsed = subtask_service.parse_subtasks(notes)
+    assert parsed["has_subtasks"] is True
+    assert parsed["total"] == 1
+    assert "0/1 concluídas" in notes
+
+
+def test_subtask_service_deduplicate_subtasks_utility():
+    """Valida a limpeza e recálculo de cabeçalho com a rotina de deduplicação de subtarefas."""
+    dirty_notes = (
+        "### 📋 Subtarefas (0/4 concluídas - 0%):\n"
+        "- [ ] Instalar equipamento da Dol Sensors (🎙️ Ref: msg-01)\n"
+        "- [x] Instalar equipamento da Dol Sensors (🎙️ Ref: msg-02)\n"
+        "- [ ] Configurar antena LoRa\n"
+        "- [ ] Configurar antena LoRa (🎙️ Ref: msg-03)\n\n"
+        "Contexto adicional mantido."
+    )
+    clean_notes = subtask_service.deduplicate_subtasks(dirty_notes)
+    parsed = subtask_service.parse_subtasks(clean_notes)
+    assert parsed["total"] == 2
+    assert parsed["completed"] == 1
+    assert "1/2 concluídas - 50%" in clean_notes
+    assert "Contexto adicional mantido." in clean_notes
+

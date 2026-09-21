@@ -160,6 +160,7 @@ class WhatsAppService:
         self.api_key = settings.EVOLUTION_API_KEY
         self.instance = settings.EVOLUTION_INSTANCE
         self._processed_keys: Dict[str, float] = {}
+        self._sent_bot_keys: Dict[str, float] = {}
         self._keys_lock = Lock()
 
     def format_viable_models_report(self, check_result: Dict[str, Any]) -> str:
@@ -173,6 +174,45 @@ class WhatsAppService:
             expired = [k for k, ts in self._processed_keys.items() if now - ts > ttl_seconds]
             for k in expired:
                 del self._processed_keys[k]
+            expired_bot = [k for k, ts in self._sent_bot_keys.items() if now - ts > ttl_seconds]
+            for k in expired_bot:
+                del self._sent_bot_keys[k]
+
+    def is_bot_echo(self, info: Dict[str, Any]) -> bool:
+        """Determina de forma estrita se a mensagem é um eco gerado pelo próprio bot."""
+        key_id = info.get("key_id")
+        if key_id:
+            with self._keys_lock:
+                if key_id in self._sent_bot_keys:
+                    return True
+
+        if not info.get("from_me"):
+            return False
+
+        raw_text = str(info.get("text") or "").strip()
+        if not raw_text:
+            return False
+
+        BOT_PREFIXES = ("🎙️", "📋", "🤖", "💡", "⚖️", "📝", "🌙", "📊", "✅", "Salve,")
+        if any(raw_text.startswith(p) for p in BOT_PREFIXES):
+            return True
+
+        BOT_SIGNATURES = (
+            "📋 *Tarefas Sinalizadas no Radar",
+            "Tarefas Identificadas no Documento:",
+            "📅 *RESUMO DIÁRIO",
+            "📊 *RELATÓRIO SEMANAL",
+            "📝 *Do que se trata:*",
+            "Recebi sua pergunta:",
+            "Pelo que consta no grafo de conhecimento",
+            "Radar (Terpsícore)",
+            "Hermes Agent",
+            "Fluxo Imediato",
+        )
+        if any(sig in raw_text for sig in BOT_SIGNATURES):
+            return True
+
+        return False
 
     def is_key_duplicate_or_processing(self, key_id: str, db: Optional[Session] = None) -> bool:
         """Verifica de forma atômica se uma mensagem/áudio com o mesmo key_id já foi processado ou está em processamento."""
@@ -262,6 +302,14 @@ class WhatsAppService:
                 resp = await client.post(target_url, json=payload, headers=headers)
                 if resp.status_code in (200, 201):
                     logger.info(f"✅ Mensagem enviada com sucesso para o proprietário ({clean_number}).")
+                    try:
+                        resp_json = resp.json()
+                        sent_key_id = resp_json.get("key", {}).get("id")
+                        if sent_key_id:
+                            with self._keys_lock:
+                                self._sent_bot_keys[sent_key_id] = time.time()
+                    except Exception:
+                        pass
                     return True
                 logger.error(f"Erro ao enviar mensagem WhatsApp ({resp.status_code}): {resp.text}")
                 # Auto-reconexão reativa: se o socket fechou ou a instância caiu (400 Bad Request, 428, 5xx)
@@ -577,10 +625,9 @@ class WhatsAppService:
             return {"status": "ignored", "reason": "ignorable_media_type"}
 
         # 3. Prevenção estrita de loop de eco de respostas geradas pelo próprio bot
-        raw_text = info["text"]
-        BOT_PREFIXES = ("🎙️", "📋", "🤖", "💡", "⚖️", "📝", "🌙", "📊", "✅", "Salve,")
-        if any(raw_text.startswith(p) for p in BOT_PREFIXES):
-            logger.debug("Mensagem do bot descartada para evitar eco.")
+        raw_text = info.get("text", "")
+        if self.is_bot_echo(info):
+            logger.debug(f"Mensagem do bot descartada para evitar eco (key_id={info.get('key_id')}).")
             return {"status": "ignored", "reason": "bot_echo_response"}
 
         is_self_memo = info.get("is_self_memo", False)

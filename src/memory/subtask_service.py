@@ -75,6 +75,70 @@ class SubtaskService:
         pct = round((completed / total * 100)) if total > 0 else 0
         return f"### 📋 Subtarefas ({completed}/{total} concluídas - {pct}%):"
 
+    def _are_titles_equivalent(self, t1: Optional[str], t2: Optional[str]) -> bool:
+        """Determina se dois títulos de tarefas/subtarefas são equivalentes ou redundantes."""
+        if not t1 or not t2:
+            return False
+        clean1 = re.sub(r"[^\w\s]", "", t1.lower()).strip()
+        clean2 = re.sub(r"[^\w\s]", "", t2.lower()).strip()
+        if clean1 == clean2:
+            return True
+        if clean1 in clean2 or clean2 in clean1:
+            if min(len(clean1), len(clean2)) >= 10:
+                return True
+        from difflib import SequenceMatcher
+        return SequenceMatcher(None, clean1, clean2).ratio() >= 0.82
+
+    def deduplicate_subtasks(self, notes: Optional[str]) -> str:
+        """Sanitiza e remove subtarefas duplicadas existentes dentro do bloco de notas."""
+        if not notes:
+            return ""
+        parsed = self.parse_subtasks(notes)
+        if not parsed["has_subtasks"] or len(parsed["subtasks"]) <= 1:
+            return notes
+
+        seen_titles: List[str] = []
+        unique_subtasks: List[Dict[str, Any]] = []
+        for st in parsed["subtasks"]:
+            title = st["title"]
+            is_dup = any(self._are_titles_equivalent(title, seen) for seen in seen_titles)
+            if not is_dup:
+                seen_titles.append(title)
+                unique_subtasks.append(st)
+            else:
+                # Se a duplicata estava marcada como concluída, propaga o status concluído
+                if st["completed"]:
+                    for u in unique_subtasks:
+                        if self._are_titles_equivalent(title, u["title"]):
+                            u["completed"] = True
+                            break
+
+        if len(unique_subtasks) == len(parsed["subtasks"]):
+            return notes
+
+        total = len(unique_subtasks)
+        completed = sum(1 for u in unique_subtasks if u["completed"])
+        new_header = self.format_progress_header(completed, total)
+
+        subtask_lines = [
+            f"- [{'x' if u['completed'] else ' '}] {u['text']}"
+            for u in unique_subtasks
+        ]
+
+        # Mantém quaisquer anotações complementares fora do checklist
+        lines = notes.splitlines()
+        remaining_lines = []
+        for line in lines:
+            if self.HEADER_REGEX.match(line) or self.SUBTASK_REGEX.match(line):
+                continue
+            remaining_lines.append(line)
+
+        body = "\n".join(remaining_lines).strip()
+        checklist_block = f"{new_header}\n" + "\n".join(subtask_lines)
+        if body:
+            return f"{checklist_block}\n\n{body}"
+        return checklist_block
+
     def add_or_merge_subtask(
         self,
         existing_notes: Optional[str],
@@ -85,8 +149,9 @@ class SubtaskService:
     ) -> str:
         """Incorpora a tarefa duplicada como uma nova subtarefa no checklist da primária.
         
-        Se a primária ainda não possuir subtarefas, converte o título da própria primária
-        na primeira subtarefa e anexa a duplicata como a segunda subtarefa.
+        Se a primária ainda não possuir subtarefas, converte o título da primária
+        na primeira subtarefa e, caso a duplicata traga uma ação distinta, anexa como segunda subtarefa.
+        Evita a criação de subtarefas idênticas repetidas.
         """
         notes = (existing_notes or "").strip()
         parsed = self.parse_subtasks(notes)
@@ -94,18 +159,31 @@ class SubtaskService:
         ref_a = f" (🎙️ Ref: {primary_audio_ref})" if primary_audio_ref else ""
         ref_b = f" (🎙️ Ref: {duplicate_audio_ref})" if duplicate_audio_ref else ""
 
+        is_same_as_primary = self._are_titles_equivalent(primary_title, duplicate_title)
+
         if not parsed["has_subtasks"]:
-            # Cria a estrutura inicial com as duas ações
-            header = self.format_progress_header(completed=0, total=2)
-            subtask_1 = f"- [ ] {primary_title.strip()}{ref_a}"
-            subtask_2 = f"- [ ] {duplicate_title.strip()}{ref_b}"
-            
-            subtasks_block = f"{header}\n{subtask_1}\n{subtask_2}"
+            if is_same_as_primary:
+                # Títulos equivalentes: não duplica a ação! Mantém 1 subtarefa e registra a referência
+                header = self.format_progress_header(completed=0, total=1)
+                subtask_1 = f"- [ ] {primary_title.strip()}{ref_a or ref_b}"
+                subtasks_block = f"{header}\n{subtask_1}"
+            else:
+                header = self.format_progress_header(completed=0, total=2)
+                subtask_1 = f"- [ ] {primary_title.strip()}{ref_a}"
+                subtask_2 = f"- [ ] {duplicate_title.strip()}{ref_b}"
+                subtasks_block = f"{header}\n{subtask_1}\n{subtask_2}"
+
             if notes:
                 return f"{subtasks_block}\n\n{notes}"
             return subtasks_block
 
-        # Já possui subtarefas: adiciona a nova ao final da lista e recalcula o cabeçalho
+        # Já possui subtarefas: verifica se a duplicata já existe no checklist
+        for st in parsed["subtasks"]:
+            if self._are_titles_equivalent(st["title"], duplicate_title):
+                # Subtarefa já existe, não insere duplicata repetida
+                return self.deduplicate_subtasks(notes)
+
+        # Adiciona a nova ação ao checklist
         new_subtask_line = f"- [ ] {duplicate_title.strip()}{ref_b}"
         lines = notes.splitlines()
         new_lines = []
@@ -114,7 +192,6 @@ class SubtaskService:
         for i, line in enumerate(lines):
             if self.SUBTASK_REGEX.match(line):
                 new_lines.append(line)
-                # Se for a última linha ou a próxima linha não for subtarefa, insere aqui
                 if i == len(lines) - 1 or not self.SUBTASK_REGEX.match(lines[i + 1]):
                     if not subtask_inserted:
                         new_lines.append(new_subtask_line)
