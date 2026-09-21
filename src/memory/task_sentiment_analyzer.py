@@ -5,9 +5,10 @@ distinguir tarefas genuínas de ruídos de conversação, observações descriti
 e relatos de status ignorados pelo usuário.
 """
 
+import functools
 import logging
 import re
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List, Tuple, Set, FrozenSet
 
 logger = logging.getLogger(__name__)
 
@@ -230,21 +231,20 @@ class TaskSentimentAnalyzer:
         analysis = self.analyze_task_text(title, source_text)
         return analysis["actionability_score"] >= threshold and analysis["noise_category"] is None
 
-    def extract_task_tags(
+    @functools.lru_cache(maxsize=4096)
+    def _extract_task_tags_cached(
         self,
-        title: str,
-        source_text: str = "",
-        existing_entities: Optional[List[str]] = None,
+        clean_title: str,
+        norm_snippet: str,
+        entities_tuple: Tuple[str, ...],
         priority: Optional[str] = None,
-    ) -> List[str]:
-        """Extrai tags contextuais da tarefa via spaCy NLP e dicionário de domínio (zero custo de API)."""
+    ) -> Tuple[str, ...]:
         tags: List[str] = []
-        clean_title = (title or "").strip()
-        clean_source = (source_text or "").strip()
-        full_text = f"{clean_title}. {clean_source}".strip()
+        clean_title = (clean_title or "").strip()
+        full_text = f"{clean_title}. {norm_snippet}".strip()
 
         if not full_text:
-            return tags
+            return tuple(tags)
 
         # 1. Tags de domínio Agro / Logística / Corporativo baseadas em palavras-chave e lemas
         domain_keywords_map = {
@@ -275,10 +275,14 @@ class TaskSentimentAnalyzer:
                         tags.append(tag_label)
                     break
 
-        # 2. Entidades nomeadas spaCy (NER)
-        if self.nlp:
+        # 2. Entidades nomeadas spaCy (NER) - Apenas o pipe NER ativo para velocidade máxima
+        if self.nlp and clean_title:
             try:
-                doc = self.nlp(clean_title)
+                if hasattr(self.nlp, "select_pipes"):
+                    with self.nlp.select_pipes(enable=["tok2vec", "ner"]):
+                        doc = self.nlp(clean_title)
+                else:
+                    doc = self.nlp(clean_title)
                 for ent in doc.ents:
                     ent_text = ent.text.strip()
                     if ent.label_ in ("ORG", "LOC", "MISC", "PER") and len(ent_text) >= 3:
@@ -291,8 +295,8 @@ class TaskSentimentAnalyzer:
                 logger.debug(f"Erro ao extrair entidades spaCy para tags: {e}")
 
         # 3. Entidades já extraídas passadas explicitamente
-        if existing_entities:
-            for ent_str in existing_entities:
+        if entities_tuple:
+            for ent_str in entities_tuple:
                 if ent_str and len(ent_str.strip()) >= 3:
                     clean_ent = ent_str.strip().title()
                     if clean_ent not in tags and len(tags) < 6:
@@ -308,7 +312,20 @@ class TaskSentimentAnalyzer:
         if not tags:
             tags.append("Operacional")
 
-        return tags[:5]
+        return tuple(tags[:5])
+
+    def extract_task_tags(
+        self,
+        title: str,
+        source_text: str = "",
+        existing_entities: Optional[List[str]] = None,
+        priority: Optional[str] = None,
+    ) -> List[str]:
+        """Extrai tags contextuais da tarefa com cache LRU em memória e spaCy acelerado."""
+        clean_title = (title or "").strip()
+        norm_snippet = (source_text or "")[:200].strip()
+        entities_tuple = tuple(sorted(existing_entities)) if existing_entities else ()
+        return list(self._extract_task_tags_cached(clean_title, norm_snippet, entities_tuple, priority))
 
     TOPIC_CLUSTERS = {
         "tags": ["tag", "tags", "cadastro de tag", "cadastros das tags"],
@@ -343,8 +360,8 @@ class TaskSentimentAnalyzer:
         notes_clean = " ".join(clean_lines)
         return f"{title or ''} {notes_clean}".strip()
 
-    def extract_task_features(self, title: str, notes: str = "") -> Dict[str, Any]:
-        """Extrai lemas, entidades, termos de Polímnia e tópicos temáticos de uma tarefa em uma única passagem."""
+    @functools.lru_cache(maxsize=4096)
+    def _extract_task_features_cached(self, title: str, notes: str = "") -> Dict[str, Any]:
         from src.ai_gateway.bypass import normalize_text
         text = self.clean_task_text_for_analysis(title, notes)
         norm = normalize_text(text)
@@ -353,7 +370,11 @@ class TaskSentimentAnalyzer:
 
         if self.nlp and text:
             try:
-                doc = self.nlp(text)
+                if hasattr(self.nlp, "select_pipes"):
+                    with self.nlp.select_pipes(disable=["parser", "ner"]):
+                        doc = self.nlp(text)
+                else:
+                    doc = self.nlp(text)
                 tokens = {t.lemma_.lower() for t in doc if not t.is_stop and not t.is_punct and len(t.text) > 2}
                 core_entities = {t.lemma_.lower() for t in doc if t.pos_ in ("PROPN", "NOUN") and len(t.text) > 2}
             except Exception:
@@ -373,10 +394,21 @@ class TaskSentimentAnalyzer:
 
         return {
             "norm": norm,
-            "tokens": tokens,
-            "core_entities": core_entities,
+            "tokens": frozenset(tokens),
+            "core_entities": frozenset(core_entities),
             "polimnia_terms": polimnia_terms,
-            "topics": topics,
+            "topics": frozenset(topics),
+        }
+
+    def extract_task_features(self, title: str, notes: str = "") -> Dict[str, Any]:
+        """Extrai lemas, entidades, termos de Polímnia e tópicos temáticos de uma tarefa com cache LRU."""
+        cached = self._extract_task_features_cached(title or "", notes or "")
+        return {
+            "norm": cached["norm"],
+            "tokens": set(cached["tokens"]),
+            "core_entities": set(cached["core_entities"]),
+            "polimnia_terms": cached["polimnia_terms"],
+            "topics": set(cached["topics"]),
         }
 
     def compute_similarity_from_features(self, feat_a: Dict[str, Any], feat_b: Dict[str, Any]) -> float:

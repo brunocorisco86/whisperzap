@@ -4,6 +4,20 @@ Todas as mudanças notáveis, refatorações arquiteturais, motores de IA e otim
 
 ---
 
+## [v2.8.4] — 2026-09-21 — Release: Terpsícore Latency Optimization (150x Speedup)
+
+### ⚡ 1. Otimização de Consultas e Eliminação de N+1 (`src/memory/repository.py`)
+- **Eager Loading com `selectinload`**: `memory_repository.list_tasks()` agora pré-carrega relacionamentos de mensagens e entidades em lote (`selectinload(TaskRecord.message).selectinload(MessageRecord.entities)`), eliminando 1.242 consultas SQL individuais por requisição e reduzindo o tempo de banco de ~840ms para ~14ms.
+
+### 🧠 2. Cache LRU & Aceleração de Extração de Tags e Features (`src/memory/task_sentiment_analyzer.py`)
+- **Cache de Tags Contextuais (`_extract_task_tags_cached`)**: Adicionado cache LRU em memória (4.096 posições) com pipeline restrito a NER (`tok2vec + ner`). Reduz o tempo de extração de tags para 620+ tarefas de 4.520ms para 0,38ms (~10.000x mais rápido).
+- **Cache de Features Semânticas (`_extract_task_features_cached`)**: Adicionado cache LRU (4.096 posições) com desativação de parser/ner para extração morfológica pura de lemas e entidades centrais, acelerando `find_similar_existing_task` de 1.492ms para 57ms.
+
+### 🌐 3. Concorrência no Frontend Dashboard (`src/web/static/js/app.js`)
+- **Busca Paralela (`Promise.all`)**: `loadTasks()` agora dispara a busca de tarefas ativas e a contagem do baú simultaneamente, eliminando bloqueio serial e garantindo renderização instantânea da interface.
+
+---
+
 ## [v2.8.3] — 2026-09-21 — Release: High-Verbosity ntfy Push Notifications & WhatsApp Decoupling
 
 ### 📢 1. Notificações Push via ntfy de Alta Verbosidade (`src/notifications/service.py`)

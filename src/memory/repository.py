@@ -880,14 +880,17 @@ class MemoryRepository:
             should_close = True
 
         try:
+            from sqlalchemy.orm import selectinload
             from src.contacts.models import ContactRecord
-            from src.memory.models import TaskResponse
+            from src.memory.models import TaskResponse, MessageRecord
             from src.memory.task_sentiment_analyzer import task_sentiment_analyzer
 
             now_dt = datetime.now(timezone.utc)
             contacts_map = {c.name.lower(): c for c in db.query(ContactRecord).all()}
 
-            query = db.query(TaskRecord)
+            query = db.query(TaskRecord).options(
+                selectinload(TaskRecord.message).selectinload(MessageRecord.entities)
+            )
             if status:
                 query = query.filter(TaskRecord.status == status.upper())
             if priority:

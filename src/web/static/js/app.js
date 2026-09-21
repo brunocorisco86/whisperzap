@@ -764,9 +764,13 @@ function updateTasksSpeakerOptions() {
 
 async function loadTasks() {
   try {
-    const res = await fetch(`/api/v1/memory/tasks?view_mode=${tasksViewMode}`);
-    if (res.ok) {
-      allTasks = await res.json();
+    const [tasksRes, vaultRes] = await Promise.all([
+      fetch(`/api/v1/memory/tasks?view_mode=${tasksViewMode}`),
+      fetch('/api/v1/memory/tasks?view_mode=vault').catch(() => null)
+    ]);
+
+    if (tasksRes && tasksRes.ok) {
+      allTasks = await tasksRes.json();
       if (countTasksEl && tasksViewMode === 'active') {
         countTasksEl.textContent = allTasks.filter(t => t.status === 'PENDING').length;
       }
@@ -775,15 +779,14 @@ async function loadTasks() {
     }
 
     // Atualiza contador de itens ativos no Baú
-    try {
-      const vaultRes = await fetch('/api/v1/memory/tasks?view_mode=vault');
-      if (vaultRes.ok) {
+    if (vaultRes && vaultRes.ok) {
+      try {
         const vaultTasks = await vaultRes.json();
         const vCount = vaultTasks.filter(t => t.status !== 'DONE').length;
         const countVaultEl = document.getElementById('count-vault-tasks');
         if (countVaultEl) countVaultEl.textContent = vCount;
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
   } catch (err) {
     console.error('Erro ao carregar tarefas:', err);
   }

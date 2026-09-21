@@ -5,7 +5,7 @@
   "nodes": [
     {
       "category": "PERSON",
-      "mentions": 430,
+      "mentions": 431,
       "role": "UNKNOWN",
       "phone": "",
       "company": "",
@@ -23252,19 +23252,19 @@
     },
     {
       "category": "PERSON",
-      "mentions": 404,
+      "mentions": 410,
       "role": "OWNER",
       "phone": "554497604925",
       "company": "Hermes Memory / Homelab",
       "weight": 1.0,
       "can_generate_tasks": false,
-      "last_interaction_at": "2026-09-21T22:35:28.980220",
+      "last_interaction_at": "2026-09-21T23:14:19.875698",
       "details": "Remetente da nota pessoal",
       "id": "Bruno Conter"
     },
     {
       "category": "LOCATION",
-      "mentions": 274,
+      "mentions": 277,
       "id": "Hermes Memory / Homelab"
     },
     {
@@ -23438,13 +23438,13 @@
     },
     {
       "category": "PERSON",
-      "mentions": 24,
+      "mentions": 26,
       "role": "UNKNOWN",
       "phone": "554499881122",
       "company": "",
       "weight": 0.4,
       "can_generate_tasks": false,
-      "last_interaction_at": "2026-09-21T22:35:25.255329",
+      "last_interaction_at": "2026-09-21T23:14:17.711971",
       "details": "Remetente da solicitação de ração",
       "id": "Debora Patel"
     },
@@ -25124,7 +25124,7 @@
     },
     {
       "relation": "AFFILIATED_AS_OWNER",
-      "weight": 274.0,
+      "weight": 277.0,
       "source": "Bruno Conter",
       "target": "Hermes Memory / Homelab"
     },
@@ -25172,7 +25172,7 @@
     },
     {
       "relation": "DELEGATED_TO",
-      "weight": 10.0,
+      "weight": 11.0,
       "source": "Bruno Conter",
       "target": "Bruno"
     },
