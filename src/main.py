@@ -4,6 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from src.config import settings
 
@@ -94,6 +95,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Monta arquivos estáticos do frontend web
 if os.path.exists(STATIC_DIR):

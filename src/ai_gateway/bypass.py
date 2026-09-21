@@ -1,11 +1,13 @@
 """Módulo de detecção de Bypass de IA, mensagens triviais, filtros de grupos e identificação de proprietário."""
 
+import functools
 import re
 import unicodedata
 from typing import Any, Dict, Optional, Tuple
 from src.config import settings
 
 
+@functools.lru_cache(maxsize=4096)
 def normalize_text(text: str) -> str:
     """Remove acentuação, caracteres especiais extras e normaliza espaços."""
     if not text:

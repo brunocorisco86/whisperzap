@@ -93,6 +93,18 @@ def record_to_response(
     )
 
 
+_CONTACTS_CACHE: Dict[str, List[ContactResponse]] = {}
+_CONTACTS_CACHE_TS: Dict[str, float] = {}
+_CONTACTS_CACHE_TTL: float = 30.0  # 30 segundos de cache TTL
+
+
+def invalidate_contacts_cache() -> None:
+    """Invalida o cache em memória da listagem de contatos."""
+    global _CONTACTS_CACHE, _CONTACTS_CACHE_TS
+    _CONTACTS_CACHE.clear()
+    _CONTACTS_CACHE_TS.clear()
+
+
 _cached_working_proxy: Optional[str] = None
 _proxy_checked_at: float = 0.0
 _PROXY_CACHE_TTL_SECONDS = 300.0  # 5 minutos
@@ -235,8 +247,15 @@ class ContactService:
         only_unknown: bool = False,
         interaction_period: str | None = None,
         db: Session | None = None,
+        force_refresh: bool = False,
     ) -> List[ContactResponse]:
         """Retorna lista de contatos enriquecida com filtros temporais de interação ('today', '7d', '30d', 'all')."""
+        import time
+        cache_key = f"{role}:{company}:{only_unknown}:{interaction_period}"
+        now_ts = time.time()
+        if not force_refresh and cache_key in _CONTACTS_CACHE and (now_ts - _CONTACTS_CACHE_TS.get(cache_key, 0.0)) < _CONTACTS_CACHE_TTL:
+            return _CONTACTS_CACHE[cache_key]
+
         should_close = False
         if db is None:
             db = SessionLocal()
@@ -366,54 +385,72 @@ class ContactService:
                         msgs_by_key[norm_p].append(m)
 
             responses = []
+            valid_keys = set(msgs_by_key.keys()) if msgs_by_key else set()
+
             for r in records:
                 matched_msgs = []
                 seen_msg_ids = set()
 
-                candidates_keys = []
-                if r.name:
-                    candidates_keys.append(r.name.lower())
-                    norm_n = normalize_text(r.name)
-                    if norm_n:
-                        candidates_keys.append(norm_n)
-                    first = r.name.split()[0]
-                    if len(first) >= 4:
-                        candidates_keys.append(first.lower())
-                if r.nickname:
-                    candidates_keys.append(r.nickname.lower())
-                    norm_nick = normalize_text(r.nickname)
-                    if norm_nick:
-                        candidates_keys.append(norm_nick)
-                if r.phone_number:
-                    dig = re.sub(r"\D", "", r.phone_number)
-                    if dig:
-                        candidates_keys.append(dig)
-                        if len(dig) >= 8:
-                            candidates_keys.append(dig[-8:])
+                # FAST-PATH: Se não há mensagens ou o contato não possui nenhuma chave em valid_keys,
+                # pula extrações caras de candidatos e normalizações desnecessárias.
+                if valid_keys:
+                    dig = re.sub(r"\D", "", r.phone_number or "") if r.phone_number else ""
+                    name_low = r.name.lower().strip() if r.name else ""
+                    has_potential_match = (
+                        (dig and (dig in valid_keys or (len(dig) >= 8 and dig[-8:] in valid_keys)))
+                        or (name_low and name_low in valid_keys)
+                        or (bool(r.nickname))
+                    )
 
-                for k in candidates_keys:
-                    if k in msgs_by_key:
-                        for m in msgs_by_key[k]:
-                            if m.id not in seen_msg_ids:
-                                seen_msg_ids.add(m.id)
-                                matched_msgs.append(m)
+                    if has_potential_match:
+                        candidates_keys = []
+                        if r.name:
+                            candidates_keys.append(name_low)
+                            norm_n = normalize_text(r.name)
+                            if norm_n:
+                                candidates_keys.append(norm_n)
+                            first = r.name.split()[0]
+                            if len(first) >= 4:
+                                candidates_keys.append(first.lower())
+                        if r.nickname:
+                            candidates_keys.append(r.nickname.lower())
+                            norm_nick = normalize_text(r.nickname)
+                            if norm_nick:
+                                candidates_keys.append(norm_nick)
+                        if dig:
+                            candidates_keys.append(dig)
+                            if len(dig) >= 8:
+                                candidates_keys.append(dig[-8:])
 
-                matched_msgs.sort(key=lambda m: m.created_at or datetime.min, reverse=True)
-                top_msgs = matched_msgs[:3]
+                        for k in candidates_keys:
+                            if k in msgs_by_key:
+                                for m in msgs_by_key[k]:
+                                    if m.id not in seen_msg_ids:
+                                        seen_msg_ids.add(m.id)
+                                        matched_msgs.append(m)
 
-                recent_sentiments = [
-                    {
-                        "sentiment": m.sentiment or "NEUTRAL",
-                        "sentiment_score": m.sentiment_score or 0.0,
-                        "summary": m.summary or (m.revised_text[:60] if m.revised_text else ""),
-                        "created_at": m.created_at.strftime("%d/%m %H:%M") if m.created_at else "",
-                        "urgency": m.urgency or "MEDIUM",
-                    }
-                    for m in top_msgs
-                ]
-                latest_sentiment = recent_sentiments[0]["sentiment"] if recent_sentiments else "NEUTRAL"
+                if matched_msgs:
+                    matched_msgs.sort(key=lambda m: m.created_at or datetime.min, reverse=True)
+                    top_msgs = matched_msgs[:3]
+                    recent_sentiments = [
+                        {
+                            "sentiment": m.sentiment or "NEUTRAL",
+                            "sentiment_score": m.sentiment_score or 0.0,
+                            "summary": m.summary or (m.revised_text[:60] if m.revised_text else ""),
+                            "created_at": m.created_at.strftime("%d/%m %H:%M") if m.created_at else "",
+                            "urgency": m.urgency or "MEDIUM",
+                        }
+                        for m in top_msgs
+                    ]
+                    latest_sentiment = recent_sentiments[0]["sentiment"] if recent_sentiments else "NEUTRAL"
+                else:
+                    recent_sentiments = []
+                    latest_sentiment = "NEUTRAL"
+
                 responses.append(record_to_response(r, latest_sentiment=latest_sentiment, recent_sentiments=recent_sentiments))
 
+            _CONTACTS_CACHE[cache_key] = responses
+            _CONTACTS_CACHE_TS[cache_key] = now_ts
             return responses
         finally:
             if should_close:
@@ -592,7 +629,7 @@ class ContactService:
 
             # Sincroniza nó no Grafo NetworkX
             self._sync_contact_to_graph(rec)
-
+            invalidate_contacts_cache()
             return record_to_response(rec)
         finally:
             if should_close:
@@ -625,6 +662,7 @@ class ContactService:
             db.commit()
             db.refresh(rec)
             self._sync_contact_to_graph(rec)
+            invalidate_contacts_cache()
             return record_to_response(rec)
         finally:
             if should_close:
@@ -657,6 +695,7 @@ class ContactService:
             db.commit()
             db.refresh(rec)
             self._sync_contact_to_graph(rec)
+            invalidate_contacts_cache()
             return record_to_response(rec)
         finally:
             if should_close:

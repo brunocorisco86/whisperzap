@@ -13,7 +13,7 @@ from src.contacts.schemas import (
     ContactResponse,
     ContactUpdate,
 )
-from src.contacts.service import contact_service, record_to_response
+from src.contacts.service import contact_service, record_to_response, invalidate_contacts_cache
 from src.memory.database import get_db
 
 router = APIRouter(prefix="/api/v1/contacts", tags=["Contatos & Papéis"])
@@ -114,6 +114,7 @@ async def update_contact(contact_id: str, payload: ContactUpdate, db: Session = 
             pass
 
     contact_service._sync_contact_to_graph(rec)
+    invalidate_contacts_cache()
     return record_to_response(rec)
 
 
@@ -161,6 +162,7 @@ async def delete_contact(contact_id: str, db: Session = Depends(get_db)):
 
     db.delete(rec)
     db.commit()
+    invalidate_contacts_cache()
     return None
 
 
