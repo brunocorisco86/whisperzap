@@ -703,15 +703,37 @@ async def get_daily_sentiment_snapshots(
 
 @router.get("/sentiment/timeline", summary="Consulta série temporal de sentimentos de uma pessoa")
 async def get_sentiment_timeline(
-    speaker: str = Query(..., description="Nome ou identificador da pessoa"),
+    speaker: Optional[str] = Query(default=None, description="Nome ou identificador da pessoa"),
     start_date: str | None = Query(default=None, description="Data inicial YYYY-MM-DD"),
     end_date: str | None = Query(default=None, description="Data final YYYY-MM-DD"),
     db: Session = Depends(get_db),
 ):
     """Retorna a evolução histórica de sentimentos e pontos da série temporal para gráficos."""
     from src.memory.sentiment_timeline import sentiment_timeline_service
+    from src.memory.models import DailySentimentSnapshotRecord, PersonSentimentTimelineResponse
+
+    resolved_speaker = speaker.strip() if speaker and speaker.strip() else None
+    if not resolved_speaker:
+        top_snapshot = (
+            db.query(DailySentimentSnapshotRecord)
+            .order_by(DailySentimentSnapshotRecord.interactions_count.desc())
+            .first()
+        )
+        if top_snapshot and top_snapshot.speaker:
+            resolved_speaker = top_snapshot.speaker
+        else:
+            return PersonSentimentTimelineResponse(
+                speaker="Geral",
+                role="UNKNOWN",
+                phone_number=None,
+                total_days_tracked=0,
+                overall_sentiment="NEUTRAL",
+                avg_score=0.0,
+                timeline=[],
+            )
+
     return sentiment_timeline_service.get_person_timeline(
-        speaker=speaker,
+        speaker=resolved_speaker,
         start_date=start_date,
         end_date=end_date,
         db=db,

@@ -126,13 +126,23 @@ async def merge_similar_dictionary_terms(
 @router.get("/candidates", response_model=list[LexicalCandidateResponse])
 async def list_lexical_candidates(
     status_filter: str | None = Query(default=None, alias="status", description="Filtrar por PENDING, HARVESTED, REJECTED"),
+    limit: int = Query(default=100, ge=1, le=500, description="Limite de candidatos retornados"),
+    offset: int = Query(default=0, ge=0, description="Deslocamento para paginação"),
     db: Session = Depends(get_db),
 ):
-    """Lista termos dúbios e candidatos no buffer de aprendizado ativo."""
+    """Lista termos dúbios e candidatos no buffer de aprendizado ativo com limite e paginação."""
     query = db.query(LexicalCandidateRecord)
     if status_filter:
         query = query.filter(LexicalCandidateRecord.status == status_filter.upper())
-    return query.order_by(LexicalCandidateRecord.occurrence_count.desc(), LexicalCandidateRecord.created_at.desc()).all()
+    return (
+        query.order_by(
+            LexicalCandidateRecord.occurrence_count.desc(),
+            LexicalCandidateRecord.created_at.desc(),
+        )
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
 
 
 @router.post("/harvest", response_model=LexicalHarvestResult)
