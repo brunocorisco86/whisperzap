@@ -139,3 +139,32 @@ def test_memory_search_and_graph_endpoints():
     assert res_stats.status_code == 200
     assert "total_messages" in res_stats.json()
     assert "graph_nodes" in res_stats.json()
+
+
+def test_memory_list_messages_endpoint():
+    """Testa listagem de mensagens recentes (Calíope) com carregamento seguro de tarefas e entidades."""
+    # Garante pelo menos 1 mensagem persistida
+    client.post(
+        "/api/v1/memory/messages",
+        json={
+            "speaker": "Bruno",
+            "revised_text": "Mensagem para teste do endpoint list_recent_messages.",
+            "raw_text": "mensagem para teste",
+            "sentiment": "POSITIVE",
+        },
+    )
+
+    res = client.get("/api/v1/memory/messages?limit=10")
+    assert res.status_code == 200
+    data = res.json()
+    assert isinstance(data, list)
+    assert len(data) >= 1
+    first = data[0]
+    assert "id" in first
+    assert "speaker" in first
+    assert "tasks" in first
+    assert "entities" in first
+    assert "tasks_count" in first
+    assert isinstance(first["tasks"], list)
+    assert isinstance(first["entities"], list)
+

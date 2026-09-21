@@ -2,7 +2,7 @@ import asyncio
 from typing import Optional
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from src.ai_gateway.schemas import (
     DailySummaryRequest,
     DailySummaryResponse,
@@ -579,12 +579,11 @@ async def list_recent_messages(
 
     records = (
         query.options(
-            joinedload(MessageRecord.tasks),
-            joinedload(MessageRecord.entities),
+            selectinload(MessageRecord.tasks),
+            selectinload(MessageRecord.entities),
         )
         .order_by(MessageRecord.created_at.desc())
         .limit(limit)
-        .unique()
         .all()
     )
     return [
