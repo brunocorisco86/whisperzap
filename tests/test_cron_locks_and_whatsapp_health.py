@@ -43,13 +43,33 @@ async def test_whatsapp_service_restart_instance():
 
 @pytest.mark.asyncio
 async def test_whatsapp_service_check_socket_health_open():
-    """Valida checagem de saúde quando o socket está conectado e saudável ('open')."""
+    """Valida checagem de saúde quando o socket está conectado e saudável ('open') e a sondagem ativa tem sucesso."""
     import httpx
-    mock_resp = httpx.Response(200, json={"instance": {"state": "open"}})
-    with patch("httpx.AsyncClient.get", new_callable=AsyncMock, return_value=mock_resp):
-        health = await whatsapp_service.check_socket_health()
-        assert health["healthy"] is True
-        assert health["state"] == "open"
+    mock_resp_get = httpx.Response(200, json={"instance": {"state": "open"}})
+    mock_resp_post = httpx.Response(200, json=[{"jid": "554497604925@s.whatsapp.net", "exists": True}])
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock, return_value=mock_resp_get):
+        with patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_resp_post):
+            health = await whatsapp_service.check_socket_health()
+            assert health["healthy"] is True
+            assert health["state"] == "open"
+
+
+@pytest.mark.asyncio
+async def test_whatsapp_service_check_socket_health_detects_zombie_and_restarts():
+    """Valida detecção de socket zumbi (connectionState='open', mas sondagem USync falha com Connection Closed/428) e acionamento de auto-cura."""
+    import httpx
+    mock_resp_get = httpx.Response(200, json={"instance": {"state": "open"}})
+    mock_resp_post = httpx.Response(428, json={"error": "Connection Closed"})
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock, return_value=mock_resp_get):
+        with patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_resp_post):
+            with patch.object(whatsapp_service, "restart_instance", new_callable=AsyncMock) as mock_restart:
+                mock_restart.return_value = True
+
+                health = await whatsapp_service.check_socket_health()
+                assert health["healthy"] is False
+                assert health.get("zombie_socket") is True
+                assert health["auto_healed"] is True
+                mock_restart.assert_called_once()
 
 
 @pytest.mark.asyncio

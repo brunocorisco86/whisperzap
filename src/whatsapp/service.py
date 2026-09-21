@@ -13,6 +13,7 @@ import time
 import base64
 import logging
 import tempfile
+import asyncio
 from datetime import datetime, timezone, timedelta
 from threading import Lock
 from typing import Any, Dict, Optional, Tuple
@@ -263,8 +264,14 @@ class WhatsAppService:
                     logger.info(f"✅ Mensagem enviada com sucesso para o proprietário ({clean_number}).")
                     return True
                 logger.error(f"Erro ao enviar mensagem WhatsApp ({resp.status_code}): {resp.text}")
+                # Auto-reconexão reativa: se o socket fechou ou a instância caiu (400 Bad Request, 428, 5xx)
+                if resp.status_code in (400, 428, 500, 502, 503):
+                    logger.warning("⚠️ [Auto-Cura WhatsApp] Falha crítica de envio detectada. Disparando reinicialização da instância...")
+                    asyncio.create_task(self.restart_instance())
         except Exception as exc:
             logger.error(f"Exceção ao enviar mensagem WhatsApp para {clean_number}: {exc}")
+            logger.warning("⚠️ [Auto-Cura WhatsApp] Exceção de rede no envio. Disparando reinicialização da instância...")
+            asyncio.create_task(self.restart_instance())
 
         return False
 
@@ -309,7 +316,7 @@ class WhatsAppService:
         return False
 
     async def check_socket_health(self) -> dict:
-        """Verifica a saúde do socket WebSocket do WhatsApp e reinicia a instância se estiver instável/zumbi."""
+        """Verifica a saúde real do socket WebSocket do WhatsApp e reinicia a instância se estiver instável/zumbi."""
         target_url = f"{self.api_url}/instance/connectionState/{self.instance}"
         headers = {"apikey": self.api_key}
         try:
@@ -321,6 +328,21 @@ class WhatsAppService:
                         logger.warning(f"⚠️ [Watchdog WhatsApp] Instância em estado '{state}'. Disparando auto-reconexão...")
                         restarted = await self.restart_instance()
                         return {"healthy": False, "state": state, "auto_healed": restarted}
+
+                    # Sondagem ativa real: mesmo com state == 'open', o socket Baileys pode estar zumbi (Connection Closed)
+                    probe_url = f"{self.api_url}/chat/whatsappNumbers/{self.instance}"
+                    probe_payload = {"numbers": [settings.USER_PHONE_NUMBER or "554497604925"]}
+                    try:
+                        probe_resp = await client.post(probe_url, json=probe_payload, headers=headers, timeout=5.0)
+                        if probe_resp.status_code != 200:
+                            logger.warning(f"⚠️ [Watchdog WhatsApp] Socket zumbi detectado (USync probe HTTP {probe_resp.status_code}). Disparando auto-reconexão...")
+                            restarted = await self.restart_instance()
+                            return {"healthy": False, "zombie_socket": True, "probe_status": probe_resp.status_code, "auto_healed": restarted}
+                    except Exception as probe_exc:
+                        logger.warning(f"⚠️ [Watchdog WhatsApp] Falha na sondagem ativa do socket ({probe_exc}). Disparando auto-reconexão...")
+                        restarted = await self.restart_instance()
+                        return {"healthy": False, "zombie_socket": True, "probe_error": str(probe_exc), "auto_healed": restarted}
+
                     return {"healthy": True, "state": "open"}
                 else:
                     logger.warning(f"⚠️ [Watchdog WhatsApp] HTTP {resp.status_code} ao consultar connectionState. Tentando auto-reconexão...")

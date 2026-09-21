@@ -81,6 +81,12 @@ services:
         condition: service_started
     volumes:
       - hermes_evolution_instances:/evolution/instances
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     networks:
       - hermes_monolith_network
 
