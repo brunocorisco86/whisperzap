@@ -466,3 +466,41 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
   - **Calibração de Threshold de Síntese Mobile**: Resumos de 250 a 400 caracteres fornecem densidade executiva suficiente sem exigir scroll no smartphone, preservando a visibilidade imediata das tarefas identificadas.
   - **Execução Não-Root em Contêineres de Produção**: Para instalar pacotes em contêineres que rodam com usuário não-privilegiado (`hermes`), é mandatório passar a flag `-u 0` no comando `docker exec`.
 - **Resultado**: Módulo de inteligência de documentos PDF 100% operacional, resiliente a falhas e em produção na VPS.
+
+---
+
+### ADR 016 — Watchdog Ativo Anti-Zumbi do Socket Baileys e Auto-Cura Reativa no Whisperzap
+- **Data**: 2026-09-21
+- **Status**: Aprovado e Implementado
+- **Contexto**: A Evolution API v2 sofreu desconexão de WebSocket (`Connection Closed`, status 428) com o WhatsApp após uma instabilidade transiente de rede/DB. Embora o socket estivesse morto, a API HTTP do Evolution continuava reportando `200 {"instance": {"state": "open"}}` na rota `/instance/connectionState/{instance}`. O watchdog passivo do Whisperzap (`cron_service.py` a cada 5m) lia esse status "open" e presumia que tudo estava operacional, permitindo que o sistema ficasse mudo por 3 dias sem disparar alertas nem reiniciar a conexão.
+- **Decisão**:
+  1. Implementar uma **sondagem ativa real via WebSocket (USync probe)** no método `check_socket_health()` em `src/whatsapp/service.py`:
+     - Se `connectionState` for diferente de `open`, aciona `restart_instance()`.
+     - Se `connectionState` for `open`, faz uma chamada `POST /chat/whatsappNumbers/{instance}` com o número do proprietário (`settings.USER_PHONE_NUMBER`). Essa chamada obriga a troca de mensagens USync direta pelo WebSocket Baileys. Se retornar != 200 ou lançar exceção, o estado zumbi é detectado e `restart_instance()` é acionado imediatamente.
+  2. Implementar **auto-cura reativa em falhas de envio (`send_text_message`)**:
+     - Sempre que o envio de uma mensagem falhar com status 400, 428 ou 5xx (típico de socket Baileys desconectado), o Whisperzap dispara em background uma tarefa assíncrona para reiniciar a instância.
+  3. Adicionar Docker healthcheck ao serviço `hermes-evolution-api` no `docker-compose.monolith.yml` com `wget -qO- http://localhost:8080/`.
+
+---
+
+## 📅 Log de Sessão — 21 de Setembro de 2026
+
+- **Objetivo**: Investigar o funcionamento na VPS Hostinger, identificar por que nenhuma mensagem era transcrita e por que consultas com prefixo `?` não obtinham resposta, e implementar mecanismos preventivos definitivos contra sockets zumbis do WhatsApp.
+- **Ações Realizadas**:
+  1. **Investigação e Diagnóstico de Produção na VPS**:
+     - Conexão via SSH à VPS (`hostinger`), análise dos contêineres Docker e logs do `hermes-evolution-api` e `hermes-api`.
+     - Identificado que em 18/09/2026 às 21:01 UTC a Evolution API registrou `Error: Connection Closed` e parou de entregar webhooks.
+     - A consulta enviada pelo usuário (`?Por favor me ajude trazendo quais as minhas pendencias e o que eu devo priorizar hoje`, ID `3EB0E9946ADDCE82836972`) ficou represada na fila interna do Baileys.
+  2. **Remediação Imediata**:
+     - Reinicialização de `hermes-evolution-api` na VPS. O Baileys reconectou, drenou o backlog e o `hermes-api` processou e respondeu a consulta no WhatsApp às 17:47 BRT (`201 Created`).
+  3. **Implementação de Prevenção Definitiva (Anti-Zumbi Watchdog & Auto-Cura)**:
+     - Adicionada sondagem ativa USync em `src/whatsapp/service.py` (`check_socket_health`) testando conectividade real do Baileys a cada 5 minutos.
+     - Adicionada auto-cura reativa em `send_text_message` para disparar restart imediato em erros 400/428/5xx.
+     - Adicionado healthcheck de container no `docker-compose.monolith.yml`.
+  4. **Testes Automatizados & Deploy**:
+     - Atualização de `tests/test_cron_locks_and_whatsapp_health.py` com novo teste `test_whatsapp_service_check_socket_health_detects_zombie_and_restarts` (100% aprovado).
+     - Instalação de `pymupdf` e `pymupdf4llm` no ambiente local.
+     - Atualização da base de conhecimento AST com `graphify update .` (2.461 nós, 4.285 arestas, 161 comunidades).
+     - Commit, push para `origin/main` e deploy na VPS com `git pull origin main` e reinicialização de `hermes-api`.
+     - Validação ao vivo da saúde ativa do socket em produção: `{'healthy': True, 'state': 'open'}`.
+- **Resultado**: Causa raiz eliminada, socket restaurado, consulta respondida e sistema protegido contra novos travamentos silenciosos de WebSocket.

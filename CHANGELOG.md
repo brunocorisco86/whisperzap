@@ -4,6 +4,22 @@ Todas as mudanças notáveis, refatorações arquiteturais, motores de IA e otim
 
 ---
 
+## [v2.8.1] — 2026-09-21 — Release: Active USync Watchdog Probe & WhatsApp Socket Auto-Healing
+
+### 🛡️ 1. Watchdog Ativo Anti-Zumbi do Socket Baileys (`src/whatsapp/service.py`)
+- **Diagnóstico da Falha**: Identificado que a Evolution API v2 continuava retornando `200 {"instance": {"state": "open"}}` na rota `/instance/connectionState/{instance}` mesmo após a queda silenciosa do WebSocket Baileys (`Connection Closed`, status 428), deixando a instância em estado zumbi por 3 dias sem entregar webhooks.
+- **Sondagem Ativa Real (USync)**: O método `check_socket_health()` agora executa uma sondagem ativa real através de `POST /chat/whatsappNumbers/{instance}` checando o próprio número do proprietário. Esse endpoint exige tráfego direto pelo WebSocket Baileys com os servidores do WhatsApp.
+- **Detecção de Socket Zumbi**: Qualquer falha na sondagem (status diferente de 200, timeout ou erro 428) detecta o estado zumbi e aciona imediatamente `restart_instance()`, recuperando a conexão em ~2 segundos.
+
+### ⚡ 2. Auto-Cura Reativa no Envio de Mensagens (`send_text_message`)
+- **Recuperação Imediata em Erros de Envio**: Caso um envio de mensagem via WhatsApp retorne erros típicos de desconexão (`400 Bad Request`, `428 Precondition Required`, `5xx`) ou sofra exceções de rede, uma rotina em background aciona automaticamente o reinício da instância na Evolution API.
+
+### 🐳 3. Observabilidade e Docker Healthcheck
+- **Healthcheck no Contêiner Evolution API**: Adicionado healthcheck com `wget -qO- http://localhost:8080/` no serviço `hermes-evolution-api` em `docker-compose.monolith.yml`.
+- **Cobertura de Testes Automatizados**: Criado teste `test_whatsapp_service_check_socket_health_detects_zombie_and_restarts` em `tests/test_cron_locks_and_whatsapp_health.py` garantindo que sockets zumbis sejam interceptados e reiniciados.
+
+---
+
 ## [v2.8.0] — 2026-09-11 — Release: PDF Document Intelligence & 3-Tier Cascading Extractor
 
 ### 📄 1. Processamento Multimodal de Documentos PDF via WhatsApp
