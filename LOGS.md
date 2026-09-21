@@ -504,3 +504,18 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
      - Commit, push para `origin/main` e deploy na VPS com `git pull origin main` e reinicialização de `hermes-api`.
      - Validação ao vivo da saúde ativa do socket em produção: `{'healthy': True, 'state': 'open'}`.
 - **Resultado**: Causa raiz eliminada, socket restaurado, consulta respondida e sistema protegido contra novos travamentos silenciosos de WebSocket.
+
+---
+
+### ADR 017 — Prevenção de Eco de Respostas do Bot e Deduplicação Inteligente de Subtarefas no Terpsícore
+- **Data**: 2026-09-21
+- **Status**: Aprovado e Implementado
+- **Contexto**: Ao responder a uma consulta do usuário no chat pessoal do WhatsApp, o bot gerou um webhook de saída (`from_me: true`). Como a resposta continha a citação das pendências existentes e começou com uma saudação personalizada em vez de prefixos estritos (`🎙️`, `📋`, etc.), o filtro anti-eco deixou passar a mensagem, gerando 4 tarefas clonadas no Terpsícore. Além disso, no módulo de subtarefas (`SubtaskService`), consolidações de tarefas com mesmo título geravam subtarefas repetidas no checklist (`- [ ] X` duplicado), totalizando 29 tarefas com checklists redundantes.
+- **Decisão**:
+  1. Implementar barreira de proteção anti-eco em duas camadas (`src/whatsapp/service.py` e `src/whatsapp/router.py`):
+     - Rastreio de IDs de mensagens enviadas pelo bot (`_sent_bot_keys`) com descarte imediato no webhook.
+     - Detecção de assinaturas semânticas de bot (`BOT_SIGNATURES`) para mensagens `from_me: true` que contenham blocos RAG, resumos ou listagens do Terpsícore.
+  2. Implementar equivalência semântica e deduplicação em `src/memory/subtask_service.py`:
+     - Método `_are_titles_equivalent()` para impedir que tarefas com títulos equivalentes sejam transformadas em subtarefas repetidas no checklist.
+     - Método `deduplicate_subtasks()` para higienizar checklists existentes e recalcular automaticamente a taxa percentual de progresso no cabeçalho executivo.
+  3. Sanitizar a base de dados de produção, cancelando as 4 tarefas clonadas pelo eco e desduplicando as subtarefas das 29 tarefas identificadas.

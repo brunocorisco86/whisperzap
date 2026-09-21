@@ -4,6 +4,23 @@ Todas as mudanças notáveis, refatorações arquiteturais, motores de IA e otim
 
 ---
 
+## [v2.8.2] — 2026-09-21 — Release: Terpsícore Subtask Deduplication & Bot Echo Loop Prevention
+
+### 🛡️ 1. Bloqueio Estrito de Eco de Respostas do Bot (`src/whatsapp/service.py` e `src/whatsapp/router.py`)
+- **Rastreio de IDs de Mensagens Enviadas (`_sent_bot_keys`)**: Armazena em memória (com limpeza periódica TTL) os identificadores únicos gerados pela Evolution API ao disparar mensagens pelo bot, descartando imediatamente quaisquer webhooks de retorno.
+- **Assinaturas Semânticas Anti-Eco (`BOT_SIGNATURES`)**: Detecção proativa de respostas do bot que começam com saudações personalizadas (ex: "Bruno, o sistema está limpo...") e contenham blocos RAG, resumos ou listagens do Terpsícore, eliminando a re-extração acidental de tarefas citadas nas respostas.
+
+### 📋 2. Deduplicação e Equivalência Inteligente de Subtarefas (`src/memory/subtask_service.py`)
+- **Equivalência Semântica (`_are_titles_equivalent`)**: Compara títulos de tarefas e subtarefas normalizados e via SequenceMatcher (threshold > 0.82) para evitar inserção de subtarefas redundantes na consolidação.
+- **Prevenção de Checklist Redundante em `add_or_merge_subtask`**: Tarefas com mesmo título não geram mais subtarefas gêmeas `- [ ] X` e `- [ ] X`.
+- **Utilitário de Higienização (`deduplicate_subtasks`)**: Varre e purga itens idênticos no checklist de notas mantendo o estado de conclusão e recalculando o cabeçalho executivo de progresso `(X/Y concluídas)`.
+
+### 🧹 3. Saneamento do Banco de Dados de Produção
+- Cancelamento das 4 tarefas eco geradas às 20:47 de 21/09.
+- Higienização e recálculo de cabeçalho em 29 tarefas no Terpsícore que acumulavam subtarefas duplicadas (reduzindo a 0 duplicatas).
+
+---
+
 ## [v2.8.1] — 2026-09-21 — Release: Active USync Watchdog Probe & WhatsApp Socket Auto-Healing
 
 ### 🛡️ 1. Watchdog Ativo Anti-Zumbi do Socket Baileys (`src/whatsapp/service.py`)
