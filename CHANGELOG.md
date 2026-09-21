@@ -4,6 +4,24 @@ Todas as mudanças notáveis, refatorações arquiteturais, motores de IA e otim
 
 ---
 
+## [v2.8.3] — 2026-09-21 — Release: High-Verbosity ntfy Push Notifications & WhatsApp Decoupling
+
+### 📢 1. Notificações Push via ntfy de Alta Verbosidade (`src/notifications/service.py`)
+- **Despachante Ntfy Nativo (`NtfyNotificationService`)**: Publicação JSON direta (`POST https://ntfy.sh`) com suporte completo a caracteres UTF-8, emojis e tags contextuais, eliminando restrições de headers ASCII.
+- **Riqueza de Metadados de Áudio (`notify_audio_processed`)**: Inclui duração, velocidade da fala (WPM), pausas acumuladas, modelo STT utilizado, transcrição revisada contextual, bloco colapsável `<details>` com o texto bruto STT, badges de intenção/sentimento e checklist completo de tarefas Terpsícore.
+- **Detalhamento de Documentos PDF (`notify_pdf_processed`)**: Notifica nome do arquivo, tamanho em MB, contagem de páginas, motor de extração (Gemini 3.5/2.5/PyMuPDF), resumo executivo do documento e tarefas extraídas.
+- **Relatórios Executivos Agendados (`notify_scheduled_report`)**: Despacho automático de Resumo Diário (18:00 BRT), Fechamento Sereno do Dia (21:00 BRT) e Relatório Semanal de Domingo (20:00 BRT).
+- **Alertas de Sistema (`notify_system_event`)**: Notificações automáticas de auto-cura, quedas de socket e rejeições de PDFs oversized (> 15 MB).
+
+### 🔇 2. Desacoplamento do WhatsApp & Redução de Ruído (`src/whatsapp/service.py` e `src/scheduler/cron_service.py`)
+- **Flag `NOTIFY_VIA_WHATSAPP=false`**: Por padrão, o envio de confirmações de áudio, resumos de PDFs e relatórios diários/semanais para o contato de WhatsApp do proprietário é desativado para manter o chat limpo e sem poluição.
+- **Preservação do Canal Interativo (`?` e `/hermes`)**: Consultas interativas iniciadas pelo usuário via WhatsApp continuam sendo respondidas normalmente no chat onde foram enviadas, com espelhamento transparente de auditoria no ntfy.
+
+### ⚙️ 3. Configuração Unificada & Docker Compose
+- Adicionadas variáveis `NTFY_ENABLED`, `NTFY_URL`, `NTFY_TOPIC=bruno-casa-dallas` e `NOTIFY_VIA_WHATSAPP=false` no `.env`, `.env.example` e repassadas ao contêiner `hermes-api` no `docker-compose.monolith.yml`.
+
+---
+
 ## [v2.8.2] — 2026-09-21 — Release: Terpsícore Subtask Deduplication & Bot Echo Loop Prevention
 
 ### 🛡️ 1. Bloqueio Estrito de Eco de Respostas do Bot (`src/whatsapp/service.py` e `src/whatsapp/router.py`)

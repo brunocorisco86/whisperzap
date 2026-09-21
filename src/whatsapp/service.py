@@ -30,6 +30,7 @@ from src.memory.models import MessageCreate, TaskRecord
 from src.ai_gateway.agent import hermes_agent_service
 from src.ai_gateway.pdf_extractor import pdf_extractor, MAX_PDF_SIZE_BYTES
 from src.memory.database import SessionLocal
+from src.notifications import ntfy_service
 
 logger = logging.getLogger(__name__)
 
@@ -740,46 +741,76 @@ class WhatsAppService:
                 )
                 saved_msg = await memory_repository.save_message(data=msg_in, db=db)
 
-                # 4. Envia transcrição no WhatsApp EXCLUSIVAMENTE para o proprietário se for áudio recente
+                # 4. Notificações: ntfy (alta verbosidade) e WhatsApp (opcional)
                 if not is_historic:
                     created_tasks = []
                     if saved_msg:
                         created_tasks = db.query(TaskRecord).filter(TaskRecord.message_id == saved_msg.id).all()
 
-                    if is_self_memo:
-                        reply_lines = [f"🎙️ *Nota Pessoal Gravada:*", f'"{revised_text.strip()}"']
+                    # 4.1 Notificação rica em Markdown via ntfy (se ativado)
+                    if getattr(settings, "NTFY_ENABLED", True) and getattr(settings, "NTFY_TOPIC", None):
+                        sentiment_dict = None
+                        if saved_msg:
+                            sentiment_dict = {
+                                "polarity": getattr(saved_msg, "sentiment", "NEUTRAL"),
+                                "sentiment_score": getattr(saved_msg, "sentiment_score", 0.0),
+                            }
+                        try:
+                            await ntfy_service.notify_audio_processed(
+                                speaker=speaker_label,
+                                revised_text=revised_text,
+                                raw_text=raw_text_audio,
+                                is_self_memo=is_self_memo,
+                                contact_phone=sanitize_phone_number(info.get("remote_jid", "")),
+                                duration_s=float(duration or 0.0),
+                                prosody=prosody_data,
+                                sentiment=sentiment_dict,
+                                intent=getattr(saved_msg, "intent", None),
+                                tasks=created_tasks,
+                                model_name=getattr(whisper_service, "model_name", "Whisper"),
+                                message_id=saved_msg.id if saved_msg else None,
+                            )
+                        except Exception as ntfy_err:
+                            logger.warning(f"⚠️ Erro ao despachar notificação de áudio via ntfy: {ntfy_err}")
+
+                    # 4.2 Envia transcrição no WhatsApp apenas se NOTIFY_VIA_WHATSAPP=True
+                    if getattr(settings, "NOTIFY_VIA_WHATSAPP", False):
+                        if is_self_memo:
+                            reply_lines = [f"🎙️ *Nota Pessoal Gravada:*", f'"{revised_text.strip()}"']
+                        else:
+                            contact_name = info.get("push_name") or "Contato"
+                            contact_phone = sanitize_phone_number(info.get("remote_jid", ""))
+                            phone_badge = f" ({contact_phone})" if contact_phone and contact_phone != contact_name else ""
+                            reply_lines = [f"🎙️ *Áudio Recebido de:* {contact_name}{phone_badge}", f'"{revised_text.strip()}"']
+
+                        if created_tasks:
+                            reply_lines.append("")
+                            has_signaled = any(
+                                getattr(t, "is_favorite", False)
+                                or getattr(t, "is_epic", False)
+                                or getattr(t, "is_idea", False)
+                                or getattr(t, "in_vault", False)
+                                or (str(t.priority or "").upper() in ["HIGH", "URGENT"])
+                                for t in created_tasks
+                            )
+                            section_title = "📋 *Tarefas Sinalizadas (Terpsícore):*" if has_signaled else "📋 *Tarefas Capturadas (Terpsícore):*"
+                            reply_lines.append(section_title)
+                            for t in created_tasks:
+                                reply_lines.append(format_terpsicore_task_verbose(t))
+                        elif getattr(saved_msg, "intent", None) == "IDEA":
+                            reply_lines.append("")
+                            reply_lines.append("💡 *Classificação:* 🧠 Ideia / Insight Estratégico (salvo no Grafo)")
+                        elif getattr(saved_msg, "intent", None) == "DECISION":
+                            reply_lines.append("")
+                            reply_lines.append("⚖️ *Classificação:* Decisão Registrada (salvo no Grafo)")
+                        elif is_self_memo:
+                            reply_lines.append("")
+                            reply_lines.append("📝 *Classificação:* Nota Pessoal (Memória & Grafo)")
+
+                        reply_text = "\n".join(reply_lines)
+                        await self.send_text_message(number=settings.USER_PHONE_NUMBER, text=reply_text)
                     else:
-                        contact_name = info.get("push_name") or "Contato"
-                        contact_phone = sanitize_phone_number(info.get("remote_jid", ""))
-                        phone_badge = f" ({contact_phone})" if contact_phone and contact_phone != contact_name else ""
-                        reply_lines = [f"🎙️ *Áudio Recebido de:* {contact_name}{phone_badge}", f'"{revised_text.strip()}"']
-
-                    if created_tasks:
-                        reply_lines.append("")
-                        has_signaled = any(
-                            getattr(t, "is_favorite", False)
-                            or getattr(t, "is_epic", False)
-                            or getattr(t, "is_idea", False)
-                            or getattr(t, "in_vault", False)
-                            or (str(t.priority or "").upper() in ["HIGH", "URGENT"])
-                            for t in created_tasks
-                        )
-                        section_title = "📋 *Tarefas Sinalizadas (Terpsícore):*" if has_signaled else "📋 *Tarefas Capturadas (Terpsícore):*"
-                        reply_lines.append(section_title)
-                        for t in created_tasks:
-                            reply_lines.append(format_terpsicore_task_verbose(t))
-                    elif getattr(saved_msg, "intent", None) == "IDEA":
-                        reply_lines.append("")
-                        reply_lines.append("💡 *Classificação:* 🧠 Ideia / Insight Estratégico (salvo no Grafo)")
-                    elif getattr(saved_msg, "intent", None) == "DECISION":
-                        reply_lines.append("")
-                        reply_lines.append("⚖️ *Classificação:* Decisão Registrada (salvo no Grafo)")
-                    elif is_self_memo:
-                        reply_lines.append("")
-                        reply_lines.append("📝 *Classificação:* Nota Pessoal (Memória & Grafo)")
-
-                    reply_text = "\n".join(reply_lines)
-                    await self.send_text_message(number=settings.USER_PHONE_NUMBER, text=reply_text)
+                        logger.info("📱 [WhatsApp] Notificação suprimida no WhatsApp conforme NOTIFY_VIA_WHATSAPP=false (despachada via ntfy).")
                 else:
                     logger.info(f"🎧 Áudio histórico arquivado silenciosamente na memória passiva (sem envio de mensagem).")
 
@@ -825,10 +856,18 @@ class WhatsAppService:
                     size_mb = len(pdf_bytes) / (1024 * 1024)
                     logger.warning(f"🚨 [PDF] Arquivo {pdf_filename} rejeitado: {size_mb:.2f} MB excede limite de 15 MB.")
                     if not is_historic and (is_self_memo or self._is_owner_number(info.get("phone_number", ""))):
-                        await self.send_text_message(
-                            number=settings.USER_PHONE_NUMBER,
-                            text=f"⚠️ *Documento Não Processado*\nO arquivo *{pdf_filename}* possui {size_mb:.1f} MB e excede a trava de segurança de 15 MB para evitar estouro de memória no container.",
-                        )
+                        if getattr(settings, "NOTIFY_VIA_WHATSAPP", False):
+                            await self.send_text_message(
+                                number=settings.USER_PHONE_NUMBER,
+                                text=f"⚠️ *Documento Não Processado*\nO arquivo *{pdf_filename}* possui {size_mb:.1f} MB e excede a trava de segurança de 15 MB para evitar estouro de memória no container.",
+                            )
+                        if getattr(settings, "NTFY_ENABLED", True) and getattr(settings, "NTFY_TOPIC", None):
+                            await ntfy_service.notify_system_event(
+                                title=f"⚠️ Documento Rejeitado: {pdf_filename}",
+                                details=f"O arquivo `{pdf_filename}` possui **{size_mb:.1f} MB** e excede a trava de 15 MB de memória.",
+                                level="WARNING",
+                                tags=["page_facing_up", "warning"],
+                            )
                     return {"status": "error", "reason": "pdf_too_large"}
 
                 # Extração e conversão para Markdown GFM via PDFExtractor (Cascata Tier 1 -> Tier 2 -> Tier 3)
@@ -931,9 +970,29 @@ class WhatsAppService:
                             prio_badge = f"[{t.priority}]" if t.priority else ""
                             reply_lines.append(f"• 📌 *{prio_badge}* {t.title}{due_str}")
 
-                    reply_text = "\n".join(reply_lines)
-                    logger.info(f"📤 [PDF] Enviando confirmação formatada via WhatsApp para o proprietário...")
-                    await self.send_text_message(number=settings.USER_PHONE_NUMBER, text=reply_text)
+                    # 4. Notificações: ntfy (alta verbosidade) e WhatsApp (opcional)
+                    if getattr(settings, "NTFY_ENABLED", True) and getattr(settings, "NTFY_TOPIC", None):
+                        try:
+                            await ntfy_service.notify_pdf_processed(
+                                filename=pdf_filename,
+                                speaker=speaker_label,
+                                page_count=getattr(extraction, "page_count", 1),
+                                size_bytes=len(pdf_bytes),
+                                tier_used=extraction.tier_used,
+                                model_name=extraction.model_name,
+                                summary=doc_summary or getattr(saved_msg, "summary", None),
+                                tasks=created_tasks,
+                                is_self_memo=is_self_memo,
+                            )
+                        except Exception as ntfy_err:
+                            logger.warning(f"⚠️ Erro ao despachar notificação de PDF via ntfy: {ntfy_err}")
+
+                    if getattr(settings, "NOTIFY_VIA_WHATSAPP", False):
+                        reply_text = "\n".join(reply_lines)
+                        logger.info(f"📤 [PDF] Enviando confirmação formatada via WhatsApp para o proprietário...")
+                        await self.send_text_message(number=settings.USER_PHONE_NUMBER, text=reply_text)
+                    else:
+                        logger.info("📱 [WhatsApp] Notificação de PDF suprimida no WhatsApp conforme NOTIFY_VIA_WHATSAPP=false (despachada via ntfy).")
                 else:
                     logger.info(f"📄 [PDF] Documento histórico '{pdf_filename}' arquivado silenciosamente na memória passiva (is_historic=True).")
 

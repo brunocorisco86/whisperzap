@@ -99,9 +99,9 @@ def test_rationalize_pending_tasks_in_memory():
 
     # task2 tinha prioridade URGENT, então deve ser mantida como primária
     # ou task1 foi consolidada em task2
-    cancelled_tasks = [t for t in [task1, task2, task3] if t.status == "CANCELLED"]
-    assert len(cancelled_tasks) == 1
-    assert "Racionalizado por Terpsícore & Polímnia" in cancelled_tasks[0].reassessment_notes
+    merged_tasks = [t for t in [task1, task2, task3] if t.status == "MERGED"]
+    assert len(merged_tasks) == 1
+    assert "Consolidado por Terpsícore & Polímnia" in merged_tasks[0].reassessment_notes
 
     active_tasks = [t for t in [task1, task2, task3] if t.status == "PENDING"]
     assert len(active_tasks) == 2

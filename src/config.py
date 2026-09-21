@@ -84,6 +84,12 @@ class Settings(BaseSettings):
     DASHBOARD_AUTH_ENABLED: bool = True
     DASHBOARD_SESSION_SECRET: str = "whisperzap_secret_session_key_2026"
 
+    # Notificações Push via ntfy (Substitui spam de WhatsApp para verbosidade alta)
+    NTFY_ENABLED: bool = True
+    NTFY_URL: str = "https://ntfy.sh"
+    NTFY_TOPIC: str = "bruno-casa-dallas"
+    NOTIFY_VIA_WHATSAPP: bool = False
+
 
 settings = Settings()
 

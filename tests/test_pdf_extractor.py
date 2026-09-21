@@ -176,7 +176,8 @@ async def test_whatsapp_service_process_webhook_pdf_success():
             success=True,
         )
 
-        res = await whatsapp_service.process_webhook_event(pdf_payload)
+        with patch.object(settings, "NOTIFY_VIA_WHATSAPP", True):
+            res = await whatsapp_service.process_webhook_event(pdf_payload)
 
         assert res["status"] == "success"
         assert res["type"] == "pdf"
@@ -216,7 +217,8 @@ async def test_whatsapp_service_process_webhook_pdf_too_large():
         },
     }
 
-    with patch.object(whatsapp_service, "send_text_message", new_callable=AsyncMock) as mock_send:
+    with patch.object(whatsapp_service, "send_text_message", new_callable=AsyncMock) as mock_send, \
+         patch.object(settings, "NOTIFY_VIA_WHATSAPP", True):
         res = await whatsapp_service.process_webhook_event(pdf_payload)
 
         assert res["status"] == "error"

@@ -115,6 +115,10 @@ services:
       EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-hermes}
       DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-blurbang}
       DASHBOARD_AUTH_ENABLED: "true"
+      NTFY_ENABLED: ${NTFY_ENABLED:-true}
+      NTFY_URL: ${NTFY_URL:-https://ntfy.sh}
+      NTFY_TOPIC: ${NTFY_TOPIC:-bruno-casa-dallas}
+      NOTIFY_VIA_WHATSAPP: ${NOTIFY_VIA_WHATSAPP:-false}
     depends_on:
       hermes-db:
         condition: service_healthy

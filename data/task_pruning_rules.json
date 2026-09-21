@@ -1,6 +1,6 @@
 {
   "version": "1.1",
-  "last_optimized_at": "2026-08-29T02:36:34.977430+00:00",
+  "last_optimized_at": "2026-09-21T22:25:54.744051+00:00",
   "total_cancelled_analyzed": 2,
   "negative_guidelines": [
     "NUNCA crie tarefas baseadas em mensagens que contenham apenas intenção de comunicação futura (ex: 'preciso falar com', 'vou ligar para') sem uma ação concreta de execução.",

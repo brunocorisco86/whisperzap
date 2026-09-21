@@ -519,3 +519,27 @@ Este arquivo registra o histórico de decisões técnicas, marcos do projeto e l
      - Método `_are_titles_equivalent()` para impedir que tarefas com títulos equivalentes sejam transformadas em subtarefas repetidas no checklist.
      - Método `deduplicate_subtasks()` para higienizar checklists existentes e recalcular automaticamente a taxa percentual de progresso no cabeçalho executivo.
   3. Sanitizar a base de dados de produção, cancelando as 4 tarefas clonadas pelo eco e desduplicando as subtarefas das 29 tarefas identificadas.
+
+---
+
+### ADR 018 — Notificações Push via ntfy de Alta Verbosidade e Desacoplamento do WhatsApp
+- **Data**: 2026-09-21
+- **Status**: Aprovado e Implementado
+- **Contexto**: O envio de confirmações de áudio, transcrições completas, relatórios periódicos e resumos de documentos via WhatsApp gerava poluição visual e ruído no chat pessoal do usuário. Além disso, as limitações do WhatsApp restringiam a exibição de metadados avançados de observabilidade (prosódia, métricas de fala, comparação STT bruta vs revisada, diagnósticos de IA e status do sistema). O usuário solicitou o envio das notificações detalhadas para o ntfy no tópico `bruno-casa-dallas`, controlado via `.env` (`NTFY_TOPIC=bruno-casa-dallas`, `NOTIFY_VIA_WHATSAPP=false`).
+- **Decisão**:
+  1. Criar `NtfyNotificationService` (`src/notifications/service.py`) com publicação JSON nativa (`POST https://ntfy.sh`), suporte completo a formatação Markdown, títulos UTF-8, tags contextuais, prioridades (2 a 5) e cards expansíveis (`<details>`).
+  2. Implementar métodos especializados de notificação push com alta verbosidade:
+     - `notify_audio_processed()`: exibe remetente, duração, métricas de prosódia (WPM, pausas), transcrição revisada, bloco colapsável com texto bruto Whisper, badges de sentimento e intenção, e checklist completo de tarefas Terpsícore.
+     - `notify_pdf_processed()`: exibe nome do arquivo, tamanho em MB, número de páginas, motor de IA utilizado (Gemini 3.5/2.5/PyMuPDF), resumo executivo e tarefas extraídas.
+     - `notify_scheduled_report()`: entrega de resumos diários (18h), fechamento sereno (21h) e relatórios estratégicos semanais (domingo 20h).
+     - `notify_system_event()`: alertas de saúde (watchdog anti-zumbi, circuit-breaker, rejeição de PDFs gigantes).
+  3. Desacoplar notificações no `src/whatsapp/service.py` e `src/scheduler/cron_service.py`:
+     - Áudios, PDFs e relatórios periódicos são despachados para o ntfy no tópico configurado.
+     - O envio de mensagens via WhatsApp para esses fluxos torna-se condicional ao flag `settings.NOTIFY_VIA_WHATSAPP` (padrão: `False`).
+     - Consultas interativas iniciadas por `?` ou `/hermes` continuam respondendo no WhatsApp (canal interativo), espelhando simultaneamente um log de auditoria no ntfy.
+  4. Configuração persistente em `.env`, `.env.example` e `docker-compose.monolith.yml`:
+     - `NTFY_ENABLED=true`
+     - `NTFY_URL=https://ntfy.sh`
+     - `NTFY_TOPIC=bruno-casa-dallas`
+     - `NOTIFY_VIA_WHATSAPP=false`
+

@@ -86,12 +86,22 @@ async def _background_scheduler_loop():
                         # Gera resumo executivo diário
                         with SessionLocal() as db:
                             rep = await daily_report_service.generate_daily_report(target_date=today_str, db=db)
-                            if rep and rep.whatsapp_text and settings.USER_PHONE_NUMBER:
-                                await whatsapp_service.send_text_message(
-                                    number=settings.USER_PHONE_NUMBER,
-                                    text=rep.whatsapp_text,
-                                )
-                                logger.info(f"✅ [Cron 18:00] Resumo Diário enviado para {settings.USER_PHONE_NUMBER}.")
+                            if rep and rep.whatsapp_text:
+                                from src.notifications import ntfy_service
+                                if getattr(settings, "NTFY_ENABLED", True) and getattr(settings, "NTFY_TOPIC", None):
+                                    await ntfy_service.notify_scheduled_report(
+                                        title=f"📋 Resumo Diário Executivo ({today_str})",
+                                        report_text=rep.whatsapp_text,
+                                        report_type="daily",
+                                    )
+                                if getattr(settings, "NOTIFY_VIA_WHATSAPP", False) and settings.USER_PHONE_NUMBER:
+                                    await whatsapp_service.send_text_message(
+                                        number=settings.USER_PHONE_NUMBER,
+                                        text=rep.whatsapp_text,
+                                    )
+                                    logger.info(f"✅ [Cron 18:00] Resumo Diário enviado para WhatsApp {settings.USER_PHONE_NUMBER}.")
+                                else:
+                                    logger.info("📱 [Cron 18:00] Resumo Diário suprimido no WhatsApp (NOTIFY_VIA_WHATSAPP=false). Entregue via ntfy.")
                     except Exception as e:
                         logger.error(f"❌ [Cron 18:00] Erro ao consolidar/enviar Resumo Diário: {e}")
 
@@ -109,12 +119,22 @@ async def _background_scheduler_loop():
 
                         with SessionLocal() as db:
                             serenity_text = await daily_report_service.generate_serenity_closing(target_date=today_str, db=db)
-                            if serenity_text and settings.USER_PHONE_NUMBER:
-                                await whatsapp_service.send_text_message(
-                                    number=settings.USER_PHONE_NUMBER,
-                                    text=serenity_text,
-                                )
-                                logger.info(f"✅ [Cron 21:00] Fechamento Sereno enviado para {settings.USER_PHONE_NUMBER}.")
+                            if serenity_text:
+                                from src.notifications import ntfy_service
+                                if getattr(settings, "NTFY_ENABLED", True) and getattr(settings, "NTFY_TOPIC", None):
+                                    await ntfy_service.notify_scheduled_report(
+                                        title=f"🌙 Fechamento Sereno do Dia ({today_str})",
+                                        report_text=serenity_text,
+                                        report_type="daily",
+                                    )
+                                if getattr(settings, "NOTIFY_VIA_WHATSAPP", False) and settings.USER_PHONE_NUMBER:
+                                    await whatsapp_service.send_text_message(
+                                        number=settings.USER_PHONE_NUMBER,
+                                        text=serenity_text,
+                                    )
+                                    logger.info(f"✅ [Cron 21:00] Fechamento Sereno enviado para WhatsApp {settings.USER_PHONE_NUMBER}.")
+                                else:
+                                    logger.info("📱 [Cron 21:00] Fechamento Sereno suprimido no WhatsApp (NOTIFY_VIA_WHATSAPP=false). Entregue via ntfy.")
                     except Exception as e:
                         logger.error(f"❌ [Cron 21:00] Erro ao enviar Fechamento Sereno: {e}")
 
@@ -161,12 +181,22 @@ async def _background_scheduler_loop():
 
                         with SessionLocal() as db:
                             w_rep = await weekly_report_service.generate_weekly_report(target_date=today_str, db=db)
-                            if w_rep and w_rep.whatsapp_text and settings.USER_PHONE_NUMBER:
-                                await whatsapp_service.send_text_message(
-                                    number=settings.USER_PHONE_NUMBER,
-                                    text=w_rep.whatsapp_text,
-                                )
-                                logger.info(f"✅ [Cron Domingo 20:00] Relatório Semanal enviado para {settings.USER_PHONE_NUMBER}.")
+                            if w_rep and w_rep.whatsapp_text:
+                                from src.notifications import ntfy_service
+                                if getattr(settings, "NTFY_ENABLED", True) and getattr(settings, "NTFY_TOPIC", None):
+                                    await ntfy_service.notify_scheduled_report(
+                                        title=f"📊 Relatório Semanal Estratégico ({today_str})",
+                                        report_text=w_rep.whatsapp_text,
+                                        report_type="weekly",
+                                    )
+                                if getattr(settings, "NOTIFY_VIA_WHATSAPP", False) and settings.USER_PHONE_NUMBER:
+                                    await whatsapp_service.send_text_message(
+                                        number=settings.USER_PHONE_NUMBER,
+                                        text=w_rep.whatsapp_text,
+                                    )
+                                    logger.info(f"✅ [Cron Domingo 20:00] Relatório Semanal enviado para WhatsApp {settings.USER_PHONE_NUMBER}.")
+                                else:
+                                    logger.info("📱 [Cron Domingo 20:00] Relatório Semanal suprimido no WhatsApp (NOTIFY_VIA_WHATSAPP=false). Entregue via ntfy.")
                     except Exception as e:
                         logger.error(f"❌ [Cron Domingo 20:00] Erro ao gerar/enviar Relatório Semanal: {e}")
 

@@ -208,7 +208,8 @@ async def test_process_webhook_audio_flow_mocked():
         )
         mock_send.return_value = True
 
-        res = await whatsapp_service.process_webhook_event(audio_payload)
+        with patch.object(settings, "NOTIFY_VIA_WHATSAPP", True):
+            res = await whatsapp_service.process_webhook_event(audio_payload)
 
         assert res["status"] == "success"
         assert res["type"] == "audio"
@@ -252,7 +253,8 @@ async def test_process_webhook_self_memo_voice_with_tasks():
         )
         mock_send.return_value = True
 
-        res = await whatsapp_service.process_webhook_event(self_memo_payload)
+        with patch.object(settings, "NOTIFY_VIA_WHATSAPP", True):
+            res = await whatsapp_service.process_webhook_event(self_memo_payload)
 
         assert res["status"] == "success"
         assert res["type"] == "audio"
@@ -391,7 +393,8 @@ async def test_process_webhook_self_memo_voice_with_verbose_signaled_tasks():
         )
         mock_send.return_value = True
 
-        res = await whatsapp_service.process_webhook_event(self_memo_payload)
+        with patch.object(settings, "NOTIFY_VIA_WHATSAPP", True):
+            res = await whatsapp_service.process_webhook_event(self_memo_payload)
 
         assert res["status"] == "success"
         assert res["type"] == "audio"
@@ -486,6 +489,54 @@ async def test_process_webhook_bot_echo_detection():
     res3 = await whatsapp_service.process_webhook_event(echo_key_payload)
     assert res3["status"] == "ignored"
     assert res3["reason"] == "bot_echo_response"
+
+
+@pytest.mark.asyncio
+async def test_process_webhook_audio_routes_to_ntfy_and_suppresses_whatsapp_by_default():
+    """Garante que por padrão (NOTIFY_VIA_WHATSAPP=False) mensagens de voz são enviadas para o ntfy e não para o WhatsApp."""
+    dummy_base64 = "T2dnUwACAAAAAAAAAAA="
+
+    audio_payload = {
+        "data": {
+            "key": {"id": "audio_ntfy_routing_01", "remoteJid": "554497604925@s.whatsapp.net", "fromMe": True},
+            "pushName": "Bruno Conter",
+            "messageType": "audioMessage",
+            "message": {"audioMessage": {"seconds": 5}},
+        }
+    }
+
+    with patch.object(whatsapp_service, "get_media_base64", new_callable=AsyncMock) as mock_media, \
+         patch.object(whatsapp_service, "send_text_message", new_callable=AsyncMock) as mock_send_wa, \
+         patch("src.transcriber.service.whisper_service.transcribe_audio", new_callable=AsyncMock) as mock_transcribe, \
+         patch("src.notifications.service.ntfy_service.notify_audio_processed", new_callable=AsyncMock) as mock_ntfy:
+
+        mock_media.return_value = dummy_base64
+        from src.transcriber.prosody_analyzer import ProsodyAnalyzer
+        mock_transcribe.return_value = (
+            "verificar status das maquinas da fazenda",
+            "pt",
+            0.99,
+            5.0,
+            [],
+            ProsodyAnalyzer.analyze_speech_prosody(5.0, [], "verificar status das maquinas da fazenda"),
+        )
+        mock_ntfy.return_value = True
+
+        # Com NOTIFY_VIA_WHATSAPP=False (padrão)
+        with patch.object(settings, "NOTIFY_VIA_WHATSAPP", False), \
+             patch.object(settings, "NTFY_TOPIC", "bruno-casa-dallas"):
+            res = await whatsapp_service.process_webhook_event(audio_payload)
+
+        assert res["status"] == "success"
+        assert res["type"] == "audio"
+        # WhatsApp não deve ser chamado
+        mock_send_wa.assert_not_called()
+        # ntfy deve ter sido chamado com a transcrição
+        mock_ntfy.assert_called_once()
+        kwargs = mock_ntfy.call_args.kwargs
+        assert "verificar status das maquinas" in kwargs["revised_text"]
+        assert kwargs["is_self_memo"] is True
+
 
 
 
