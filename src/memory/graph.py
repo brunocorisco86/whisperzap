@@ -19,7 +19,21 @@ class KnowledgeGraph:
         self.persistence_path = persistence_path
         self.graph = nx.DiGraph()
         self._lock = threading.RLock()
+        self._invalidation_callbacks = []
         self._load()
+
+    def register_invalidation_callback(self, cb) -> None:
+        """Registra callback acionado sempre que a topologia do grafo for modificada."""
+        if cb not in self._invalidation_callbacks:
+            self._invalidation_callbacks.append(cb)
+
+    def _trigger_invalidation(self) -> None:
+        """Notifica os caches dependentes sobre a mutação da topologia do grafo."""
+        for cb in getattr(self, "_invalidation_callbacks", []):
+            try:
+                cb()
+            except Exception:
+                pass
 
     def _load(self) -> None:
         """Carrega o grafo do disco se existir."""
@@ -47,6 +61,7 @@ class KnowledgeGraph:
                 with open(tmp_path, "w", encoding="utf-8") as f:
                     json.dump(data, f, ensure_ascii=False, indent=2)
                 os.replace(tmp_path, self.persistence_path)
+                self._trigger_invalidation()
             except Exception as e:
                 logger.error(f"Erro ao salvar grafo de conhecimento: {e}")
 

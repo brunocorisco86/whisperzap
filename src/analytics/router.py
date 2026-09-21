@@ -21,6 +21,7 @@ def get_analytics_dashboard(
         default="day",
         description="Agrupamento temporal: 'day', 'week', 'month'",
     ),
+    force_refresh: bool = Query(default=False, description="Forçar recálculo ignorando o cache"),
     db: Session = Depends(get_db),
 ):
     """Retorna dados consolidados para o Dashboard Executivo (KPIs, Séries Temporais, Top Interlocutores, WordMap e Heatmap)."""
@@ -28,4 +29,5 @@ def get_analytics_dashboard(
         period=period,
         group_by=group_by,
         db=db,
+        force_refresh=force_refresh,
     )

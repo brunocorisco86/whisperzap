@@ -137,6 +137,20 @@ CATEGORY_KEYWORDS = {
 }
 
 
+_ANALYTICS_CACHE: Dict[str, AnalyticsDashboardResponse] = {}
+_ANALYTICS_CACHE_FINGERPRINT: Optional[Any] = None
+_ANALYTICS_CACHE_TS: Dict[str, float] = {}
+_ANALYTICS_CACHE_TTL: float = 60.0  # 60 segundos TTL
+
+
+def invalidate_analytics_cache() -> None:
+    """Invalida o cache em memória das métricas analíticas."""
+    global _ANALYTICS_CACHE, _ANALYTICS_CACHE_TS, _ANALYTICS_CACHE_FINGERPRINT
+    _ANALYTICS_CACHE.clear()
+    _ANALYTICS_CACHE_TS.clear()
+    _ANALYTICS_CACHE_FINGERPRINT = None
+
+
 class AnalyticsService:
     """Calcula KPIs, séries temporais e estatísticas consolidadas para o Dashboard."""
 
@@ -145,14 +159,30 @@ class AnalyticsService:
         period: str = "3d",
         group_by: str = "day",
         db: Session | None = None,
+        force_refresh: bool = False,
     ) -> AnalyticsDashboardResponse:
-        """Processa e consolida todas as métricas analíticas."""
+        """Processa e consolida todas as métricas analíticas com cache TTL orientado a mutações no DB."""
+        import time
+
         should_close = False
         if db is None:
             db = SessionLocal()
             should_close = True
 
         try:
+            # Invalidação inteligente instantânea baseada no fingerprint do DB (contagem + timestamp máximo)
+            global _ANALYTICS_CACHE, _ANALYTICS_CACHE_TS, _ANALYTICS_CACHE_FINGERPRINT
+            db_fingerprint = db.query(func.count(MessageRecord.id), func.max(MessageRecord.created_at)).first()
+            if db_fingerprint != _ANALYTICS_CACHE_FINGERPRINT:
+                _ANALYTICS_CACHE.clear()
+                _ANALYTICS_CACHE_TS.clear()
+                _ANALYTICS_CACHE_FINGERPRINT = db_fingerprint
+
+            cache_key = f"{period}:{group_by}"
+            now_ts = time.time()
+            if not force_refresh and cache_key in _ANALYTICS_CACHE and (now_ts - _ANALYTICS_CACHE_TS.get(cache_key, 0.0)) < _ANALYTICS_CACHE_TTL:
+                return _ANALYTICS_CACHE[cache_key]
+
             now = datetime.now(timezone.utc)
             start_date, end_date, prev_start, prev_end = self._resolve_date_ranges(period, now)
 
@@ -217,7 +247,7 @@ class AnalyticsService:
                 top_senders[0].speaker if top_senders else "Nenhum",
             )
 
-            return AnalyticsDashboardResponse(
+            res = AnalyticsDashboardResponse(
                 period=period,
                 group_by=group_by,
                 start_date=start_date.strftime("%Y-%m-%d"),
@@ -233,6 +263,9 @@ class AnalyticsService:
                 heatmap=heatmap,
                 summary_text=summary,
             )
+            _ANALYTICS_CACHE[cache_key] = res
+            _ANALYTICS_CACHE_TS[cache_key] = now_ts
+            return res
         finally:
             if should_close:
                 db.close()

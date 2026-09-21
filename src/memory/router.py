@@ -1,5 +1,5 @@
 import asyncio
-from typing import Optional
+from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -366,13 +366,35 @@ async def get_entity_neighborhood(name: str, depth: int = Query(default=1, ge=1,
     return result
 
 
+_GRAPH_FULL_CACHE: dict[str, Any] = {}
+_GRAPH_FULL_CACHE_TS: dict[str, float] = {}
+_GRAPH_FULL_CACHE_TTL: float = 60.0  # 60 segundos TTL
+
+
+def invalidate_full_graph_cache() -> None:
+    """Invalida o cache serializado do grafo completo."""
+    global _GRAPH_FULL_CACHE, _GRAPH_FULL_CACHE_TS
+    _GRAPH_FULL_CACHE.clear()
+    _GRAPH_FULL_CACHE_TS.clear()
+
+
+knowledge_graph.register_invalidation_callback(invalidate_full_graph_cache)
+
+
 @router.get("/graph/full")
 async def get_full_graph(
     main_only: bool = Query(default=True, description="Exibir apenas nós principais e conectados (padrão)"),
     days_cutoff: int = Query(default=7, description="Ocultar contatos sem interação há mais de X dias (padrão: 7)"),
     db: Session = Depends(get_db),
+    force_refresh: bool = False,
 ):
     """Retorna o grafo estruturado e otimizado para o frontend, aplicando filtros de relevância e corte temporal padrão (7 dias)."""
+    import time
+    cache_key = f"{main_only}:{days_cutoff}"
+    now_ts = time.time()
+    if not force_refresh and cache_key in _GRAPH_FULL_CACHE and (now_ts - _GRAPH_FULL_CACHE_TS.get(cache_key, 0.0)) < _GRAPH_FULL_CACHE_TTL:
+        return _GRAPH_FULL_CACHE[cache_key]
+
     from datetime import datetime, timezone, timedelta
     from src.contacts.models import ContactRecord
     from src.memory.models import MessageRecord
@@ -533,7 +555,7 @@ async def get_full_graph(
     else:
         final_nodes = candidate_nodes
 
-    return {
+    res = {
         "nodes": final_nodes,
         "edges": kept_edges,
         "stats": {
@@ -545,6 +567,9 @@ async def get_full_graph(
             "days_cutoff": days_cutoff,
         },
     }
+    _GRAPH_FULL_CACHE[cache_key] = res
+    _GRAPH_FULL_CACHE_TS[cache_key] = now_ts
+    return res
 
 
 @router.get("/messages")
