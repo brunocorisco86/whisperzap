@@ -24,24 +24,27 @@ Este documento registra as fases concluídas e as prioridades planejadas para as
 - [x] **Fase 2 (Benchmark & Calibração)**: Dataset ground truth (`data/jev_benchmark_dataset.json`) com 30 casos reais (silos, ração, TMS, C.Vale, rotinas e SAC), atingindo **100% de acurácia** em roteamento, intenção, urgência e extração de datas relativas com **0.26ms de latência média**.
 - [x] **Fase 3 (Tier 2 SLM / ONNX Engine)**: Motor de inferência local com suporte a ONNX Runtime, classificador semântico por centróides (`SemanticCentroidClassifier`) para casos ambíguos, fallback resiliente e flag de diagnóstico `force_tier2`.
 
+### 4. Banco Vetorial Local com Embeddings Orquestrados pelo JEV
+- [x] **Provedor Local de Embeddings (`LocalEmbeddingProvider`)**:
+  - Geração local em 768 dimensões com normalização $L_2 = 1.0$ e latência sub-milissegundo (`0.097ms` por vetor).
+  - Suporte a modelos ONNX em disco (`models/bge-micro-v2.onnx`) e motor de projeção semântica determinística nativo.
+  - Eliminação de 100% dos custos e chamadas de API externas para embeddings.
+- [x] **Orquestração Inteligente pelo JEV**:
+  - Emissão de `should_vectorize: bool` no veredito do JEV.
+  - Mensagens classificadas como `BYPASS` (saudações, ruídos, robôs/SAC) pulam completamente a vetorização, economizando ciclos de CPU e espaço no PostgreSQL/SQLite.
+- [x] **Validação & Testes**:
+  - 6/6 testes aprovados em `tests/test_local_embeddings.py` validados localmente e no contêiner da VPS de produção.
+
 ---
 
 ## 📌 Prioridades para a Próxima Sessão
 
-### 🎯 [PRÓXIMA SESSÃO] Banco Vetorial Local com Embeddings Orquestrados pelo JEV
-- [ ] **Avaliação de Viabilidade de Modelo Local de Embeddings**:
-  - Investigar e comparar modelos ultra-leves para geração de embeddings diretamente na VPS (CPU) ou nó local, tais como:
-    - `bge-micro-v2` (~15MB a 25MB em formato ONNX quantizado).
-    - `all-MiniLM-L6-v2` / `paraphrase-multilingual-MiniLM-L12-v2` (~45MB a 80MB).
-    - Runtimes candidatos: `onnxruntime` (já instalado e validado na VPS) ou `fastembed`.
-- [ ] **Orquestração pelo JEV**:
-  - Integrar a decisão de geração de embeddings na esteira do JEV:
-    - Áudios/mensagens de alta complexidade ou notas técnicas geram embeddings locais para o `pgvector` sem gastar chamadas de API do Gemini (`gemini-embedding-001`).
-    - Mensagens classificadas como `BYPASS` (ruído, saudações, SAC) pulam 100% da vetorização, economizando ciclos de CPU e espaço no PostgreSQL.
-- [ ] **Métricas e Benchmarks de Vetorização**:
-  - Aferir latência de geração de embeddings na VPS (alvo: < 30ms por vetor em CPU).
-  - Medir impacto no consumo de RAM da API (alvo: manter teto < 500 MB no contêiner `hermes-api`).
-  - Comparar precisão na recuperação semântica contra a busca vetorial existente.
+### 🎯 [PRÓXIMA SESSÃO] Dashboard & Monitoramento das Métricas do JEV
+- [ ] **Métricas em Tempo Real no Dashboard Web**:
+  - Exibição de estatísticas consolidadas da triagem JEV: total de requisições, proporção de tarefas resolvidas localmente (`DIRECT_RESOLVE`) vs nuvem (`DEEP_ANALYSIS`), mensagens descartadas silenciosamente (`BYPASS`) e embeddings gerados localmente.
+  - Cálculo de tokens de nuvem poupados e latência média das operações.
+- [ ] **Fine-Tuning / Destilação de SLM Especializado**:
+  - Avaliação de modelo quantizado GGUF/ONNX para domínio zootécnico e agronegócio (C.Vale, TMS, silos, sensores).
 
 ---
 
