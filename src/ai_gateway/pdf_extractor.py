@@ -18,8 +18,12 @@ import re
 from dataclasses import dataclass
 from typing import Optional, Union
 
-import pymupdf
-import pymupdf4llm
+try:
+    import pymupdf
+    import pymupdf4llm
+except ImportError:
+    pymupdf = None
+    pymupdf4llm = None
 
 from src.ai_gateway.model_registry import ModelRegistry
 from src.ai_gateway.prompts import PDF_EXTRACT_SYSTEM_PROMPT, PDF_EXTRACT_USER_PROMPT
