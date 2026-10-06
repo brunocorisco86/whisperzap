@@ -105,7 +105,7 @@ class WhisperService:
         self,
         audio_path_or_file: str | BinaryIO,
         language: Optional[str] = "pt",
-        beam_size: int = 5,
+        beam_size: int = 1,
         initial_prompt: Optional[str] = None,
     ) -> Tuple[str, str, float, float, List[TranscriptionSegment]]:
         """Execução síncrona da transcrição com suporte a initial_prompt e VAD calibrado."""
@@ -170,7 +170,7 @@ class WhisperService:
         self,
         audio_path_or_file: str | BinaryIO,
         language: Optional[str] = "pt",
-        beam_size: int = 5,
+        beam_size: int = 1,
         speaker: Optional[str] = None,
         custom_prompt: Optional[str] = None,
         db: Optional[Session] = None,

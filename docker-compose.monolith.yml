@@ -20,6 +20,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-hermes_voice_memory}
     volumes:
       - hermes_db_data:/var/lib/postgresql/data
+    mem_limit: 512m
+    mem_reservation: 128m
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-hermes_voice_memory}"]
       interval: 10s
@@ -35,10 +37,14 @@ services:
     image: redis:7-alpine
     container_name: hermes-redis
     restart: unless-stopped
+    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru --save ""
+    mem_limit: 128m
+    mem_reservation: 32m
     volumes:
       - hermes_redis_data:/data
     networks:
       - hermes_monolith_network
+
 
   # ==============================================================================
   # 3. Evolution API v2 (WhatsApp Baileys Engine com Webhook Nativo)
@@ -69,11 +75,14 @@ services:
       CACHE_REDIS_URI: redis://hermes-redis:6379
       LOG_LEVEL: ERROR,WARN,INFO
       CONFIG_SESSION_PHONE_CLIENT: "Hermes Voice Memory"
+      NODE_OPTIONS: "--max-old-space-size=512"
       # Webhook Global apontando diretamente para o endpoint nativo do FastAPI
       WEBHOOK_GLOBAL_URL: http://hermes-api:8000/api/v1/whatsapp/webhook
       WEBHOOK_GLOBAL_ENABLED: "true"
       WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS: "false"
       WEBHOOK_EVENTS_MESSAGES_UPSERT: "true"
+    mem_limit: 768m
+    mem_reservation: 256m
     depends_on:
       hermes-db:
         condition: service_healthy
@@ -100,6 +109,8 @@ services:
     image: whisperzap-hermes-api:latest
     container_name: hermes-api
     restart: unless-stopped
+    mem_limit: 1200m
+    mem_reservation: 384m
     ports:
       - "8005:8000"
     environment:
@@ -138,6 +149,8 @@ services:
     image: caddy:2-alpine
     container_name: hermes-caddy
     restart: unless-stopped
+    mem_limit: 128m
+    mem_reservation: 32m
     ports:
       - "80:80"
       - "443:443"

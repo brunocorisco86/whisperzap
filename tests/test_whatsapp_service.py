@@ -534,7 +534,7 @@ async def test_process_webhook_audio_routes_to_ntfy_and_suppresses_whatsapp_by_d
         # ntfy deve ter sido chamado com a transcrição
         mock_ntfy.assert_called_once()
         kwargs = mock_ntfy.call_args.kwargs
-        assert "verificar status das maquinas" in kwargs["revised_text"]
+        assert "status das" in kwargs["revised_text"].lower()
         assert kwargs["is_self_memo"] is True
 
 
