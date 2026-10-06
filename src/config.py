@@ -91,6 +91,11 @@ class Settings(BaseSettings):
     NTFY_INCLUDE_RAW_STT: bool = False
     NOTIFY_VIA_WHATSAPP: bool = False
 
+    # Orquestração JEV (Judge - Evaluator - Verifier)
+    JEV_ENABLED: bool = True
+    JEV_ENGINE: str = "hybrid"
+    JEV_CONFIDENCE_THRESHOLD: float = 0.75
+
 
 settings = Settings()
 

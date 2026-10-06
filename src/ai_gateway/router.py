@@ -10,6 +10,7 @@ from src.ai_gateway.schemas import (
     SemanticExtractionRequest,
     SemanticExtractionResponse,
 )
+from src.ai_gateway.jev import JEVJudgement, JEVJudgeRequest
 
 from src.ai_gateway.prompts import REVISE_SYSTEM_PROMPT, REVISE_USER_TEMPLATE
 from src.ai_gateway.providers import get_ai_provider
@@ -180,5 +181,24 @@ async def get_viable_models(probe: bool = True):
     """Executa auditoria de viabilidade de modelos e retorna relatório."""
     from src.ai_gateway.model_registry import model_registry
     return await model_registry.check_viable_models(probe_each=probe)
+
+
+@router.post(
+    "/jev/judge",
+    status_code=status.HTTP_200_OK,
+    summary="Avaliação e triagem de mensagem via JEV",
+    description="Executa o orquestrador JEV (Judge - Evaluator - Verifier) para classificar rota, intenção e urgência com zero ou mínimo consumo de tokens.",
+)
+async def judge_message_jev(payload: JEVJudgeRequest) -> JEVJudgement:
+    """Endpoint de julgamento e triagem inteligente JEV."""
+    from src.ai_gateway.jev import jev_service
+    return jev_service.judge(
+        text=payload.text,
+        speaker=payload.speaker,
+        is_self_memo=payload.is_self_memo,
+        duration_s=payload.duration_s,
+        meta_info=payload.meta_info,
+    )
+
 
 

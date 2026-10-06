@@ -701,21 +701,35 @@ class WhatsAppService:
                     logger.warning("Áudio sem fala identificável.")
                     return {"status": "processed", "type": "audio", "text": "", "reason": "empty_transcription"}
 
-                # 2. Revisão Contextual via AI Gateway
+                # 2. Orquestração e Julgamento JEV (Judge - Evaluator - Verifier)
+                from src.ai_gateway.jev import jev_service, JEVAction
+                jev_verdict = jev_service.judge(
+                    text=raw_text_audio,
+                    speaker=speaker_label,
+                    is_self_memo=is_self_memo,
+                    duration_s=float(duration or 0.0),
+                    meta_info=info,
+                )
+                logger.info(f"⚖️ [JEV Judge] Ação: {jev_verdict.action} | Intenção: {jev_verdict.intent} | Confiança: {jev_verdict.confidence:.2f}")
+
+                # 2.1 Revisão Contextual via AI Gateway
                 revised_text = raw_text_audio
-                try:
-                    provider = get_ai_provider(task="revise")
-                    prompt = REVISE_USER_TEMPLATE.format(
-                        raw_text=raw_text_audio.strip(),
-                        context_block=f"Contexto: Mensagem de voz de {speaker_label}.",
-                    )
-                    revised_text = await provider.generate_text(
-                        prompt=prompt,
-                        system_instruction=REVISE_SYSTEM_PROMPT,
-                        temperature=0.1,
-                    )
-                except Exception as e:
-                    logger.warning(f"Fallback para texto bruto devido a erro no AI Gateway: {e}")
+                if jev_verdict.action == JEVAction.DIRECT_RESOLVE and jev_verdict.direct_task_title:
+                    revised_text = jev_verdict.direct_task_title
+                else:
+                    try:
+                        provider = get_ai_provider(task="revise")
+                        prompt = REVISE_USER_TEMPLATE.format(
+                            raw_text=raw_text_audio.strip(),
+                            context_block=f"Contexto: Mensagem de voz de {speaker_label}.",
+                        )
+                        revised_text = await provider.generate_text(
+                            prompt=prompt,
+                            system_instruction=REVISE_SYSTEM_PROMPT,
+                            temperature=0.1,
+                        )
+                    except Exception as e:
+                        logger.warning(f"Fallback para texto bruto devido a erro no AI Gateway: {e}")
 
                 # 3. Salva na Memória e Grafo (executa extração de tarefas e entidades)
                 prosody_data = None
