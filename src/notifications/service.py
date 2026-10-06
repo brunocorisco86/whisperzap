@@ -63,6 +63,19 @@ class NtfyNotificationService:
 
         return False
 
+    @staticmethod
+    def _sanitize_notification_text(revised_text: str, duration_s: float = 0.0) -> str:
+        """Remove seções redundantes de destaques executivos em áudios curtos ou concisos."""
+        clean = revised_text.strip()
+        if "📌" in clean:
+            parts = clean.split("📌", 1)
+            main_body = parts[0].strip()
+            # Se o corpo principal tem menos de 250 caracteres ou o áudio durou <= 25s,
+            # os tópicos de destaques são 100% redundantes (repetem a própria frase)
+            if len(main_body) < 250 or (0 < duration_s <= 25.0):
+                return main_body if main_body else clean
+        return clean
+
     async def notify_audio_processed(
         self,
         speaker: str,
@@ -78,11 +91,13 @@ class NtfyNotificationService:
         tasks: Optional[List[Any]] = None,
         model_name: Optional[str] = None,
         message_id: Optional[str] = None,
+        include_raw_stt: Optional[bool] = None,
     ) -> bool:
-        """Formata e envia notificação de áudio processado com alta verbosidade."""
-        title = "🎙️ Nota Pessoal Gravada" if is_self_memo else f"🎙️ Áudio: {speaker}"
+        """Formata e envia notificação de áudio processado com alta clareza e sem redundâncias."""
+        title = f"🎙️ Nota Pessoal: {speaker}" if is_self_memo else f"🎙️ Áudio: {speaker}"
         prio = 3
-        tags = ["microphone", "memo"] if is_self_memo else ["sound", "speech_balloon"]
+        # Usa apenas tags essenciais para evitar festival de emojis duplicados no card do ntfy
+        tags = ["memo"] if is_self_memo else ["speech_balloon"]
 
         tasks = tasks or []
         has_urgent = any(str(getattr(t, "priority", "")).upper() in ["URGENT", "HIGH"] for t in tasks)
@@ -93,11 +108,14 @@ class NtfyNotificationService:
         lines = []
 
         # 1. Cabeçalho de Metadados
-        speaker_line = f"**Remetente:** `{speaker}`"
-        if contact_phone and contact_phone != speaker:
-            speaker_line += f" (`{contact_phone}`)"
-        if contact_role:
-            speaker_line += f" • Role: *{contact_role}*"
+        if is_self_memo:
+            speaker_line = f"**Remetente:** `{speaker}` *(Nota Pessoal)*"
+        else:
+            speaker_line = f"**Remetente:** `{speaker}`"
+            if contact_phone and contact_phone != speaker:
+                speaker_line += f" (`{contact_phone}`)"
+            if contact_role:
+                speaker_line += f" • Role: *{contact_role}*"
         lines.append(speaker_line)
 
         meta_parts = []
@@ -106,34 +124,44 @@ class NtfyNotificationService:
         if prosody:
             wpm = prosody.get("wpm")
             pauses = prosody.get("pauses_duration_s")
-            if wpm:
+            if wpm and wpm > 0:
                 meta_parts.append(f"⚡ `{wpm:.0f} WPM`")
-            if pauses:
+            if pauses and pauses > 0:
                 meta_parts.append(f"⏸️ `{pauses:.1f}s pausas`")
         if model_name:
             meta_parts.append(f"🤖 `{model_name}`")
         if meta_parts:
             lines.append(" • ".join(meta_parts))
 
-        # 2. Transcrição
+        # 2. Transcrição Sanitizada
+        clean_text = self._sanitize_notification_text(revised_text, duration_s=duration_s)
         lines.append("")
-        lines.append(f"### 📝 Transcrição:")
-        lines.append(f"> {revised_text.strip()}")
+        lines.append("### 📝 Transcrição:")
+        lines.append(f"> {clean_text}")
 
-        if raw_text and raw_text.strip() != revised_text.strip():
+        # Texto bruto só é exibido se explicitamente configurado ou solicitado
+        should_include_raw = (
+            include_raw_stt if include_raw_stt is not None else getattr(settings, "NTFY_INCLUDE_RAW_STT", False)
+        )
+        if should_include_raw and raw_text and raw_text.strip() != clean_text:
             lines.append("")
             lines.append(f"<details><summary>🔍 Ver texto bruto STT (Whisper)</summary>\n\n> {raw_text.strip()}\n</details>")
 
-        # 3. Classificação e Sentimento
+        # 3. Classificação e Sentimento (Filtrando redundâncias e neutros inertes)
         meta_badges = []
-        if intent:
-            intent_icons = {"TASK": "📋 Tarefa", "IDEA": "💡 Ideia", "DECISION": "⚖️ Decisão", "MEMO": "📝 Nota"}
+        # Não exibir "Intenção: Tarefa" se já listamos a seção de Tarefas abaixo
+        if intent and (intent != "TASK" or not tasks):
+            intent_icons = {"TASK": "📋 Tarefa", "IDEA": "💡 Ideia", "DECISION": "⚖️ Decisão", "MEMO": "📝 Nota", "QUESTION": "❓ Pergunta"}
             meta_badges.append(f"**Intenção:** `{intent_icons.get(intent, intent)}`")
+
         if sentiment:
             pol = sentiment.get("polarity", "NEUTRAL")
-            score = sentiment.get("sentiment_score", 0.0)
-            pol_icon = "🟢" if pol == "POSITIVE" else ("🔴" if pol == "NEGATIVE" else "⚪")
-            meta_badges.append(f"**Sentimento:** {pol_icon} `{pol}` (`{score:+.2f}`)")
+            score = float(sentiment.get("sentiment_score", 0.0) or 0.0)
+            # Só exibe se houver sentimento expressivo (evita ruído com NEUTRAL +0.00)
+            if pol not in ("NEUTRAL", None) or abs(score) >= 0.20:
+                pol_icon = "🟢" if pol == "POSITIVE" else ("🔴" if pol in ("NEGATIVE", "FRUSTRATED", "ANXIOUS", "URGENT") else "⚪")
+                meta_badges.append(f"**Sentimento:** {pol_icon} `{pol}` (`{score:+.2f}`)")
+
         if meta_badges:
             lines.append("")
             lines.append(" • ".join(meta_badges))
@@ -146,7 +174,7 @@ class NtfyNotificationService:
                 t_prio = (getattr(t, "priority", "") or "MEDIUM").upper()
                 p_icon = "🔴" if t_prio == "URGENT" else ("🟠" if t_prio == "HIGH" else "🔵")
                 due = f" • 📅 `{t.due_date}`" if getattr(t, "due_date", None) else ""
-                resp_name = f" • 👤 `{t.assignee}`" if getattr(t, "assignee", None) else ""
+                resp_name = f" • 👤 `{t.assignee}`" if (getattr(t, "assignee", None) and getattr(t, "assignee", "") != speaker) else ""
                 vault = " • 🏛️ *[Vault]*" if getattr(t, "in_vault", False) else ""
                 lines.append(f"- {p_icon} **[{t_prio}]** {t.title}{due}{resp_name}{vault}")
 

@@ -88,6 +88,7 @@ class Settings(BaseSettings):
     NTFY_ENABLED: bool = True
     NTFY_URL: str = "https://ntfy.sh"
     NTFY_TOPIC: str = "bruno-casa-dallas"
+    NTFY_INCLUDE_RAW_STT: bool = False
     NOTIFY_VIA_WHATSAPP: bool = False
 
 

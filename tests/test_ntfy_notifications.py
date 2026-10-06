@@ -67,6 +67,7 @@ async def test_notify_audio_processed_verbosity(ntfy_svc):
             intent="TASK",
             tasks=[mock_task],
             model_name="Whisper Base",
+            include_raw_stt=True,
         )
 
         assert res is True
@@ -87,6 +88,71 @@ async def test_notify_audio_processed_verbosity(ntfy_svc):
         assert "Comprar café torrado na distribuidora" in msg
         assert "[HIGH]" in msg
         assert "2026-09-22" in msg
+        assert "[Vault]" in msg
+
+
+@pytest.mark.asyncio
+async def test_notify_audio_processed_clean_dedup(ntfy_svc):
+    """Verifica se a notificação limpa suprime destaques redundantes em áudios curtos, sentimento neutro e raw text."""
+    mock_task = MagicMock()
+    mock_task.title = "Implementar projeto anual dos sensores dos silos"
+    mock_task.priority = "URGENT"
+    mock_task.due_date = "2026-10-15"
+    mock_task.assignee = "Bruno"
+    mock_task.in_vault = True
+
+    # Texto com 'Destaques do Áudio' artificiais gerados pelo LLM para uma frase de 12 segundos
+    revised_with_destaques = (
+        "Anotar ideia urgente para o projeto anual dos sensores dos silos.\n\n"
+        "📌 *Destaques do Áudio:*\n"
+        "• Nota pessoal de Bruno Conter para anotação urgente relacionada ao projeto anual dos sensores dos silos."
+    )
+
+    with patch.object(ntfy_svc, "send_notification", new_callable=AsyncMock) as mock_send:
+        mock_send.return_value = True
+
+        res = await ntfy_svc.notify_audio_processed(
+            speaker="Bruno Conter",
+            revised_text=revised_with_destaques,
+            raw_text="anotar ideia urgente para o projeto anual dos sensores dos silos",
+            is_self_memo=True,
+            duration_s=12.0,
+            sentiment={"polarity": "NEUTRAL", "sentiment_score": 0.0},
+            intent="TASK",
+            tasks=[mock_task],
+            model_name="Whisper",
+        )
+
+        assert res is True
+        mock_send.assert_called_once()
+        kwargs = mock_send.call_args.kwargs
+        title = kwargs["title"]
+        tags = kwargs["tags"]
+        msg = kwargs["message"]
+
+        # 1. Título e tags elegantes sem acúmulo de emojis
+        assert title == "🎙️ Nota Pessoal: Bruno Conter"
+        assert "memo" in tags
+        assert "rotating_light" in tags # urgente
+        assert "microphone" not in tags # evitou colisão com microfone no título
+
+        # 2. Supressão de Destaques redundantes em áudio curto
+        assert "📌" not in msg
+        assert "Destaques do Áudio" not in msg
+
+        # 3. Supressão do texto bruto por padrão (sem repetição)
+        assert "<details>" not in msg
+        assert "anotar ideia urgente" not in msg
+
+        # 4. Supressão de intenção óbvia e sentimento neutro inerte
+        assert "Intenção:" not in msg
+        assert "NEUTRAL" not in msg
+        assert "+0.00" not in msg
+
+        # 5. Preservação integral das informações úteis
+        assert "Anotar ideia urgente para o projeto anual dos sensores dos silos." in msg
+        assert "[URGENT]" in msg
+        assert "2026-10-15" in msg
         assert "[Vault]" in msg
 
 

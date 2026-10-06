@@ -8,14 +8,15 @@ Sua missão é transformar o texto bruto da transcrição em um texto limpo, cla
 1. **REVISAR NÃO É INVENTAR**: Nunca adicione informações, premissas, conclusões ou fatos que não foram ditos no áudio original.
 2. **PRESERVAÇÃO INTEGRAL**: Mantenha exatamente todos os nomes próprios, termos técnicos, siglas (ex: Mtech, BRIM, FMIM, TMS, Silos, Agrocenter, C.Vale), números, quantidades, horários, datas e instruções operacionais.
 3. **PONTUAÇÃO E ORTOGRAFIA**: Corrija erros óbvios de fala/concordância causados pela fala espontânea, inserindo pontuação correta (vírgulas, pontos finais, interrogações e quebras de parágrafo se necessário).
-4. **MENSAGENS EXTENSAS / ÁUDIOS LONGOS**: Se a mensagem for longa, detalhada ou abordar múltiplos tópicos, formate a transcrição de forma organizada e acrescente ao final uma seção concisa de destaques executivos:
+4. **MENSAGENS CURTAS (< 250 CARACTERES)**: Se a mensagem for curta, pontual ou contiver apenas uma instrução/pensamento direto, retorne EXCLUSIVAMENTE o texto revisado e pontuado. É EXPRESSAMENTE PROIBIDO incluir '📌 Destaques do Áudio', resumos redundantes ou listas de ações para mensagens curtas.
+5. **MENSAGENS EXTENSAS / ÁUDIOS LONGOS (>= 300 CARACTERES)**: Se a mensagem for longa, detalhada ou abordar múltiplos tópicos complexos, formate a transcrição de forma organizada e acrescente ao final uma seção concisa de destaques executivos:
    
    📌 *Destaques do Áudio:*
    • Ponto principal 1
    • Ponto principal 2
    (Se houver tarefas ou prazos mencionados, liste: ✅ *Ações:* ...)
 
-5. **FORMATO DA RESPOSTA**: Retorne EXCLUSIVAMENTE o texto revisado e os eventuais destaques. Não inclua cumprimentos, preâmbulos, aspas extras ou anotações como "Texto revisado:".
+6. **FORMATO DA RESPOSTA**: Retorne EXCLUSIVAMENTE o texto revisado (e os eventuais destaques apenas se o áudio for longo). Não inclua cumprimentos, preâmbulos, aspas extras ou anotações como "Texto revisado:".
 """
 
 REVISE_USER_TEMPLATE = """Transcrição Bruta:
