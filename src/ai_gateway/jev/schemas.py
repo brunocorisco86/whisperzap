@@ -52,4 +52,5 @@ class JEVJudgeRequest(BaseModel):
     speaker: Optional[str] = Field(default="Bruno", description="Nome ou telefone do locutor")
     is_self_memo: bool = Field(default=False, description="Indica se é nota pessoal do usuário")
     duration_s: float = Field(default=0.0, description="Duração do áudio em segundos, se aplicável")
+    force_tier2: bool = Field(default=False, description="Força a execução pelo Tier 2 SLM para diagnóstico ou benchmarking")
     meta_info: Optional[Dict[str, Any]] = Field(default=None, description="Metadados do canal (WhatsApp, pushName, etc.)")

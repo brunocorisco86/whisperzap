@@ -197,6 +197,7 @@ async def judge_message_jev(payload: JEVJudgeRequest) -> JEVJudgement:
         speaker=payload.speaker,
         is_self_memo=payload.is_self_memo,
         duration_s=payload.duration_s,
+        force_tier2=payload.force_tier2,
         meta_info=payload.meta_info,
     )
 

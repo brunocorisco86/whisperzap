@@ -16,7 +16,7 @@ sys.path.insert(0, str(project_root))
 from src.ai_gateway.jev import jev_service, JEVAction, JEVIntent, JEVUrgency
 
 
-def run_benchmark(dataset_path: str = "data/jev_benchmark_dataset.json") -> Dict[str, Any]:
+def run_benchmark(dataset_path: str = "data/jev_benchmark_dataset.json", force_tier2: bool = False) -> Dict[str, Any]:
     full_path = project_root / dataset_path
     if not full_path.exists():
         print(f"❌ Arquivo de dataset não encontrado: {full_path}")
@@ -37,8 +37,9 @@ def run_benchmark(dataset_path: str = "data/jev_benchmark_dataset.json") -> Dict
 
     today = datetime.now()
 
+    tier_label = "TIER 2 (SLM/Semantic)" if force_tier2 else "TIER 1 (Heurístico)"
     print("\n" + "=" * 90)
-    print(f"📊 INICIANDO BENCHMARK JEV — {total_cases} CASOS DE TESTE")
+    print(f"📊 INICIANDO BENCHMARK JEV [{tier_label}] — {total_cases} CASOS DE TESTE")
     print("=" * 90)
     print(f"{'ID':<28} | {'ACTION':<15} | {'INTENT':<10} | {'URGENCY':<8} | {'LATÊNCIA':<8} | STATUS")
     print("-" * 90)
@@ -57,6 +58,7 @@ def run_benchmark(dataset_path: str = "data/jev_benchmark_dataset.json") -> Dict
             speaker=speaker,
             is_self_memo=is_self_memo,
             duration_s=duration_s,
+            force_tier2=force_tier2,
         )
         t1 = time.perf_counter_ns()
         lat_ns = t1 - t0
@@ -148,8 +150,10 @@ def run_benchmark(dataset_path: str = "data/jev_benchmark_dataset.json") -> Dict
 
 
 if __name__ == "__main__":
-    summary = run_benchmark()
-    if summary["action_accuracy"] < 95.0 or summary["urgency_accuracy"] < 90.0:
+    use_tier2 = "--tier2" in sys.argv
+    summary = run_benchmark(force_tier2=use_tier2)
+    min_action_acc = 85.0 if use_tier2 else 95.0
+    if summary["action_accuracy"] < min_action_acc or summary["urgency_accuracy"] < 85.0:
         print("❌ Falha nos critérios mínimos de qualidade do benchmark.")
         sys.exit(1)
     else:

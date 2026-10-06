@@ -18,6 +18,7 @@ from src.ai_gateway.jev.schemas import (
     JEVUrgency,
     JEVJudgement,
 )
+from src.ai_gateway.jev.tier2 import JEVTier2Engine
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +105,7 @@ class JEVService:
 
     def __init__(self):
         self.enabled = getattr(settings, "JEV_ENABLED", True)
+        self.tier2 = JEVTier2Engine()
 
     def judge(
         self,
@@ -111,9 +113,20 @@ class JEVService:
         speaker: Optional[str] = "Bruno",
         is_self_memo: bool = False,
         duration_s: float = 0.0,
+        force_tier2: bool = False,
         meta_info: Optional[Dict[str, Any]] = None,
     ) -> JEVJudgement:
         """Executa o julgamento do Judge em cascata de alta performance."""
+        # Se force_tier2 estiver ativo ou engine estiver configurada exclusivamente como onnx
+        if force_tier2 or getattr(settings, "JEV_ENGINE", "hybrid") == "onnx":
+            return self.tier2.judge(
+                text=text,
+                speaker=speaker,
+                is_self_memo=is_self_memo,
+                duration_s=duration_s,
+                meta_info=meta_info,
+            )
+
         if not text or not text.strip():
             return JEVJudgement(
                 action=JEVAction.BYPASS,
