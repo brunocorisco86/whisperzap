@@ -1,0 +1,307 @@
+[
+  {
+    "id": "direct_urgent_silo_idea",
+    "text": "Anotar ideia urgente para o projeto anual dos sensores dos silos.",
+    "speaker": "Bruno Conter",
+    "is_self_memo": true,
+    "duration_s": 7.5,
+    "expected_action": "DIRECT_RESOLVE",
+    "expected_intent": "TASK",
+    "expected_urgency": "URGENT"
+  },
+  {
+    "id": "direct_check_silo_tomorrow",
+    "text": "Lembrar de checar o nível do silo 2 da granja amanhã.",
+    "speaker": "Bruno Conter",
+    "is_self_memo": true,
+    "duration_s": 5.0,
+    "expected_action": "DIRECT_RESOLVE",
+    "expected_intent": "TASK",
+    "expected_urgency": "MEDIUM",
+    "expected_date_offset_days": 1
+  },
+  {
+    "id": "direct_today_battery",
+    "text": "Comprar pilhas para o termômetro do aviário hoje.",
+    "speaker": "Bruno Conter",
+    "is_self_memo": true,
+    "duration_s": 4.0,
+    "expected_action": "DIRECT_RESOLVE",
+    "expected_intent": "TASK",
+    "expected_urgency": "MEDIUM",
+    "expected_date_offset_days": 0
+  },
+  {
+    "id": "direct_day_after_tomorrow",
+    "text": "Favor verificar o motor do exaustor depois de amanhã.",
+    "speaker": "Bruno Conter",
+    "is_self_memo": true,
+    "duration_s": 4.5,
+    "expected_action": "DIRECT_RESOLVE",
+    "expected_intent": "TASK",
+    "expected_urgency": "MEDIUM",
+    "expected_date_offset_days": 2
+  },
+  {
+    "id": "direct_urgent_feed_shortage",
+    "text": "Urgente, falta de ração confirmada no silo 1, verificar rota do TMS imediatamente.",
+    "speaker": "Bruno Conter",
+    "is_self_memo": true,
+    "duration_s": 6.0,
+    "expected_action": "DIRECT_RESOLVE",
+    "expected_intent": "TASK",
+    "expected_urgency": "URGENT"
+  },
+  {
+    "id": "direct_schedule_meeting",
+    "text": "Favor agendar reunião com a equipe do TMS na próxima segunda-feira.",
+    "speaker": "Bruno Conter",
+    "is_self_memo": false,
+    "duration_s": 5.5,
+    "expected_action": "DIRECT_RESOLVE",
+    "expected_intent": "TASK",
+    "expected_urgency": "MEDIUM"
+  },
+  {
+    "id": "direct_call_debora",
+    "text": "Ligar para a Débora Patel sobre a confirmação dos pedidos de ração.",
+    "speaker": "Bruno Conter",
+    "is_self_memo": true,
+    "duration_s": 5.0,
+    "expected_action": "DIRECT_RESOLVE",
+    "expected_intent": "TASK",
+    "expected_urgency": "MEDIUM"
+  },
+  {
+    "id": "direct_urgent_leak",
+    "text": "Emergência vazamento crítico no cano de abastecimento de água do aviário 3.",
+    "speaker": "Produtor",
+    "is_self_memo": false,
+    "duration_s": 6.0,
+    "expected_action": "DIRECT_RESOLVE",
+    "expected_intent": "TASK",
+    "expected_urgency": "URGENT"
+  },
+  {
+    "id": "direct_ask_feed_order",
+    "text": "Pedir confirmação do pedido de ração para a cooperativa amanhã.",
+    "speaker": "Bruno Conter",
+    "is_self_memo": true,
+    "duration_s": 5.0,
+    "expected_action": "DIRECT_RESOLVE",
+    "expected_intent": "TASK",
+    "expected_urgency": "MEDIUM",
+    "expected_date_offset_days": 1
+  },
+  {
+    "id": "direct_send_report",
+    "text": "Enviar o relatório de IEP da última liquidação para o supervisor hoje.",
+    "speaker": "Bruno Conter",
+    "is_self_memo": true,
+    "duration_s": 5.0,
+    "expected_action": "DIRECT_RESOLVE",
+    "expected_intent": "TASK",
+    "expected_urgency": "MEDIUM",
+    "expected_date_offset_days": 0
+  },
+  {
+    "id": "bypass_good_morning",
+    "text": "Bom dia a todos!",
+    "speaker": "Cooperado",
+    "is_self_memo": false,
+    "duration_s": 2.0,
+    "expected_action": "BYPASS",
+    "expected_intent": "NOISE",
+    "expected_urgency": "LOW"
+  },
+  {
+    "id": "bypass_thanks",
+    "text": "Muito obrigado, valeu!",
+    "speaker": "Transportador",
+    "is_self_memo": false,
+    "duration_s": 2.5,
+    "expected_action": "BYPASS",
+    "expected_intent": "NOISE",
+    "expected_urgency": "LOW"
+  },
+  {
+    "id": "bypass_emojis_only",
+    "text": "👍👏🤝",
+    "speaker": "Colega",
+    "is_self_memo": false,
+    "duration_s": 0.0,
+    "expected_action": "BYPASS",
+    "expected_intent": "NOISE",
+    "expected_urgency": "LOW"
+  },
+  {
+    "id": "bypass_sac_bot",
+    "text": "Olá! Sou o assistente virtual da transportadora. Digite 1 para rastreio ou 2 para falar com atendente.",
+    "speaker": "Bot SAC",
+    "is_self_memo": false,
+    "duration_s": 0.0,
+    "expected_action": "BYPASS",
+    "expected_intent": "NOISE",
+    "expected_urgency": "LOW"
+  },
+  {
+    "id": "bypass_good_night",
+    "text": "Boa noite pessoal, até amanhã.",
+    "speaker": "João",
+    "is_self_memo": false,
+    "duration_s": 3.0,
+    "expected_action": "BYPASS",
+    "expected_intent": "NOISE",
+    "expected_urgency": "LOW"
+  },
+  {
+    "id": "bypass_ok_received",
+    "text": "Ok recebido, abraço!",
+    "speaker": "Carlos",
+    "is_self_memo": false,
+    "duration_s": 2.0,
+    "expected_action": "BYPASS",
+    "expected_intent": "NOISE",
+    "expected_urgency": "LOW"
+  },
+  {
+    "id": "query_sensor_history",
+    "text": "Qual é o histórico de leituras do sensor do Silo 3 nos últimos 7 dias?",
+    "speaker": "Bruno Conter",
+    "is_self_memo": false,
+    "duration_s": 5.0,
+    "expected_action": "GRAPH_QUERY",
+    "expected_intent": "QUESTION",
+    "expected_urgency": "MEDIUM"
+  },
+  {
+    "id": "query_feed_supplier",
+    "text": "Quem é o fornecedor de ração atualmente cadastrado para a regional norte?",
+    "speaker": "Bruno Conter",
+    "is_self_memo": false,
+    "duration_s": 4.5,
+    "expected_action": "GRAPH_QUERY",
+    "expected_intent": "QUESTION",
+    "expected_urgency": "MEDIUM"
+  },
+  {
+    "id": "query_tms_integration_status",
+    "text": "Você sabe se a integração do TMS com o sistema de pesagem já foi concluída?",
+    "speaker": "Bruno Conter",
+    "is_self_memo": false,
+    "duration_s": 6.0,
+    "expected_action": "GRAPH_QUERY",
+    "expected_intent": "QUESTION",
+    "expected_urgency": "MEDIUM"
+  },
+  {
+    "id": "query_how_to_calc_iep",
+    "text": "Como calcular o IEP do lote de frangos de corte abatido com 48 dias?",
+    "speaker": "Técnico",
+    "is_self_memo": false,
+    "duration_s": 5.0,
+    "expected_action": "GRAPH_QUERY",
+    "expected_intent": "QUESTION",
+    "expected_urgency": "MEDIUM"
+  },
+  {
+    "id": "query_silo_levels_status",
+    "text": "Qual é o status dos sensores dos silos na granja Santo Antônio?",
+    "speaker": "Bruno Conter",
+    "is_self_memo": false,
+    "duration_s": 4.0,
+    "expected_action": "GRAPH_QUERY",
+    "expected_intent": "QUESTION",
+    "expected_urgency": "MEDIUM"
+  },
+  {
+    "id": "idea_silo_dashboard",
+    "text": "Ideia: podíamos criar um painel no Agrocenter integrando os sensores de nível dos silos ao TMS.",
+    "speaker": "Bruno Conter",
+    "is_self_memo": true,
+    "duration_s": 7.0,
+    "expected_action": "DIRECT_RESOLVE",
+    "expected_intent": "IDEA",
+    "expected_urgency": "MEDIUM"
+  },
+  {
+    "id": "idea_feed_order_confirmation",
+    "text": "Sugestão de fluxo: implementar confirmação em dois passos para pedidos de ração via WhatsApp.",
+    "speaker": "Bruno Conter",
+    "is_self_memo": true,
+    "duration_s": 6.5,
+    "expected_action": "DIRECT_RESOLVE",
+    "expected_intent": "IDEA",
+    "expected_urgency": "MEDIUM"
+  },
+  {
+    "id": "deep_complex_annual_planning",
+    "text": "Reunião de alinhamento com a diretoria sobre as três frentes para solucionar falhas na entrega de ração: Comunicação Eficiente com plataforma centralizada, Processos Otimizados no redesenho de fluxo e confirmação de pedidos, e Tecnologia Habilitadora com TMS e sensores de nível nos silos. Precisamos definir os prazos de homologação com os cooperados até o final do trimestre.",
+    "speaker": "Diretoria",
+    "is_self_memo": false,
+    "duration_s": 48.0,
+    "expected_action": "DEEP_ANALYSIS",
+    "expected_intent": "TASK",
+    "expected_urgency": "MEDIUM"
+  },
+  {
+    "id": "deep_zootechnical_review",
+    "text": "Discussão técnica sobre a curva de crescimento e conversão alimentar dos frangos de 42 a 60 dias. Avaliamos os desvios de peso no abate, o impacto da temperatura nos aviários durante o verão e a necessidade de ajustar a formulação da ração de crescimento junto aos nutricionistas para a próxima semana.",
+    "speaker": "Zootecnista C.Vale",
+    "is_self_memo": false,
+    "duration_s": 42.0,
+    "expected_action": "DEEP_ANALYSIS",
+    "expected_intent": "MEMO",
+    "expected_urgency": "MEDIUM"
+  },
+  {
+    "id": "deep_multitopic_audit",
+    "text": "Relatório executivo da visita técnica às granjas do núcleo oeste: primeiro, o silo 4 apresentou oscilação na calibração do sensor ultrassônico; segundo, os dados de pesagem automática divergiram em 3% do sistema Mtech; e terceiro, o produtor solicitou antecipação de carga de ração inicial para quarta-feira.",
+    "speaker": "Auditoria de Campo",
+    "is_self_memo": false,
+    "duration_s": 50.0,
+    "expected_action": "DEEP_ANALYSIS",
+    "expected_intent": "TASK",
+    "expected_urgency": "MEDIUM"
+  },
+  {
+    "id": "direct_urgent_stopped_all",
+    "text": "Parou tudo na esteira de distribuição de ração do galpão 2, precisamos de suporte imediato.",
+    "speaker": "Produtor",
+    "is_self_memo": false,
+    "duration_s": 6.0,
+    "expected_action": "DIRECT_RESOLVE",
+    "expected_intent": "TASK",
+    "expected_urgency": "URGENT"
+  },
+  {
+    "id": "direct_review_contract",
+    "text": "Revisar o contrato com a transportadora do TMS na próxima sexta-feira.",
+    "speaker": "Bruno Conter",
+    "is_self_memo": true,
+    "duration_s": 5.0,
+    "expected_action": "DIRECT_RESOLVE",
+    "expected_intent": "TASK",
+    "expected_urgency": "MEDIUM"
+  },
+  {
+    "id": "direct_short_memo",
+    "text": "Nota pessoal: a taxa de conversão alimentar do lote 12 ficou em 1.58.",
+    "speaker": "Bruno Conter",
+    "is_self_memo": true,
+    "duration_s": 5.0,
+    "expected_action": "DIRECT_RESOLVE",
+    "expected_intent": "MEMO",
+    "expected_urgency": "MEDIUM"
+  },
+  {
+    "id": "bypass_greeting_casual",
+    "text": "Tudo bem por aí?",
+    "speaker": "Amigo",
+    "is_self_memo": false,
+    "duration_s": 2.0,
+    "expected_action": "BYPASS",
+    "expected_intent": "NOISE",
+    "expected_urgency": "LOW"
+  }
+]
