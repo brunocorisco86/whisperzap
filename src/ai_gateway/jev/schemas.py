@@ -44,6 +44,7 @@ class JEVJudgement(BaseModel):
     extracted_entities: List[str] = Field(default_factory=list, description="Entidades preliminares identificadas")
     direct_task_title: Optional[str] = Field(default=None, description="Título da tarefa caso seja DIRECT_RESOLVE")
     direct_due_date: Optional[str] = Field(default=None, description="Data limite identificada localmente (YYYY-MM-DD)")
+    should_vectorize: bool = Field(default=True, description="Indica se a mensagem deve ser indexada no banco vetorial")
 
 
 class JEVJudgeRequest(BaseModel):

@@ -3,8 +3,11 @@
 import functools
 import re
 import unicodedata
+import logging
 from typing import Any, Dict, Optional, Tuple
 from src.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 @functools.lru_cache(maxsize=4096)

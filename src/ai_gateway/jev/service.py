@@ -134,6 +134,7 @@ class JEVService:
                 urgency=JEVUrgency.LOW,
                 confidence=1.0,
                 suggested_route="bypass",
+                should_vectorize=False,
                 rationale="Texto vazio ou nulo.",
             )
 
@@ -148,6 +149,7 @@ class JEVService:
                 urgency=JEVUrgency.LOW,
                 confidence=1.0,
                 suggested_route="bypass",
+                should_vectorize=False,
                 rationale="Mensagem composta apenas por emojis ou caracteres especiais.",
             )
 
@@ -158,6 +160,7 @@ class JEVService:
                 urgency=JEVUrgency.LOW,
                 confidence=1.0,
                 suggested_route="bypass",
+                should_vectorize=False,
                 rationale="Mensagem transacional ou robô de atendimento automatizado.",
             )
 
@@ -169,6 +172,7 @@ class JEVService:
                 urgency=JEVUrgency.LOW,
                 confidence=0.98,
                 suggested_route="bypass",
+                should_vectorize=False,
                 rationale="Saudação social trivial sem conteúdo acionável.",
             )
 
@@ -180,6 +184,7 @@ class JEVService:
                     urgency=JEVUrgency.LOW,
                     confidence=0.96,
                     suggested_route="bypass",
+                    should_vectorize=False,
                     rationale="Saudação ou despedida social sem conteúdo operacional.",
                 )
 

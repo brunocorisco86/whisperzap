@@ -49,8 +49,10 @@ class Settings(BaseSettings):
     DATABASE_URL: str = ""
 
     # Embeddings & Busca Vetorial
-    EMBEDDING_PROVIDER: Literal["gemini", "openrouter", "mock"] = "gemini"
-    EMBEDDING_MODEL: str = "gemini-embedding-001"
+    EMBEDDING_PROVIDER: Literal["local", "onnx", "gemini", "openrouter", "mock"] = "local"
+    EMBEDDING_MODEL: str = "bge-micro-v2"
+    LOCAL_EMBEDDING_MODEL_PATH: str = "models/bge-micro-v2.onnx"
+    LOCAL_EMBEDDING_DIMENSION: int = 768
 
     # Grafo de Conhecimento e Dicionário Léxico
     DATA_DIR: str = "data"

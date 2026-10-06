@@ -330,17 +330,34 @@ class MemoryRepository:
                 db.add(ent_rec)
                 extracted_entities_dicts.append(e.model_dump())
 
-            # 5. Gera e Salva Embedding Semântico
-            embedding_vector = await self.generate_embedding(data.revised_text)
-            emb_id = str(uuid4())
-            emb_rec = EmbeddingRecord(
-                id=emb_id,
-                message_id=msg_id,
-                text_content=data.revised_text,
-                embedding_json=embedding_vector,
-                created_at=datetime.now(timezone.utc),
-            )
-            db.add(emb_rec)
+            # 5. Gera e Salva Embedding Semântico (Orquestrado pelo JEV)
+            should_vectorize = True
+            try:
+                from src.ai_gateway.jev import jev_service
+                jev_verdict = jev_service.judge(
+                    text=data.revised_text,
+                    speaker=data.speaker,
+                    is_self_memo=(data.speaker == settings.USER_NAME or str(data.speaker).lower() in ("user", "bruno")),
+                    meta_info=data.meta_info if isinstance(data.meta_info, dict) else None,
+                )
+                should_vectorize = getattr(jev_verdict, "should_vectorize", True)
+            except Exception as jev_err:
+                logger.debug(f"Falha ao consultar JEV para vetorização: {jev_err}")
+
+            if should_vectorize:
+                embedding_vector = await self.generate_embedding(data.revised_text)
+                emb_id = str(uuid4())
+                emb_rec = EmbeddingRecord(
+                    id=emb_id,
+                    message_id=msg_id,
+                    text_content=data.revised_text,
+                    embedding_json=embedding_vector,
+                    created_at=datetime.now(timezone.utc),
+                )
+                db.add(emb_rec)
+            else:
+                logger.info(f"JEV determinou bypass de vetorização para mensagem {msg_id} (ruído/saudação descartado do banco vetorial).")
+
             db.commit()
             db.refresh(message)
 

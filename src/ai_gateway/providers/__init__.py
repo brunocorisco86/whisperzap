@@ -5,12 +5,14 @@ from src.ai_gateway.providers.base import BaseLLMProvider
 from src.ai_gateway.providers.gemini import GeminiProvider
 from src.ai_gateway.providers.openrouter import OpenRouterProvider
 from src.ai_gateway.providers.mock import MockProvider
+from src.ai_gateway.providers.local_embedding import LocalEmbeddingProvider
 
 __all__ = [
     "BaseLLMProvider",
     "GeminiProvider",
     "OpenRouterProvider",
     "MockProvider",
+    "LocalEmbeddingProvider",
     "get_ai_provider",
 ]
 
@@ -37,5 +39,7 @@ def get_ai_provider(
         return OpenRouterProvider(api_key=settings.OPENROUTER_API_KEY, model_name=model_name)
     elif provider_name == "mock":
         return MockProvider(model_name=model_name)
+    elif provider_name in ("local", "onnx"):
+        return LocalEmbeddingProvider(model_name=model_name)
     else:
-        raise ValueError(f"Provedor desconhecido: '{provider_name}'. Suportados: gemini, openrouter, mock")
+        raise ValueError(f"Provedor desconhecido: '{provider_name}'. Suportados: gemini, openrouter, mock, local, onnx")

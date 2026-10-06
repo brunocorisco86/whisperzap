@@ -129,6 +129,7 @@ class JEVTier2Engine:
                 confidence=1.0,
                 suggested_route="bypass",
                 tier_used="tier2_slm",
+                should_vectorize=False,
                 rationale="Texto vazio ou emojis recebido no Tier 2.",
             )
 
@@ -166,6 +167,7 @@ class JEVTier2Engine:
                 confidence=confidence,
                 suggested_route="bypass",
                 tier_used="tier2_slm",
+                should_vectorize=False,
                 rationale="Classificado semanticamente pelo Tier 2 como saudação ou ruído.",
             )
 
