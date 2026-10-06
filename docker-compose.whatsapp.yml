@@ -12,6 +12,8 @@ services:
       POSTGRES_DB: evolution_db
     volumes:
       - evolution_postgres_data:/var/lib/postgresql/data
+    mem_limit: 256m
+    mem_reservation: 64m
     networks:
       - hermes_mesh_network
 
@@ -22,6 +24,9 @@ services:
     image: redis:7-alpine
     container_name: hermes-evolution-redis
     restart: unless-stopped
+    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru --save ""
+    mem_limit: 128m
+    mem_reservation: 32m
     volumes:
       - evolution_redis_data:/data
     networks:
@@ -34,6 +39,8 @@ services:
     image: evoapicloud/evolution-api:latest
     container_name: hermes-evolution-api
     restart: unless-stopped
+    mem_limit: 768m
+    mem_reservation: 256m
     ports:
       - "8085:8080"
     environment:
@@ -56,6 +63,7 @@ services:
       CACHE_REDIS_URI: redis://evolution-redis:6379
       LOG_LEVEL: ERROR,WARN,INFO
       CONFIG_SESSION_PHONE_CLIENT: "Hermes Voice Memory"
+      NODE_OPTIONS: "--max-old-space-size=512"
     depends_on:
       - evolution-redis
     volumes:
@@ -70,6 +78,8 @@ services:
     image: n8nio/n8n:latest
     container_name: hermes-n8n
     restart: unless-stopped
+    mem_limit: 512m
+    mem_reservation: 128m
     ports:
       - "5678:5678"
     environment:
