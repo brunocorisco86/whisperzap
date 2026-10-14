@@ -37,8 +37,16 @@ if [ -f "data/hermes_graph.json" ]; then
     echo "✅ Backup do Grafo salvo em: $BACKUP_DIR/hermes_graph_$TIMESTAMP.json"
 fi
 
-# 3. Rotação e limpeza de backups com mais de 7 dias
+# 3. Backup das Memórias Contextuais do Hermes Agent
+HERMES_MEMORIES_DIR="${HERMES_MEMORIES_DIR:-/root/projetos/hermes-agent/config/memories}"
+if [ -d "$HERMES_MEMORIES_DIR" ]; then
+    echo "🧠 Compactando memórias contextuais do Hermes Agent..."
+    tar -czf "$BACKUP_DIR/hermes_agent_memories_$TIMESTAMP.tar.gz" -C "$HERMES_MEMORIES_DIR" .
+    echo "✅ Backup das Memórias Contextuais salvo em: $BACKUP_DIR/hermes_agent_memories_$TIMESTAMP.tar.gz"
+fi
+
+# 4. Rotação e limpeza de backups com mais de 7 dias
 echo "🧹 Removendo backups com mais de $RETENTION_DAYS dias..."
-find "$BACKUP_DIR" -type f \( -name "*.sql.gz" -o -name "*.json" -o -name "*.db" \) -mtime +$RETENTION_DAYS -exec rm -f {} \;
+find "$BACKUP_DIR" -type f \( -name "*.sql.gz" -o -name "*.json" -o -name "*.db" -o -name "*.tar.gz" \) -mtime +$RETENTION_DAYS -exec rm -f {} \;
 
 echo "🎉 [$(date)] Rotina de backup concluída com sucesso!"

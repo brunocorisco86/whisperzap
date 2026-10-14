@@ -97,11 +97,12 @@ app.add_middleware(
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# Monta arquivos estáticos do frontend web
+# Monta arquivos estáticos do frontend web (raiz e sub-caminho /mnemosine)
 if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    app.mount("/mnemosine/static", StaticFiles(directory=STATIC_DIR), name="mnemosine_static")
 
-# Inclusão dos roteadores de microsserviços
+# Inclusão dos roteadores de microsserviços na raiz
 app.include_router(web_router)
 app.include_router(transcriber_router)
 app.include_router(ai_router, prefix="/api/v1/ai")
@@ -113,6 +114,16 @@ app.include_router(analytics_router)
 app.include_router(audit_router)
 app.include_router(audit_router, prefix="/api/audit", include_in_schema=False)
 app.include_router(whatsapp_router)
+
+# Inclusão dos roteadores sob o sub-caminho /mnemosine
+app.include_router(transcriber_router, prefix="/mnemosine", include_in_schema=False)
+app.include_router(ai_router, prefix="/mnemosine/api/v1/ai", include_in_schema=False)
+app.include_router(dictionary_router, prefix="/mnemosine", include_in_schema=False)
+app.include_router(memory_router, prefix="/mnemosine", include_in_schema=False)
+app.include_router(contacts_router, prefix="/mnemosine", include_in_schema=False)
+app.include_router(analytics_router, prefix="/mnemosine", include_in_schema=False)
+app.include_router(audit_router, prefix="/mnemosine", include_in_schema=False)
+app.include_router(whatsapp_router, prefix="/mnemosine", include_in_schema=False)
 
 
 

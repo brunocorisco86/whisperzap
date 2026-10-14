@@ -102,21 +102,43 @@ class MemoryRepository:
 
             if bypass_active:
                 logger.info(f"⚡ [AI Gateway] Bypass de IA ativado para remetente='{data.speaker}': motivo='{bypass_reason}'")
-                from src.ai_gateway.schemas import SemanticExtractionResponse
+                from src.ai_gateway.schemas import SemanticExtractionResponse, ExtractedTask
+                from src.ai_gateway.sentiment_analyzer import fast_sentiment_analyzer
+                
+                # Se o bypass veio de uma resolução direta do JEV (Zero-Token Task)
+                jev_tasks = []
+                jev_intent = "NOTE"
+                jev_urgency = "LOW"
+                meta_jev = (data.meta_info or {}).get("jev_verdict") if isinstance(data.meta_info, dict) else None
+                if isinstance(meta_jev, dict) and meta_jev.get("action") == "DIRECT_RESOLVE":
+                    jev_task_title = meta_jev.get("direct_task_title") or text_to_check
+                    jev_intent = "TASK"
+                    jev_urgency = meta_jev.get("urgency", "MEDIUM")
+                    jev_tasks.append(
+                        ExtractedTask(
+                            title=jev_task_title,
+                            due_date=meta_jev.get("direct_due_date"),
+                            priority=jev_urgency,
+                            assignee=None,
+                        )
+                    )
+                    logger.info(f"🎯 [JEV Zero-Token] Tarefa direta registrada sem custo de tokens: '{jev_task_title}' (prazo={meta_jev.get('direct_due_date')})")
+
+                bypass_sent = fast_sentiment_analyzer.analyze(text=text_to_check, urgency=jev_urgency)
                 extracted = SemanticExtractionResponse(
-                    intent="NOTE",
+                    intent=jev_intent,
                     summary=text_to_check[:120] if text_to_check else "",
-                    sentiment="NEUTRAL",
-                    sentiment_score=0.0,
-                    tasks=[],
+                    sentiment=bypass_sent.sentiment,
+                    sentiment_score=bypass_sent.sentiment_score,
+                    tasks=jev_tasks,
                     entities=[],
                     triples=[],
                     decisions=[],
                     ideas=[],
                     topics=[],
-                    urgency="LOW",
-                    provider="bypass",
-                    model="bypass",
+                    urgency=jev_urgency,
+                    provider="jev_local" if jev_tasks else "bypass",
+                    model="jev_direct_resolve" if jev_tasks else "bypass",
                     processing_time_ms=0.0,
                 )
             else:
@@ -133,11 +155,16 @@ class MemoryRepository:
                 except Exception as extract_err:
                     logger.warning(f"Extração semântica com IA falhou ({extract_err}). Usando fallback heurístico.")
                     from src.ai_gateway.schemas import SemanticExtractionResponse
+                    from src.ai_gateway.sentiment_analyzer import fast_sentiment_analyzer
+                    fallback_sent = fast_sentiment_analyzer.analyze(
+                        text=data.revised_text or data.raw_text or "",
+                        urgency="MEDIUM",
+                    )
                     extracted = SemanticExtractionResponse(
                         intent="NOTE",
                         summary=data.revised_text[:120] if data.revised_text else "",
-                        sentiment="NEUTRAL",
-                        sentiment_score=0.0,
+                        sentiment=fallback_sent.sentiment,
+                        sentiment_score=fallback_sent.sentiment_score,
                         tasks=[],
                         entities=[],
                         triples=[],
@@ -161,6 +188,9 @@ class MemoryRepository:
 
             # 2. Computa prosódia acústica se houver áudio e meta_info não contiver
             final_meta = dict(data.meta_info or {})
+            if data.prosody_metrics and "prosody" not in final_meta:
+                final_meta["prosody"] = data.prosody_metrics
+
             if data.audio_duration_s and "prosody" not in final_meta:
                 from src.transcriber.prosody_analyzer import prosody_analyzer
                 prosody_obj = prosody_analyzer.analyze_speech_prosody(
@@ -170,7 +200,29 @@ class MemoryRepository:
                 )
                 final_meta["prosody"] = prosody_obj.model_dump()
 
-            # 3. Cria registro da mensagem
+            # 3. Calibração de Sentimento Multimodal (Texto + Prosódia)
+            final_sentiment = extracted.sentiment or "NEUTRAL"
+            final_sentiment_score = float(extracted.sentiment_score or 0.0)
+
+            # Se o sentimento for NEUTRAL com score 0.0, verifica se há pistas prosódicas ou léxicas claras
+            if final_sentiment == "NEUTRAL" and final_sentiment_score == 0.0:
+                from src.ai_gateway.sentiment_analyzer import fast_sentiment_analyzer
+                prosody_meta = final_meta.get("prosody") or {}
+                voice_tone = prosody_meta.get("voice_tone")
+                ac_score = prosody_meta.get("acoustic_score")
+
+                calibrated = fast_sentiment_analyzer.analyze(
+                    text=data.revised_text or data.raw_text or "",
+                    summary=extracted.summary or "",
+                    urgency=weighted_message_urgency,
+                    prosody_tone=voice_tone,
+                    acoustic_score=ac_score,
+                )
+                if calibrated.confidence >= 0.50 and calibrated.sentiment != "NEUTRAL":
+                    final_sentiment = calibrated.sentiment
+                    final_sentiment_score = calibrated.sentiment_score
+
+            # 4. Cria registro da mensagem
             msg_created_at = data.created_at or datetime.now(timezone.utc)
             if msg_created_at.tzinfo is not None:
                 msg_created_at = msg_created_at.astimezone(timezone.utc).replace(tzinfo=None)
@@ -185,8 +237,8 @@ class MemoryRepository:
                 audio_filename=data.audio_filename,
                 intent=extracted.intent,
                 summary=extracted.summary,
-                sentiment=extracted.sentiment or "NEUTRAL",
-                sentiment_score=extracted.sentiment_score or 0.0,
+                sentiment=final_sentiment,
+                sentiment_score=final_sentiment_score,
                 urgency=weighted_message_urgency,
                 meta_info=final_meta,
             )
@@ -810,7 +862,39 @@ class MemoryRepository:
             else:
                 final_sources = sources
 
-            # 7. Chama o Agente Hermes para inferência e resposta estrita com humanização
+            # 6.1 Opção 3: Rotação RAG Factual Determinística Local (Zero-Token Graph & Task Synthesizer)
+            # Se for busca direta por tarefas (TASK_LOOKUP) ou diálogo pontual recente já consolidado
+            is_pure_task_lookup = (parsed.intent == "TASK_LOOKUP")
+            is_pure_temporal_dialogue = (parsed.intent == "INTERLOCUTOR_DIALOGUE" and (parsed.is_today or parsed.is_yesterday))
+            has_direct_glossary = (len(parsed.domain_terms) == 1 and not sources and not related_tasks and len(parsed.raw_query.split()) <= 4)
+
+            if is_pure_task_lookup or is_pure_temporal_dialogue or has_direct_glossary:
+                logger.info(f"🧠 [Graph RAG Zero-Token] Consulta factual ('{parsed.intent}') resolvida via síntese local de grafo/banco (0 tokens gastos).")
+                from src.ai_gateway.cognitive_synthesizer import local_cognitive_synthesizer
+                from src.ai_gateway.humanizer import hermes_response_humanizer
+                
+                local_answer = local_cognitive_synthesizer.synthesize_general(
+                    query=query,
+                    sources=final_sources[:10],
+                    pending_tasks=related_tasks[:5],
+                    related_entities=list(set(related_entities))[:8],
+                    parsed_query=parsed,
+                )
+                humanized = hermes_response_humanizer.humanize(local_answer, parsed=parsed)
+                result = HermesQueryResponse(
+                    query=query,
+                    answer=humanized,
+                    sources=final_sources[:10],
+                    related_entities=list(set(related_entities))[:8],
+                    pending_tasks_mentioned=related_tasks[:5],
+                    provider="local_graph_synthesizer",
+                    model="graph_networkx_spacy",
+                    processing_time_ms=0.0,
+                )
+                semantic_cache.set(query, result.model_dump(), tokens_saved=1200)
+                return result
+
+            # 7. Chama o Agente Hermes para inferência e resposta estrita com humanização (Gemini Flash-Lite)
             result = await hermes_agent_service.answer_hermes_query(
                 query=query,
                 sources=final_sources[:10],

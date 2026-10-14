@@ -15,14 +15,14 @@ class CachedQueryItem(BaseModel):
     normalized_query: str
     response_data: Dict[str, Any]
     created_at: float
-    ttl_seconds: float = 900.0  # 15 minutos padrão
+    ttl_seconds: float = 7200.0  # 2 horas padrão para máxima economia de tokens
     tokens_saved: int = 450
 
 
 class SemanticResponseCache:
     """Cache semântico rápido em memória com expiração por TTL e correspondência fuzzy."""
 
-    def __init__(self, default_ttl_seconds: float = 900.0, similarity_threshold: float = 94.0):
+    def __init__(self, default_ttl_seconds: float = 7200.0, similarity_threshold: float = 94.0):
         self.default_ttl = default_ttl_seconds
         self.similarity_threshold = similarity_threshold
         self._cache: Dict[str, CachedQueryItem] = {}
@@ -99,6 +99,18 @@ class SemanticResponseCache:
             ttl_seconds=ttl,
             tokens_saved=tokens_saved,
         )
+
+    def invalidate_matching(self, pattern: str) -> int:
+        """Invalida seletivamente entradas do cache que contenham o padrão (ex: nome de contato ou termo)."""
+        if not pattern:
+            return 0
+        pat_clean = pattern.lower().strip()
+        keys_to_remove = [k for k in self._cache if pat_clean in k or pat_clean in self._cache[k].query.lower()]
+        for k in keys_to_remove:
+            self._cache.pop(k, None)
+        if keys_to_remove:
+            logger.info(f"🧹 [Semantic Cache] {len(keys_to_remove)} entrada(s) invalidadas para o padrão '{pattern}'.")
+        return len(keys_to_remove)
 
     def clear(self) -> None:
         """Limpa todo o cache."""

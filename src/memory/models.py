@@ -171,6 +171,28 @@ class CronLockRecord(Base):
     worker_pid = Column(Integer)
 
 
+class AdminSettingRecord(Base):
+    """Tabela de configurações administrativas persistentes (ex: hash de senha, segredos)."""
+
+    __tablename__ = "admin_settings"
+
+    key = Column(String(128), primary_key=True, index=True)
+    value = Column(Text, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class Fido2CredentialRecord(Base):
+    """Tabela de credenciais de hardware FIDO2 / WebAuthn (YubiKey, Pico Key, Passkeys)."""
+
+    __tablename__ = "fido2_credentials"
+
+    id = Column(String(255), primary_key=True)  # Credential ID em base64url
+    public_key = Column(Text, nullable=False)    # Chave pública COSE / PEM em base64url
+    sign_count = Column(Integer, default=0)      # Contador contra replay attacks
+    device_name = Column(String(100), default="Pico Key / Hardware Key")
+    transports = Column(JSON, default=list)      # Ex: ["usb", "nfc"]
+    created_at = Column(DateTime, default=utc_now)
+    last_used_at = Column(DateTime, nullable=True)
 
 
 # ===================== Schemas Pydantic da API =====================
@@ -354,6 +376,7 @@ class MessageCreate(BaseModel):
     revised_text: str
     audio_duration_s: Optional[float] = None
     audio_filename: Optional[str] = None
+    prosody_metrics: Optional[dict] = None
     meta_info: Optional[dict] = None
     created_at: Optional[datetime] = None
 

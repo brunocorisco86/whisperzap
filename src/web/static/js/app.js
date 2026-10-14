@@ -2,6 +2,20 @@
  * Hermes Control Hub — Frontend Logic
  */
 
+// Interceptador transparente de fetch para suporte a sub-caminhos (/mnemosine)
+(function() {
+  const originalFetch = window.fetch;
+  const basePath = window.location.pathname.startsWith('/mnemosine') ? '/mnemosine' : '';
+  if (basePath) {
+    window.fetch = function(resource, init) {
+      if (typeof resource === 'string' && resource.startsWith('/api/')) {
+        resource = basePath + resource;
+      }
+      return originalFetch(resource, init);
+    };
+  }
+})();
+
 // State
 let allContacts = [];
 let allDictionaryTerms = [];
@@ -4594,5 +4608,349 @@ async function saveAiModelsConfig(event) {
   }
 }
 window.saveAiModelsConfig = saveAiModelsConfig;
+
+
+// ==========================================
+// 7. Central de Segurança & Autenticação FIDO2
+// ==========================================
+
+function openAdminSecurityModal() {
+  const modal = document.getElementById('modal-admin-security');
+  if (!modal) return;
+  modal.classList.add('active');
+  switchSecurityTab('pwd');
+}
+window.openAdminSecurityModal = openAdminSecurityModal;
+
+function closeAdminSecurityModal() {
+  const modal = document.getElementById('modal-admin-security');
+  if (modal) modal.classList.remove('active');
+}
+window.closeAdminSecurityModal = closeAdminSecurityModal;
+
+function switchSecurityTab(tab) {
+  const btnPwd = document.getElementById('tab-btn-sec-pwd');
+  const btnFido = document.getElementById('tab-btn-sec-fido2');
+  const contentPwd = document.getElementById('sec-tab-content-pwd');
+  const contentFido = document.getElementById('sec-tab-content-fido2');
+
+  if (tab === 'pwd') {
+    if (btnPwd) btnPwd.classList.add('active');
+    if (btnFido) btnFido.classList.remove('active');
+    if (contentPwd) contentPwd.style.display = 'block';
+    if (contentFido) contentFido.style.display = 'none';
+  } else {
+    if (btnPwd) btnPwd.classList.remove('active');
+    if (btnFido) btnFido.classList.add('active');
+    if (contentPwd) contentPwd.style.display = 'none';
+    if (contentFido) contentFido.style.display = 'block';
+    loadFido2Keys();
+  }
+}
+window.switchSecurityTab = switchSecurityTab;
+
+async function handleAuthChangePassword() {
+  const curPwd = document.getElementById('sec-current-pwd').value;
+  const newPwd = document.getElementById('sec-new-pwd').value;
+  const cnfPwd = document.getElementById('sec-confirm-pwd').value;
+  const msgEl = document.getElementById('sec-pwd-msg');
+  const btn = document.getElementById('btn-save-new-pwd');
+
+  if (!curPwd || !newPwd) {
+    if (msgEl) {
+      msgEl.innerText = 'Preencha todos os campos.';
+      msgEl.style.color = '#f87171';
+      msgEl.style.display = 'block';
+    }
+    return;
+  }
+
+  if (newPwd !== cnfPwd) {
+    if (msgEl) {
+      msgEl.innerText = '❌ A confirmação de nova senha não confere.';
+      msgEl.style.color = '#f87171';
+      msgEl.style.display = 'block';
+    }
+    return;
+  }
+
+  try {
+    if (btn) btn.disabled = true;
+    const res = await fetch('/api/auth/password/change', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        current_password: curPwd,
+        new_password: newPwd,
+        confirm_password: cnfPwd
+      })
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      showToast('🔒 Senha mestra alterada com sucesso!');
+      if (msgEl) {
+        msgEl.innerText = '✅ Senha mestra alterada com sucesso!';
+        msgEl.style.color = '#4ade80';
+        msgEl.style.display = 'block';
+      }
+      document.getElementById('form-change-password').reset();
+      setTimeout(() => closeAdminSecurityModal(), 1200);
+    } else {
+      if (msgEl) {
+        msgEl.innerText = `❌ ${data.detail || 'Erro ao alterar senha'}`;
+        msgEl.style.color = '#f87171';
+        msgEl.style.display = 'block';
+      }
+    }
+  } catch (err) {
+    if (msgEl) {
+      msgEl.innerText = `❌ Erro de conexão: ${err}`;
+      msgEl.style.color = '#f87171';
+      msgEl.style.display = 'block';
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+window.handleAuthChangePassword = handleAuthChangePassword;
+
+// --- WebAuthn Base64URL Helpers ---
+function _bufToBase64url(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let str = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    str += String.fromCharCode(bytes[i]);
+  }
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+function _base64urlToBuf(base64url) {
+  let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+  while (base64.length % 4) base64 += '=';
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+async function loadFido2Keys() {
+  const container = document.getElementById('fido2-keys-list');
+  if (!container) return;
+
+  try {
+    const res = await fetch('/api/auth/fido2/keys');
+    if (!res.ok) {
+      container.innerHTML = '<p style="color: #f87171; font-size: 0.82rem;">Erro ao carregar chaves.</p>';
+      return;
+    }
+    const keys = await res.json();
+    if (!keys || keys.length === 0) {
+      container.innerHTML = '<p style="color: var(--text-muted); font-size: 0.82rem; font-style: italic;">Nenhuma chave FIDO2 cadastrada ainda.</p>';
+      return;
+    }
+
+    let html = '<div style="display: flex; flex-direction: column; gap: 0.5rem;">';
+    for (const k of keys) {
+      html += `
+        <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(30, 41, 59, 0.6); padding: 0.6rem 0.8rem; border-radius: 6px; border: 1px solid var(--border-subtle);">
+          <div>
+            <div style="font-weight: 600; color: #f8fafc; font-size: 0.88rem;">🔑 ${k.device_name || 'Chave FIDO2'}</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">Adicionada em: ${k.created_at} • Usada: ${k.last_used_at}</div>
+          </div>
+          <button type="button" class="btn btn-sm btn-danger" onclick="window.deleteFido2Key('${k.id}')" title="Excluir Chave">
+            🗑️
+          </button>
+        </div>
+      `;
+    }
+    html += '</div>';
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = `<p style="color: #f87171; font-size: 0.82rem;">Erro de conexão: ${err}</p>`;
+  }
+}
+window.loadFido2Keys = loadFido2Keys;
+
+async function deleteFido2Key(keyId) {
+  if (!confirm('Deseja realmente excluir esta chave FIDO2? Ela não poderá mais ser usada para login.')) return;
+  try {
+    const res = await fetch(`/api/auth/fido2/keys/${encodeURIComponent(keyId)}`, { method: 'DELETE' });
+    if (res.ok) {
+      showToast('🗑️ Chave FIDO2 removida com sucesso.');
+      loadFido2Keys();
+    } else {
+      showToast('❌ Erro ao excluir chave FIDO2.');
+    }
+  } catch (err) {
+    showToast(`❌ Erro de conexão: ${err}`);
+  }
+}
+window.deleteFido2Key = deleteFido2Key;
+
+async function handleFido2Register() {
+  if (!window.PublicKeyCredential) {
+    alert('Seu navegador não suporta WebAuthn / FIDO2. Use Chrome, Firefox, Safari ou Edge modernos.');
+    return;
+  }
+
+  const nameInput = document.getElementById('sec-fido2-name');
+  const deviceName = (nameInput && nameInput.value.trim()) || 'Pico Key / Hardware Key';
+  const msgEl = document.getElementById('sec-fido2-msg');
+  const btn = document.getElementById('btn-register-fido2');
+
+  try {
+    if (btn) btn.disabled = true;
+    if (msgEl) {
+      msgEl.innerText = '👉 Toque na chave de hardware (YubiKey / Pico Key) agora...';
+      msgEl.style.color = '#38bdf8';
+      msgEl.style.display = 'block';
+    }
+
+    const optionsRes = await fetch('/api/auth/fido2/register/options', { method: 'POST' });
+    if (!optionsRes.ok) {
+      throw new Error('Falha ao obter desafio do servidor.');
+    }
+    const options = await optionsRes.json();
+
+    options.challenge = _base64urlToBuf(options.challenge);
+    options.user.id = _base64urlToBuf(options.user.id);
+    if (options.excludeCredentials) {
+      for (const cred of options.excludeCredentials) {
+        cred.id = _base64urlToBuf(cred.id);
+      }
+    }
+
+    const credential = await navigator.credentials.create({ publicKey: options });
+    if (!credential) {
+      throw new Error('Registro cancelado pelo usuário ou dispositivo.');
+    }
+
+    const credData = {
+      id: credential.id,
+      rawId: _bufToBase64url(credential.rawId),
+      type: credential.type,
+      response: {
+        attestationObject: _bufToBase64url(credential.response.attestationObject),
+        clientDataJSON: _bufToBase64url(credential.response.clientDataJSON),
+      }
+    };
+
+    const verifyRes = await fetch('/api/auth/fido2/register/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        credential_json: JSON.stringify(credData),
+        device_name: deviceName
+      })
+    });
+
+    const verifyData = await verifyRes.json().catch(() => ({}));
+    if (verifyRes.ok) {
+      showToast('🎉 Chave FIDO2 cadastrada com sucesso!');
+      if (msgEl) {
+        msgEl.innerText = '✅ Chave FIDO2 cadastrada e pronta para login!';
+        msgEl.style.color = '#4ade80';
+      }
+      if (nameInput) nameInput.value = '';
+      loadFido2Keys();
+    } else {
+      if (msgEl) {
+        msgEl.innerText = `❌ ${verifyData.detail || 'Erro ao validar chave'}`;
+        msgEl.style.color = '#f87171';
+      }
+    }
+  } catch (err) {
+    if (msgEl) {
+      msgEl.innerText = `❌ ${err.message || err}`;
+      msgEl.style.color = '#f87171';
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+window.handleFido2Register = handleFido2Register;
+
+async function handleFido2Login() {
+  if (!window.PublicKeyCredential) {
+    alert('Seu navegador não suporta WebAuthn / FIDO2.');
+    return;
+  }
+
+  const msgEl = document.getElementById('fido2-status-msg');
+  const btn = document.getElementById('btn-fido2-login');
+
+  try {
+    if (btn) btn.disabled = true;
+    if (msgEl) {
+      msgEl.innerText = '👉 Toque na sua chave FIDO2 / Pico Key agora...';
+      msgEl.style.color = '#38bdf8';
+      msgEl.style.display = 'block';
+    }
+
+    const optionsRes = await fetch('/api/auth/fido2/login/options', { method: 'POST' });
+    if (!optionsRes.ok) {
+      throw new Error('Falha ao obter desafio do servidor.');
+    }
+    const options = await optionsRes.json();
+
+    options.challenge = _base64urlToBuf(options.challenge);
+    if (options.allowCredentials) {
+      for (const cred of options.allowCredentials) {
+        cred.id = _base64urlToBuf(cred.id);
+      }
+    }
+
+    const assertion = await navigator.credentials.get({ publicKey: options });
+    if (!assertion) {
+      throw new Error('Autenticação cancelada.');
+    }
+
+    const assertData = {
+      id: assertion.id,
+      rawId: _bufToBase64url(assertion.rawId),
+      type: assertion.type,
+      response: {
+        authenticatorData: _bufToBase64url(assertion.response.authenticatorData),
+        clientDataJSON: _bufToBase64url(assertion.response.clientDataJSON),
+        signature: _bufToBase64url(assertion.response.signature),
+        userHandle: assertion.response.userHandle ? _bufToBase64url(assertion.response.userHandle) : null
+      }
+    };
+
+    const verifyRes = await fetch('/api/auth/fido2/login/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        credential_json: JSON.stringify(assertData)
+      })
+    });
+
+    const verifyData = await verifyRes.json().catch(() => ({}));
+    if (verifyRes.ok) {
+      const overlay = document.getElementById('auth-overlay');
+      if (overlay) overlay.style.display = 'none';
+      showToast('🔑 Bem-vindo! Login com Chave FIDO2 efetuado com sucesso.');
+      if (typeof initApp === 'function') initApp();
+      else window.location.reload();
+    } else {
+      if (msgEl) {
+        msgEl.innerText = `❌ ${verifyData.detail || 'Chave FIDO2 não autorizada.'}`;
+        msgEl.style.color = '#f87171';
+      }
+    }
+  } catch (err) {
+    if (msgEl) {
+      msgEl.innerText = `❌ ${err.message || 'Falha ao autenticar com chave.'}`;
+      msgEl.style.color = '#f87171';
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+window.handleFido2Login = handleFido2Login;
+
 
 

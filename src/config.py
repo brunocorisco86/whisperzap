@@ -35,10 +35,12 @@ class Settings(BaseSettings):
     AI_LOG_RESPONSES: bool = False
 
     # Speech-to-Text (Whisper)
-    WHISPER_MODEL: str = "base"
+    WHISPER_MODEL: str = "small"
     WHISPER_DEVICE: str = "cpu"
     WHISPER_COMPUTE_TYPE: str = "int8"
-    WHISPER_MAX_CONCURRENCY: int = 2
+    WHISPER_MAX_CONCURRENCY: int = 1
+    WHISPER_CPU_THREADS: int = 1
+    WHISPER_BEAM_SIZE: int = 2
 
     # Banco de dados e Persistência
     POSTGRES_HOST: str = "localhost"
@@ -90,6 +92,7 @@ class Settings(BaseSettings):
     NTFY_ENABLED: bool = True
     NTFY_URL: str = "https://ntfy.sh"
     NTFY_TOPIC: str = "bruno-casa-dallas"
+    NTFY_FAMILY_TOPIC: str = "EEpT9fCTfBkjC4bg"
     NTFY_INCLUDE_RAW_STT: bool = False
     NOTIFY_VIA_WHATSAPP: bool = False
 
@@ -97,6 +100,18 @@ class Settings(BaseSettings):
     JEV_ENABLED: bool = True
     JEV_ENGINE: str = "hybrid"
     JEV_CONFIDENCE_THRESHOLD: float = 0.75
+
+    @property
+    def ntfy_general_topic(self) -> str:
+        """Retorna o slug limpo do tópico geral de notificações (ex: 'bruno-casa-dallas')."""
+        raw = (self.NTFY_TOPIC or "bruno-casa-dallas").strip()
+        return raw.rstrip("/").split("/")[-1]
+
+    @property
+    def ntfy_family_topic(self) -> str:
+        """Retorna o slug limpo do tópico de notificações da família (ex: 'EEpT9fCTfBkjC4bg')."""
+        raw = (self.NTFY_FAMILY_TOPIC or "EEpT9fCTfBkjC4bg").strip()
+        return raw.rstrip("/").split("/")[-1]
 
 
 settings = Settings()

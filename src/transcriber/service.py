@@ -97,6 +97,7 @@ class WhisperService:
                 settings.WHISPER_MODEL,
                 device=settings.WHISPER_DEVICE,
                 compute_type=settings.WHISPER_COMPUTE_TYPE,
+                cpu_threads=getattr(settings, "WHISPER_CPU_THREADS", 1),
             )
             logger.info("Modelo faster-whisper carregado com sucesso.")
         return self._model
@@ -105,11 +106,12 @@ class WhisperService:
         self,
         audio_path_or_file: str | BinaryIO,
         language: Optional[str] = "pt",
-        beam_size: int = 1,
+        beam_size: Optional[int] = None,
         initial_prompt: Optional[str] = None,
     ) -> Tuple[str, str, float, float, List[TranscriptionSegment]]:
         """Execução síncrona da transcrição com suporte a initial_prompt e VAD calibrado."""
         model = self._load_model()
+        effective_beam = beam_size if (beam_size is not None and beam_size != 5) else getattr(settings, "WHISPER_BEAM_SIZE", 2)
         
         # Calibração otimizada de Silero VAD para ambientes rurais/ruidosos
         vad_parameters = dict(
@@ -123,7 +125,7 @@ class WhisperService:
         segments_generator, info = model.transcribe(
             audio_path_or_file,
             language=language,
-            beam_size=beam_size,
+            beam_size=effective_beam,
             initial_prompt=initial_prompt,
             vad_filter=True,
             vad_parameters=vad_parameters,

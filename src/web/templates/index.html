@@ -32,6 +32,15 @@
         </div>
         <div id="auth-error-msg" class="auth-error-text" style="display: none;">❌ Senha incorreta. Tente novamente.</div>
       </form>
+
+      <div class="auth-divider">
+        <span>OU</span>
+      </div>
+
+      <button type="button" class="btn btn-fido2" id="btn-fido2-login" onclick="window.handleFido2Login();">
+        <span class="fido2-icon">🔑</span> Entrar com Chave FIDO2 (Pico Key / YubiKey)
+      </button>
+      <div id="fido2-status-msg" class="fido2-status-text" style="display: none;"></div>
     </div>
   </div>
 
@@ -121,6 +130,9 @@
       </div>
       <button class="btn btn-secondary btn-sm" id="btn-open-ai-models" title="Gerenciar e Descobrir Modelos de IA Dinâmicos" onclick="window.openAiModelsModal()">
         🤖 Modelos IA
+      </button>
+      <button class="btn btn-secondary btn-sm" id="btn-open-admin-security" title="Administração: Troca de Senha e Chaves FIDO2" onclick="window.openAdminSecurityModal()">
+        🔐 Segurança
       </button>
       <button class="btn btn-secondary btn-sm" id="btn-refresh-all" title="Recarregar Dados da VPS">
         🔄 Atualizar
@@ -829,11 +841,11 @@
         </div>
 
         <div class="card stat-card">
-          <div class="stat-icon">🏠</div>
+          <div class="stat-icon">💬</div>
           <div class="stat-info">
-            <span class="stat-title">Homelab Raspberry Pi 3B (peixe)</span>
-            <span class="stat-value">192.168.1.99</span>
-            <span class="stat-desc">Evolution API :8080 • n8n :5678 • WhatsApp Status: OPEN</span>
+            <span class="stat-title">Evolution API v2 (WhatsApp)</span>
+            <span class="stat-value">VPS Hostinger</span>
+            <span class="stat-desc">Evolution API :8085 • n8n :5678 • WhatsApp Status: OPEN (Consolidado)</span>
           </div>
         </div>
 
@@ -1621,6 +1633,81 @@
             <button type="submit" class="btn btn-primary">🗝️ Salvar & Guardar no Baú</button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Central de Segurança & Chaves FIDO2 -->
+  <div class="modal-overlay" id="modal-admin-security">
+    <div class="modal-card" style="max-width: 580px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <span style="font-size: 1.5rem;">🔐</span>
+          <div>
+            <h3 style="margin: 0; font-family: var(--font-display);">Central de Segurança Administrativa</h3>
+            <small style="color: var(--text-muted);">Troca de Senha Mestra & Chaves de Hardware FIDO2</small>
+          </div>
+        </div>
+        <button class="modal-close" onclick="window.closeAdminSecurityModal()">&times;</button>
+      </div>
+
+      <!-- Navigation Tabs do Modal -->
+      <div class="security-modal-tabs" style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.5rem;">
+        <button type="button" class="btn btn-sm btn-secondary active" id="tab-btn-sec-pwd" onclick="window.switchSecurityTab('pwd')">
+          🔑 Senha Mestra
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" id="tab-btn-sec-fido2" onclick="window.switchSecurityTab('fido2')">
+          🛡️ Chaves FIDO2 / Hardware
+        </button>
+      </div>
+
+      <!-- Tab Content: Troca de Senha -->
+      <div id="sec-tab-content-pwd">
+        <form id="form-change-password" onsubmit="event.preventDefault(); window.handleAuthChangePassword();">
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label for="sec-current-pwd" style="font-size: 0.8rem; color: var(--text-muted);">Senha Atual *</label>
+            <input type="password" id="sec-current-pwd" class="form-control" required placeholder="Digite a senha atual...">
+          </div>
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label for="sec-new-pwd" style="font-size: 0.8rem; color: var(--text-muted);">Nova Senha *</label>
+            <input type="password" id="sec-new-pwd" class="form-control" required placeholder="Digite a nova senha (mínimo 4 caracteres)...">
+          </div>
+          <div class="form-group" style="margin-bottom: 1.25rem;">
+            <label for="sec-confirm-pwd" style="font-size: 0.8rem; color: var(--text-muted);">Confirmar Nova Senha *</label>
+            <input type="password" id="sec-confirm-pwd" class="form-control" required placeholder="Confirme a nova senha...">
+          </div>
+          <div id="sec-pwd-msg" style="display: none; margin-bottom: 1rem; font-size: 0.85rem;"></div>
+          <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+            <button type="button" class="btn btn-secondary" onclick="window.closeAdminSecurityModal()">Fechar</button>
+            <button type="submit" class="btn btn-primary" id="btn-save-new-pwd">💾 Salvar Nova Senha</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Tab Content: Chaves FIDO2 / Pico Key -->
+      <div id="sec-tab-content-fido2" style="display: none;">
+        <div style="background: rgba(15, 23, 42, 0.6); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-subtle); margin-bottom: 1.25rem;">
+          <h4 style="margin: 0 0 0.5rem 0; font-size: 0.95rem; color: #38bdf8;">Cadastrar Chave FIDO2 (YubiKey / Pico Key)</h4>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+            Conecte sua chave USB ou dispositivo FIDO2, insira um nome e clique em cadastrar para tocar na chave.
+          </p>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="text" id="sec-fido2-name" class="form-control" placeholder="Ex: Minha Pico Key / YubiKey" style="flex: 1;">
+            <button type="button" class="btn btn-primary" id="btn-register-fido2" onclick="window.handleFido2Register()">
+              ➕ Cadastrar Chave
+            </button>
+          </div>
+          <div id="sec-fido2-msg" style="display: none; margin-top: 0.75rem; font-size: 0.85rem;"></div>
+        </div>
+
+        <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-secondary);">Chaves Cadastradas</h4>
+        <div id="fido2-keys-list" style="max-height: 200px; overflow-y: auto;">
+          <p style="color: var(--text-muted); font-size: 0.82rem;">Carregando chaves cadastradas...</p>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 1.25rem; display: flex; justify-content: flex-end;">
+          <button type="button" class="btn btn-secondary" onclick="window.closeAdminSecurityModal()">Fechar</button>
+        </div>
       </div>
     </div>
   </div>

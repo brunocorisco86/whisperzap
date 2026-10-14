@@ -20,9 +20,15 @@ from typing import Optional, Union
 
 try:
     import pymupdf
+except ImportError:
+    try:
+        import fitz as pymupdf
+    except ImportError:
+        pymupdf = None
+
+try:
     import pymupdf4llm
 except ImportError:
-    pymupdf = None
     pymupdf4llm = None
 
 from src.ai_gateway.model_registry import ModelRegistry
@@ -102,6 +108,8 @@ class PDFExtractor:
 
     def _extract_local_contingency(self, pdf_bytes: bytes, filename: str) -> tuple[str, int]:
         """Tier 3: Extração local de emergência usando PyMuPDF4LLM em memória."""
+        if pymupdf is None or pymupdf4llm is None:
+            raise PDFExtractionError("PyMuPDF / PyMuPDF4LLM não estão instalados neste ambiente.")
         try:
             doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
             page_count = len(doc)
@@ -166,12 +174,13 @@ class PDFExtractor:
 
         # Inspeciona documento para contagem de páginas
         page_count = 1
-        try:
-            doc_probe = pymupdf.open(stream=pdf_bytes, filetype="pdf")
-            page_count = len(doc_probe)
-            doc_probe.close()
-        except Exception as e:
-            logger.warning(f"[PDFExtractor] Não foi possível inspecionar metadados do PDF {filename}: {e}")
+        if pymupdf is not None:
+            try:
+                doc_probe = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+                page_count = len(doc_probe)
+                doc_probe.close()
+            except Exception as e:
+                logger.warning(f"[PDFExtractor] Não foi possível inspecionar metadados do PDF {filename}: {e}")
 
         # Prepara base64 para envio aos Tiers Gemini
         pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")

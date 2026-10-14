@@ -2785,4 +2785,76 @@ select:focus {
   line-height: 1.4;
 }
 
+/* ==========================================================================
+   Central de Segurança & Botão FIDO2 / WebAuthn
+   ========================================================================== */
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 1.2rem 0;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.auth-divider span {
+  padding: 0 0.75rem;
+  font-weight: 600;
+}
+
+.btn-fido2 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.8rem 1rem;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.25));
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fef3c7;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.1);
+}
+
+.btn-fido2:hover {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.4));
+  border-color: rgba(245, 158, 11, 0.7);
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.25);
+  transform: translateY(-1px);
+}
+
+.btn-fido2:active {
+  transform: translateY(0);
+}
+
+.fido2-icon {
+  font-size: 1.15rem;
+}
+
+.fido2-status-text {
+  margin-top: 0.75rem;
+  font-size: 0.82rem;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.security-modal-tabs .btn.active {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: #38bdf8;
+  color: #bae6fd;
+}
+
 

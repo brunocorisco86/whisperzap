@@ -87,9 +87,10 @@ flowchart TD
 
     subgraph APILayer["2. Motor de IA & Core Engine (FastAPI)"]
         WHISPER["🎙️ Faster-Whisper (Transcrição em Milissegundos)"]
-        BYPASS["🛡️ Funil Semântico & Bypass Lexical (Anti-Poluição)"]
-        AIGATEWAY["🧠 AI Gateway (Gemini 3.1 Flash-Lite / 3.7 Flash)"]
-        LEXICAL["📖 Glossário Fonético & Dicionário Técnico"]
+        VISION["👁️ VisionLocalEngine (YOLO11n ONNX + Detector de Notas)"]
+        BYPASS["🛡️ Funil Semântico & JEV Short-Circuit (Zero-Token)"]
+        AIGATEWAY["🧠 AI Gateway (Gemini 3.5 Flash-Lite / 2.5 Flash)"]
+        LEXICAL["📖 Matcher Léxico Dinâmico Scoped (Poda 80%)"]
     end
 
     subgraph StorageLayer["3. Memória em Camadas & Persistência"]
@@ -111,12 +112,16 @@ flowchart TD
         QR_PAGE["📱 /whatsapp-qr (Painel Reativo de Pareamento)"]
         DASH["📊 Analytics & Heatmap 24x7 (Chart.js)"]
         GRAPH_VIZ["🌐 Visualizador Interativo de Grafos (Graphify AST)"]
+        NTFY["📢 Push Notifications (ntfy.sh)"]
     end
 
     WA --> EVO
     EVO --> WEBHOOK
-    WEBHOOK --> WHISPER
+    WEBHOOK -->|Áudio| WHISPER
+    WEBHOOK -->|Foto/Imagem| VISION
     WHISPER --> BYPASS
+    VISION -->|0 Tokens| StorageLayer
+    VISION --> NTFY
     BYPASS --> AIGATEWAY
     LEXICAL --> AIGATEWAY
     AIGATEWAY --> StorageLayer
@@ -130,8 +135,9 @@ flowchart TD
 | **Linguagem & Runtime** | Python 3.12+ / Linux | Desempenho nativo com suporte a tipagem estrita e asyncio |
 | **API Framework** | FastAPI + Uvicorn | Servidor assíncrono de alto throughput com OpenAPI e endpoints RESTful |
 | **Transcrição Local** | Faster-Whisper (CTranslate2) | Transcrição ultra-rápida de áudio (OGG/MP3/WAV/Base64) em CPU/GPU |
+| **Visão Computacional Local** | YOLO11 Nano ONNX + FFmpeg | Inferência em CPU (360ms, 0 tokens), 80 classes COCO (PT-BR) e detector de notas |
 | **Documentos & PDF** | Gemini Multimodal + PyMuPDF4LLM | Extração de PDFs em GFM com cascata 3-Tier e síntese executiva |
-| **AI Gateway** | Google Gemini 3.1 Flash-Lite / 3.7 Flash | Extração de entidades (`NER`), classificação de intenções e RAG Híbrido |
+| **AI Gateway & Orquestração** | Google Gemini 3.5 Flash-Lite + JEV | Triagem sub-milissegundo, NER, classificação de intenções e RAG Híbrido |
 | **Banco Relacional & Vetorial** | PostgreSQL 16 + pgvector | Persistência unificada de mensagens, contatos, tarefas e embeddings |
 | **Grafo Relacional** | NetworkX + Graphify | Modelagem de conexões inter-pessoais, detecção de comunidades e clusterização |
 | **Orquestração & Mensageria** | Webhook Nativo Python + Evolution API v2 | Ingestão in-process, download de mídia, zero latência e sem intermediários |
@@ -195,6 +201,18 @@ flowchart TD
 
 ### 11. 🇧🇷 Alinhamento de Fuso Horário de Brasília (America/Sao_Paulo)
 - Conversão precisa de todos os timestamps do banco para o Horário de Brasília (UTC-3), garantindo que consultas sobre "hoje" e "ontem" operem no fuso brasileiro sem distorções de UTC.
+
+### 12. 👁️ Visão Computacional Local 100% Zero-Token (YOLO11n + Detector de Notas)
+- **Zero Consumo de Tokens**: Classificação de imagens e fotos sem qualquer chamada externa de LLM, utilizando o modelo **YOLO11 Nano ONNX (`yolo11n.onnx`)** rodando puramente na CPU da VPS em ~360ms.
+- **Detector Heurístico de Notas Fiscais e Documentos**: Identificação direta de comprovantes e folhas A4 por aspect ratio e densidade luminosa sem OCR pesado (*"É uma Nota Fiscal / Documento impresso"*).
+- **Conexão ao Grafo de Conhecimento**: Objetos identificados (80 classes do dataset COCO em Português) são automaticamente vinculados ao remetente com arestas `TRANSMITTED_PHOTO` no NetworkX e persistidos no PostgreSQL com flag `bypass_ai=True`.
+- **Notificações Push com Taxa de Confiança**: Envio imediato via ntfy (`tags: camera, package`) com detalhamento de objetos detectados (ex: *Cachorro 88%*).
+
+### 13. ⚡ Redução Agressiva de Tokens & Short-Circuit JEV (Poda de 80% do Prompt)
+- **Injeção Dinâmica de Glossário Scoped**: Matcher léxico local via regex e spaCy que filtra dinamicamente apenas os termos técnicos presentes na mensagem bruta, podando mais de 80% dos tokens de sistema.
+- **Short-Circuit em `DIRECT_RESOLVE`**: Tarefas e notas diretas são compreendidas e salvas na borda pelo JEV Judge sem intervenção de modelos de linguagem.
+- **Bypass de Revisão para Áudios Curtos (< 120 chars)**: Transcrição direta do Whisper corrigida pelo dicionário local dispensa chamadas LLM.
+- **Cache Semântico Local de 2 Horas**: Perguntas e análises idênticas reutilizam o contexto em memória com zero custo.
 
 ---
 
@@ -339,6 +357,45 @@ Conforme os meses avançam, a **MUSA** acumula dezenas de mensagens, intenções
    - **Projetos Ativos**: Extrai tags dinâmicas como `["Silo 4", "Auditoria Miratorg", "Calibração Sensores"]`.
    - **Dossiê / Anotações**: Redige um resumo executivo com pontos fortes, estilo de comunicação e preferências operacionais.
 4. **Aprovação em 1-Clique**: O usuário vê o comparativo visual do que mudou e aprova com um único clique, atualizando o SQL e rebalanceando os pesos do Grafo de Conhecimento.
+
+---
+
+## 🔐 Central de Segurança & Autenticação de Hardware FIDO2 (WebAuthn)
+
+O Mnemosine possui uma camada de segurança de nível corporativo projetada para ambientes de missão crítica e acesso remoto seguro:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        ACESSO REMOTO TLS / SSL                         │
+│               https://brunoconter.duckdns.org/mnemosine                │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+           ┌────────────────────────┴────────────────────────┐
+           ▼                                                 ▼
+┌──────────────────────────────┐              ┌──────────────────────────────┐
+│  🔑 Autenticação FIDO2       │              │  🛡️ Senha Mestra PBKDF2      │
+│  - WebAuthn Nativo (W3C/FIDO)│              │  - 100.000 iterações SHA-256 │
+│  - Lilygo / Pico Key / Yubi  │              │  - Salt aleatório 16 bytes   │
+│  - Zero-leak de chave privada│              │  - Persistida no PostgreSQL  │
+│  - Proteção anti-replay      │              │  - Troca via Modal no Painel │
+└──────────────────────────────┘              └──────────────────────────────┘
+```
+
+- **Autenticação por Hardware (Passkeys / FIDO2 / U2F)**: Suporte completo à API WebAuthn para chaves físicas USB/NFC/BLE (Lilygo T-Display, Raspberry Pico Key, YubiKey, biometric passkeys).
+- **Zero Vazamento de Chaves Privadas**: A chave privada nunca sai do chip seguro do hardware. O servidor armazena apenas a chave pública para validação de assinaturas criptográficas com tolerância a desafios concorrentes via `clientDataJSON`.
+- **Proteção Anti-Replay**: Cada chave possui validação incremental de contador (`sign_count`) impedindo ataques de repetição ou clonagem.
+- **Roteamento Sob Sub-caminho (`/mnemosine`)**: O Caddy Reverse Proxy gerencia certificados automáticos Let's Encrypt e roteia múltiplos serviços com segurança total em porta única 443/80, isolando as portas de banco e backend na rede interna.
+
+---
+
+## 👁️ Motor de Visão Local 100% Zero-Token (YOLO11n ONNX + Detector de Documentos)
+
+Processamento visual local e ultrarrápido diretamente na CPU da VPS/Homelab sem consumir nenhum token de LLM externa:
+
+- **Modelo**: YOLO11 Nano ONNX (`yolo11n.onnx`) executando via ONNX Runtime em ~360ms por imagem.
+- **Detecção de Objetos Físicos**: Classificação instantânea de pessoas, animais, veículos, ferramentas e equipamentos.
+- **Detector Heurístico de Documentos/Notas**: Análise de luminosidade média e razão de aspecto de folha para identificação de Notas Fiscais e comprovantes sem sobrecarga de OCR.
+- **Integração Relacional**: Os objetos detectados e documentos alimentam automaticamente o Grafo de Conhecimento NetworkX (`TRANSMITTED_PHOTO`) e disparam notificações push ricas via **ntfy**.
 
 ---
 

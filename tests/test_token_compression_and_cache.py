@@ -70,6 +70,55 @@ def test_semantic_cache_exact_and_fuzzy_hits():
     assert miss_diff is None
 
 
+def test_dictionary_scoped_prompt_context():
+    """Valida que o glossário injeta apenas termos presentes na mensagem, economizando tokens."""
+    from src.dictionary.service import dictionary_service
+
+    # Mensagem sem jargões: deve retornar string vazia
+    hint_empty = dictionary_service.get_prompt_context_hint(text="Gostaria de agendar um café amanhã às 14h.")
+    assert hint_empty == ""
+
+    # Mensagem com jargão 'Silo' e 'Mtech': deve conter apenas os termos relevantes
+    hint_matched = dictionary_service.get_prompt_context_hint(text="Precisamos calibrar os silos usando o sistema Mtech.")
+    assert "Silo" in hint_matched or "Mtech" in hint_matched
+    # Garante que termos não citados (ex: FMIM, eProdutor) não inflem o prompt desnecessariamente
+    assert "eProdutor" not in hint_matched
+
+
+def test_jev_direct_resolve_bypass_logic():
+    """Valida que uma mensagem com JEV DIRECT_RESOLVE aciona o bypass no should_bypass_ai."""
+    from src.ai_gateway.bypass import should_bypass_ai
+
+    meta_with_jev = {
+        "jev_verdict": {
+            "action": "DIRECT_RESOLVE",
+            "direct_task_title": "Comprar ração para o lote 12",
+            "direct_due_date": "2026-10-14",
+            "urgency": "HIGH",
+        }
+    }
+    bypass_active, reason = should_bypass_ai(
+        text="Anotar comprar ração amanhã",
+        meta_info=meta_with_jev,
+        speaker="Bruno Conter",
+    )
+    assert bypass_active is True
+    assert reason == "jev_direct_resolve"
+
+
+def test_semantic_cache_invalidation():
+    """Valida a invalidação inteligente do cache por padrão/termo."""
+    semantic_cache.clear()
+    semantic_cache.set("Tarefas do Valdecir", {"answer": "Calibrar sensor"}, tokens_saved=500)
+    semantic_cache.set("Status do Silo 3", {"answer": "Nível 85%"}, tokens_saved=500)
+
+    # Invalida apenas entradas relacionadas a 'Valdecir'
+    removed = semantic_cache.invalidate_matching("Valdecir")
+    assert removed == 1
+    assert semantic_cache.get("Tarefas do Valdecir") is None
+    assert semantic_cache.get("Status do Silo 3") is not None
+
+
 def test_token_savings_api_endpoint():
     """Testa o endpoint GET /api/v1/memory/token-savings."""
     response = client.get("/api/v1/memory/token-savings")

@@ -45,9 +45,13 @@ Sua missão é analisar o texto recebido e extrair de forma estruturada as inten
    - Exemplo: `{"source": "Fernando Varolo", "relation": "MANAGES", "target": "DEPRA"}`
 5. **Decisões & Ideias**: Separe claramente o que foi decidido do que é apenas sugestão.
 6. **Urgência (urgency)**: `LOW`, `MEDIUM`, `HIGH`, `URGENT`.
-7. **Análise de Sentimento (sentiment & sentiment_score)**: Avalie o tom emocional e sentimento do locutor:
-   - `sentiment`: `POSITIVE`, `CONFIDENT`, `NEUTRAL`, `URGENT`, `ANXIOUS`, `FRUSTRATED`.
-   - `sentiment_score`: valor numérico de -1.0 a 1.0.
+7. **Análise de Sentimento (sentiment & sentiment_score)**: Avalie com sensibilidade e precisão o tom emocional do locutor, evitando classificar tudo como NEUTRAL por padrão:
+   - `POSITIVE` (score +0.5 a +1.0): gratidão, elogio, entusiasmo, satisfação, acordos amigáveis ("ótimo", "valeu", "show", "muito obrigado", "parabéns").
+   - `CONFIDENT` (score +0.5 a +1.0): convicção, firmeza, liderança, compromisso assertivo ("garantido", "está resolvido", "pode deixar comigo", "fechado").
+   - `URGENT` (score -0.6 a -1.0): tensão por tempo, emergência operacional, bloqueios críticos imediatos ("urgente", "parou tudo", "preciso agora").
+   - `ANXIOUS` (score -0.3 a -0.7): apreensão, dúvida sobre atrasos, espera nervosa, preocupação ("alguma novidade?", "aguardo retorno", "estou preocupado").
+   - `FRUSTRATED` (score -0.4 a -1.0): descontentamento, reclamação, apontamento de falhas recorrentes ("de novo com erro", "complicado assim", "péssimo").
+   - `NEUTRAL` (score 0.0): use APENAS quando a mensagem for estritamente técnica, burocrática ou informativa, sem nenhuma nuance emocional evidente.
 8. **Termos Dúbios / Aprendizado Léxico (unclear_terms)**: Se houver palavras truncadas, termos técnicos, jargões da C.Vale/avicultura/Mtech/TMS/Silos ou siglas onde você teve dúvida fonética ou teve que fazer esforço dedutivo para adaptar, liste-os para enriquecimento do vocabulário.
 
 Retorne EXCLUSIVAMENTE um objeto JSON válido seguindo a estrutura:

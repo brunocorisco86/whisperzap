@@ -420,10 +420,13 @@ def should_bypass_ai(
     if should_drop:
         return True, drop_reason
 
-    # 2. Bypass explícito no payload
+    # 2. Bypass explícito no payload ou resolução direta pelo JEV (Zero-Token)
     if meta_info and isinstance(meta_info, dict):
         if meta_info.get("bypass_ai") is True or meta_info.get("bypass") is True:
             return True, "explicit_bypass"
+        jev_info = meta_info.get("jev_verdict")
+        if isinstance(jev_info, dict) and jev_info.get("action") == "DIRECT_RESOLVE":
+            return True, "jev_direct_resolve"
 
     # 3. Economia de Tokens com spaCy: Mensagens puramente fáticas / saudações
     from src.ai_gateway.token_economy import token_economy

@@ -30,6 +30,7 @@ from src.memory.models import MessageCreate, TaskRecord
 from src.ai_gateway.agent import hermes_agent_service
 from src.ai_gateway.pdf_extractor import pdf_extractor, MAX_PDF_SIZE_BYTES
 from src.memory.database import SessionLocal
+from src.contacts.service import contact_service
 from src.notifications import ntfy_service
 
 logger = logging.getLogger(__name__)
@@ -526,9 +527,28 @@ class WhatsAppService:
             )
         )
 
-        # Se não houver texto principal mas houver legenda no documento, adota a legenda
+        # Detecta se é imagem / foto (imageMessage ou documento com mimetype image/)
+        has_image = (
+            not has_audio
+            and not has_pdf
+            and (
+                "image" in msg_type
+                or bool(msg_obj.get("imageMessage"))
+                or (
+                    "document" in msg_type
+                    and doc_mimetype.startswith("image/")
+                )
+            )
+        )
+
+        img_obj = msg_obj.get("imageMessage") or {}
+        img_caption = str(img_obj.get("caption") or "").strip()
+
+        # Se não houver texto principal mas houver legenda no documento ou na imagem, adota a legenda
         if not text_content and doc_caption:
             text_content = doc_caption
+        elif not text_content and img_caption:
+            text_content = img_caption
 
         # Detecta se é mídia ignorável (sticker, reação, localização)
         is_ignorable = any(ign in msg_type for ign in ["sticker", "reaction", "location", "contact"])
@@ -543,9 +563,9 @@ class WhatsAppService:
             if msg_ts > 0:
                 msg_dt = datetime.fromtimestamp(msg_ts, tz=timezone.utc)
 
-            # Para comandos interativos ('?') e PDFs encaminhados, tolerância de até 24h para não descartar encaminhamentos
+            # Para comandos interativos ('?'), PDFs e imagens encaminhadas, tolerância de até 24h
             is_cmd_hint = str(text_content or "").strip().startswith(("?", "/hermes", "hermes,"))
-            time_limit = 86400.0 if (is_cmd_hint or has_pdf) else 120.0
+            time_limit = 86400.0 if (is_cmd_hint or has_pdf or has_image) else 120.0
             is_historic = bool(msg_ts > 0 and (time.time() - msg_ts > time_limit))
         except Exception:
             is_historic = False
@@ -573,9 +593,10 @@ class WhatsAppService:
             "is_group": is_group,
             "has_audio": has_audio,
             "has_pdf": has_pdf,
+            "has_image": has_image,
             "pdf_filename": doc_filename or "documento.pdf",
             "pdf_filesize": doc_filesize,
-            "caption": doc_caption,
+            "caption": img_caption or doc_caption,
             "is_ignorable": is_ignorable,
             "is_historic": is_historic,
             "is_self_memo": is_self_memo,
@@ -712,10 +733,15 @@ class WhatsAppService:
                 )
                 logger.info(f"⚖️ [JEV Judge] Ação: {jev_verdict.action} | Intenção: {jev_verdict.intent} | Confiança: {jev_verdict.confidence:.2f}")
 
-                # 2.1 Revisão Contextual via AI Gateway
+                # 2.1 Revisão Contextual Inteligente (Zero-Token Routing)
                 revised_text = raw_text_audio
                 if jev_verdict.action == JEVAction.DIRECT_RESOLVE and jev_verdict.direct_task_title:
                     revised_text = jev_verdict.direct_task_title
+                elif len(raw_text_audio.strip()) < 120 and jev_verdict.action != JEVAction.DEEP_ANALYSIS:
+                    # Economia de Tokens: Áudios curtos usam transcrição direta do Whisper com correção léxica local
+                    from src.dictionary.service import dictionary_service
+                    revised_text = dictionary_service.apply_lexical_corrections(raw_text_audio.strip())
+                    logger.info(f"⚡ [AI Revise Short-Circuit] Áudio curto ({len(raw_text_audio)} chars): Revisão LLM dispensada (0 tokens poupados).")
                 else:
                     try:
                         provider = get_ai_provider(task="revise")
@@ -736,6 +762,18 @@ class WhatsAppService:
                 if prosody:
                     prosody_data = prosody.model_dump() if hasattr(prosody, "model_dump") else (prosody.dict() if hasattr(prosody, "dict") else dict(prosody))
 
+                meta_dict = {
+                    "source": "whatsapp",
+                    "message_type": "audio",
+                    "is_self_memo": is_self_memo,
+                    "remoteJid": info["remote_jid"],
+                    "pushName": info["push_name"],
+                    "key_id": info["key_id"],
+                    "jev_verdict": jev_verdict.model_dump() if hasattr(jev_verdict, "model_dump") else dict(jev_verdict),
+                }
+                if prosody_data:
+                    meta_dict["prosody"] = prosody_data
+
                 msg_in = MessageCreate(
                     speaker=speaker_label,
                     raw_text=raw_text_audio,
@@ -744,14 +782,7 @@ class WhatsAppService:
                     audio_duration_s=float(duration or 0.0),
                     prosody_metrics=prosody_data,
                     created_at=info.get("created_at"),
-                    meta_info={
-                        "source": "whatsapp",
-                        "message_type": "audio",
-                        "is_self_memo": is_self_memo,
-                        "remoteJid": info["remote_jid"],
-                        "pushName": info["push_name"],
-                        "key_id": info["key_id"],
-                    },
+                    meta_info=meta_dict,
                 )
                 saved_msg = await memory_repository.save_message(data=msg_in, db=db)
 
@@ -762,28 +793,61 @@ class WhatsAppService:
                         created_tasks = db.query(TaskRecord).filter(TaskRecord.message_id == saved_msg.id).all()
 
                     # 4.1 Notificação rica em Markdown via ntfy (se ativado)
-                    if getattr(settings, "NTFY_ENABLED", True) and getattr(settings, "NTFY_TOPIC", None):
+                    if getattr(settings, "NTFY_ENABLED", True) and (getattr(settings, "NTFY_TOPIC", None) or getattr(settings, "NTFY_FAMILY_TOPIC", None)):
                         sentiment_dict = None
                         if saved_msg:
                             sentiment_dict = {
                                 "polarity": getattr(saved_msg, "sentiment", "NEUTRAL"),
                                 "sentiment_score": getattr(saved_msg, "sentiment_score", 0.0),
                             }
+                        contact_phone = sanitize_phone_number(info.get("remote_jid", ""))
+                        contact_rec = None
+                        if contact_phone:
+                            contact_rec = contact_service.get_contact_by_phone(contact_phone, db=db)
+                        if not contact_rec and info.get("push_name"):
+                            contact_rec = contact_service.get_contact_by_name(info.get("push_name"), db=db)
+
+                        is_family, is_wife, relationship = contact_service.resolve_family_status(
+                            contact=contact_rec,
+                            speaker=info.get("push_name"),
+                            phone=contact_phone,
+                            db=db,
+                        )
+
                         try:
-                            await ntfy_service.notify_audio_processed(
-                                speaker=speaker_label,
-                                revised_text=revised_text,
-                                raw_text=raw_text_audio,
-                                is_self_memo=is_self_memo,
-                                contact_phone=sanitize_phone_number(info.get("remote_jid", "")),
-                                duration_s=float(duration or 0.0),
-                                prosody=prosody_data,
-                                sentiment=sentiment_dict,
-                                intent=getattr(saved_msg, "intent", None),
-                                tasks=created_tasks,
-                                model_name=getattr(whisper_service, "model_name", "Whisper"),
-                                message_id=saved_msg.id if saved_msg else None,
-                            )
+                            if is_family and not is_self_memo:
+                                # Roteamento dedicado para o tópico da família configurado via variável de ambiente
+                                await ntfy_service.notify_family_message(
+                                    speaker=info.get("push_name") or speaker_label,
+                                    text=revised_text,
+                                    message_type="audio",
+                                    is_wife=is_wife,
+                                    relationship=relationship,
+                                    contact_phone=contact_phone,
+                                    duration_s=float(duration or 0.0),
+                                    prosody=prosody_data,
+                                    sentiment=sentiment_dict,
+                                    tasks=created_tasks,
+                                    raw_text=raw_text_audio,
+                                    model_name=getattr(whisper_service, "model_name", "Whisper"),
+                                )
+                            else:
+                                # Roteamento para o tópico geral ntfy
+                                await ntfy_service.notify_audio_processed(
+                                    speaker=speaker_label,
+                                    revised_text=revised_text,
+                                    raw_text=raw_text_audio,
+                                    is_self_memo=is_self_memo,
+                                    contact_phone=contact_phone,
+                                    contact_role=getattr(contact_rec, "role", None),
+                                    duration_s=float(duration or 0.0),
+                                    prosody=prosody_data,
+                                    sentiment=sentiment_dict,
+                                    intent=getattr(saved_msg, "intent", None),
+                                    tasks=created_tasks,
+                                    model_name=getattr(whisper_service, "model_name", "Whisper"),
+                                    message_id=saved_msg.id if saved_msg else None,
+                                )
                         except Exception as ntfy_err:
                             logger.warning(f"⚠️ Erro ao despachar notificação de áudio via ntfy: {ntfy_err}")
 
@@ -985,19 +1049,46 @@ class WhatsAppService:
                             reply_lines.append(f"• 📌 *{prio_badge}* {t.title}{due_str}")
 
                     # 4. Notificações: ntfy (alta verbosidade) e WhatsApp (opcional)
-                    if getattr(settings, "NTFY_ENABLED", True) and getattr(settings, "NTFY_TOPIC", None):
+                    if getattr(settings, "NTFY_ENABLED", True) and (getattr(settings, "NTFY_TOPIC", None) or getattr(settings, "NTFY_FAMILY_TOPIC", None)):
+                        contact_phone = sanitize_phone_number(info.get("remote_jid", ""))
+                        contact_rec = None
+                        if contact_phone:
+                            contact_rec = contact_service.get_contact_by_phone(contact_phone, db=db)
+                        if not contact_rec and info.get("push_name"):
+                            contact_rec = contact_service.get_contact_by_name(info.get("push_name"), db=db)
+
+                        is_family, is_wife, relationship = contact_service.resolve_family_status(
+                            contact=contact_rec,
+                            speaker=info.get("push_name"),
+                            phone=contact_phone,
+                            db=db,
+                        )
+
                         try:
-                            await ntfy_service.notify_pdf_processed(
-                                filename=pdf_filename,
-                                speaker=speaker_label,
-                                page_count=getattr(extraction, "page_count", 1),
-                                size_bytes=len(pdf_bytes),
-                                tier_used=extraction.tier_used,
-                                model_name=extraction.model_name,
-                                summary=doc_summary or getattr(saved_msg, "summary", None),
-                                tasks=created_tasks,
-                                is_self_memo=is_self_memo,
-                            )
+                            if is_family and not is_self_memo:
+                                await ntfy_service.notify_family_message(
+                                    speaker=info.get("push_name") or speaker_label,
+                                    text=doc_summary or getattr(saved_msg, "summary", "") or pdf_filename,
+                                    message_type="pdf",
+                                    is_wife=is_wife,
+                                    relationship=relationship,
+                                    contact_phone=contact_phone,
+                                    tasks=created_tasks,
+                                    filename=pdf_filename,
+                                    summary=doc_summary or getattr(saved_msg, "summary", None),
+                                )
+                            else:
+                                await ntfy_service.notify_pdf_processed(
+                                    filename=pdf_filename,
+                                    speaker=speaker_label,
+                                    page_count=getattr(extraction, "page_count", 1),
+                                    size_bytes=len(pdf_bytes),
+                                    tier_used=extraction.tier_used,
+                                    model_name=extraction.model_name,
+                                    summary=doc_summary or getattr(saved_msg, "summary", None),
+                                    tasks=created_tasks,
+                                    is_self_memo=is_self_memo,
+                                )
                         except Exception as ntfy_err:
                             logger.warning(f"⚠️ Erro ao despachar notificação de PDF via ntfy: {ntfy_err}")
 
@@ -1018,6 +1109,102 @@ class WhatsAppService:
                     "message_id": saved_msg.id if saved_msg else None,
                     "tier_used": extraction.tier_used,
                     "model_name": extraction.model_name,
+                    "speaker": speaker_label,
+                }
+
+            # ===================== FLUXO DE IMAGEM / FOTO =====================
+            if info.get("has_image"):
+                logger.info(f"📷 [Imagem] Foto detectada de {speaker_label} | Self-Memo: {is_self_memo} | Histórico: {is_historic} | KeyID: {info['key_id']}")
+
+                base64_str = info.get("direct_base64") or await self.get_media_base64(
+                    message_id=info["key_id"],
+                    remote_jid=info["remote_jid"],
+                    from_me=info["from_me"],
+                )
+                if not base64_str:
+                    logger.warning(f"❌ [Imagem] Não foi possível obter base64 da foto ({info['key_id']}).")
+                    return {"status": "error", "reason": "base64_download_failed"}
+
+                if "," in base64_str:
+                    base64_str = base64_str.split(",", 1)[1]
+
+                try:
+                    img_bytes = base64.b64decode(base64_str)
+                    logger.info(f"📷 [Imagem] Foto decodificada com sucesso: {len(img_bytes)} bytes.")
+                except Exception as e:
+                    logger.error(f"❌ [Imagem] Erro ao decodificar base64 da foto: {e}")
+                    return {"status": "error", "reason": "base64_decode_error"}
+
+                # Trava de segurança: rejeita imagens anômalas > 15 MB
+                if len(img_bytes) > MAX_PDF_SIZE_BYTES:
+                    logger.warning(f"🚨 [Imagem] Foto rejeitada: {len(img_bytes)/(1024*1024):.2f} MB excede limite.")
+                    return {"status": "error", "reason": "image_too_large"}
+
+                # Análise Visual Local 100% Zero-Token (YOLO11n ONNX + Detector de Documentos)
+                from src.ai_gateway.vision_local import vision_local_engine
+                caption = info.get("caption") or info.get("text", "")
+                vision_res = vision_local_engine.classify_image(image_bytes=img_bytes, caption=caption)
+
+                # Monta representação textual para a Memória MUSA e Grafo
+                formatted_text = f"📷 [Foto de {speaker_label}] {vision_res.summary}"
+                detected_labels = [o.label for o in vision_res.detected_objects]
+                if vision_res.is_document and "Nota Fiscal / Documento" not in detected_labels:
+                    detected_labels.append("Nota Fiscal / Documento")
+
+                msg_in = MessageCreate(
+                    speaker=speaker_label,
+                    raw_text=formatted_text,
+                    revised_text=formatted_text,
+                    meta_info={
+                        "source": "whatsapp",
+                        "message_type": "image",
+                        "is_self_memo": is_self_memo,
+                        "is_document": vision_res.is_document,
+                        "detected_objects": detected_labels,
+                        "vision_model": vision_res.model_name,
+                        "inference_time_ms": vision_res.inference_time_ms,
+                        "caption": caption,
+                        "remoteJid": info["remote_jid"],
+                        "pushName": info["push_name"],
+                        "key_id": info["key_id"],
+                        "bypass_ai": True,  # Zero-Token: dispensa chamada ao Gemini Extractor
+                    },
+                )
+                saved_msg = await memory_repository.save_message(data=msg_in, db=db)
+
+                # Conecta objetos detectados no Grafo de Conhecimento
+                if saved_msg:
+                    from src.memory.graph import knowledge_graph
+                    for obj_label in detected_labels:
+                        cat = "DOCUMENT" if "documento" in obj_label.lower() or "nota" in obj_label.lower() else (
+                            "EQUIPMENT" if any(w in obj_label.lower() for w in ["caminhão", "veículo", "carro", "computador", "monitor", "silo"]) else "OTHER"
+                        )
+                        knowledge_graph.add_node(name=obj_label, category=cat)
+                        knowledge_graph.add_edge(source=speaker_label, target=obj_label, relation="TRANSMITTED_PHOTO")
+
+                # Notificação Push via ntfy se recente
+                if not is_historic and getattr(settings, "NTFY_ENABLED", True):
+                    contact_phone = sanitize_phone_number(info.get("remote_jid", ""))
+                    try:
+                        await ntfy_service.notify_image_processed(
+                            speaker=speaker_label,
+                            summary=vision_res.summary,
+                            is_document=vision_res.is_document,
+                            detected_objects=vision_res.detected_objects,
+                            caption=caption,
+                            contact_phone=contact_phone,
+                            is_self_memo=is_self_memo,
+                        )
+                    except Exception as ntfy_err:
+                        logger.warning(f"⚠️ Erro ao despachar notificação de imagem via ntfy: {ntfy_err}")
+
+                return {
+                    "status": "success",
+                    "type": "image",
+                    "summary": vision_res.summary,
+                    "is_document": vision_res.is_document,
+                    "detected_objects": detected_labels,
+                    "inference_time_ms": vision_res.inference_time_ms,
                     "speaker": speaker_label,
                 }
 
@@ -1146,6 +1333,47 @@ class WhatsAppService:
                 },
             )
             saved_msg = await memory_repository.save_message(data=msg_in, db=db)
+
+            # 4. Notificação Familiar Imediata via ntfy (se o remetente for da Família/Esposa)
+            if not is_self_memo and not is_historic and getattr(settings, "NTFY_ENABLED", True):
+                contact_phone = sanitize_phone_number(info.get("remote_jid", ""))
+                contact_rec = None
+                if contact_phone:
+                    contact_rec = contact_service.get_contact_by_phone(contact_phone, db=db)
+                if not contact_rec and info.get("push_name"):
+                    contact_rec = contact_service.get_contact_by_name(info.get("push_name"), db=db)
+
+                is_family, is_wife, relationship = contact_service.resolve_family_status(
+                    contact=contact_rec,
+                    speaker=info.get("push_name"),
+                    phone=contact_phone,
+                    db=db,
+                )
+
+                if is_family:
+                    try:
+                        sentiment_dict = None
+                        if saved_msg:
+                            sentiment_dict = {
+                                "polarity": getattr(saved_msg, "sentiment", "NEUTRAL"),
+                                "sentiment_score": getattr(saved_msg, "sentiment_score", 0.0),
+                            }
+                        tasks = []
+                        if saved_msg:
+                            tasks = db.query(TaskRecord).filter(TaskRecord.message_id == saved_msg.id).all()
+
+                        await ntfy_service.notify_family_message(
+                            speaker=info.get("push_name") or speaker_label,
+                            text=raw_text,
+                            message_type="text",
+                            is_wife=is_wife,
+                            relationship=relationship,
+                            contact_phone=contact_phone,
+                            sentiment=sentiment_dict,
+                            tasks=tasks,
+                        )
+                    except Exception as ntfy_err:
+                        logger.warning(f"⚠️ Erro ao despachar notificação familiar de texto via ntfy: {ntfy_err}")
 
             return {
                 "status": "success",

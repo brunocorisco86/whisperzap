@@ -50,6 +50,14 @@ class SemanticExtractor:
         """Executa a extração semântica de uma mensagem."""
         start_time = time.perf_counter()
 
+        # 1. Poda de disfluências e compressão extrativa de contexto com spaCy para economia prévia de tokens
+        from src.ai_gateway.token_economy import token_economy
+        from src.ai_gateway.context_compressor import extractive_context_compressor
+        
+        cleaned_text, _ = token_economy.prune_disfluencies(request.text)
+        if len(cleaned_text.split()) >= 40:
+            cleaned_text, _ = extractive_context_compressor.compress_text(cleaned_text)
+
         # Constrói bloco de contexto
         context_parts = []
         if request.speaker:
@@ -58,7 +66,7 @@ class SemanticExtractor:
             context_parts.append(f"Contexto prévio: {request.context}")
 
         if request.include_dictionary:
-            dict_hint = dictionary_service.get_prompt_context_hint()
+            dict_hint = dictionary_service.get_prompt_context_hint(text=cleaned_text)
             if dict_hint:
                 context_parts.append(dict_hint)
 
@@ -70,14 +78,6 @@ class SemanticExtractor:
         context_block = "\n\n".join(context_parts)
         if context_block:
             context_block = f"Contexto de Apoio & Regras:\n{context_block}\n"
-
-        # 1. Poda de disfluências e compressão extrativa de contexto com spaCy para economia de tokens
-        from src.ai_gateway.token_economy import token_economy
-        from src.ai_gateway.context_compressor import extractive_context_compressor
-        
-        cleaned_text, _ = token_economy.prune_disfluencies(request.text)
-        if len(cleaned_text.split()) >= 40:
-            cleaned_text, _ = extractive_context_compressor.compress_text(cleaned_text)
 
         prompt = EXTRACT_USER_TEMPLATE.format(
             text=cleaned_text,
@@ -147,11 +147,26 @@ class SemanticExtractor:
         ideas = _to_string_list(parsed_data.get("ideas", []))
         topics = _to_string_list(parsed_data.get("topics", []))
 
+        extracted_sentiment = parsed_data.get("sentiment", "NEUTRAL")
+        extracted_sentiment_score = float(parsed_data.get("sentiment_score", 0.0) or 0.0)
+
+        # Se a LLM retornar NEUTRAL (0.0) mas o texto contiver fortes marcadores emocionais, calibra localmente em < 0.1ms
+        if extracted_sentiment == "NEUTRAL" and extracted_sentiment_score == 0.0:
+            from src.ai_gateway.sentiment_analyzer import fast_sentiment_analyzer
+            calibrated = fast_sentiment_analyzer.analyze(
+                text=request.text,
+                summary=parsed_data.get("summary", ""),
+                urgency=parsed_data.get("urgency", "MEDIUM"),
+            )
+            if calibrated.confidence >= 0.55 and calibrated.sentiment != "NEUTRAL":
+                extracted_sentiment = calibrated.sentiment
+                extracted_sentiment_score = calibrated.sentiment_score
+
         return SemanticExtractionResponse(
             intent=parsed_data.get("intent", "NOTE"),
             summary=parsed_data.get("summary", request.text[:100]),
-            sentiment=parsed_data.get("sentiment", "NEUTRAL"),
-            sentiment_score=float(parsed_data.get("sentiment_score", 0.0) or 0.0),
+            sentiment=extracted_sentiment,
+            sentiment_score=extracted_sentiment_score,
             tasks=tasks,
             entities=entities,
             triples=triples,

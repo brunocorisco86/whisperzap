@@ -35,6 +35,21 @@ Este documento registra as fases concluídas e as prioridades planejadas para as
 - [x] **Validação & Testes**:
   - 6/6 testes aprovados em `tests/test_local_embeddings.py` validados localmente e no contêiner da VPS de produção.
 
+### 5. Redução Agressiva de Tokens & Síntese Neural-Simbólica
+- [x] **Injeção Dinâmica de Glossário Scoped**: Redução de mais de 80% dos tokens de sistema filtrando apenas termos presentes na mensagem via matcher léxico local.
+- [x] **Short-Circuit JEV em `DIRECT_RESOLVE`**: Tarefas imperativas e notas estruturadas diretamente no backend com 0 tokens de LLM.
+- [x] **Bypass de Revisão para Áudios Curtos**: Áudios diretos (< 120 chars) utilizam transcrição local refinada via dicionário léxico, dispensando revisão externa.
+- [x] **Cache Semântico Local de 2 Horas**: Respostas reutilizadas em memória para consultas idênticas ou muito próximas.
+- [x] **Síntese Neural-Simbólica Local**: Roteamento sobre topologia do Grafo NetworkX e queries do Postgres antes de acionar LLM.
+
+### 6. Motor de Visão Computacional Local 100% Zero-Token
+- [x] **YOLO11 Nano em ONNX (`yolo11n.onnx`)**: Inferência local na CPU da VPS Hostinger (~360ms) com 80 classes do COCO Dataset traduzidas para PT-BR.
+- [x] **Detector Heurístico de Documentos / Notas Fiscais**: Classificação instantânea de cupons e folhas A4 por aspect ratio e luminosidade sem OCR pesado.
+- [x] **Decodificação Universal em Passagem Única**: Pipeline otimizado com streaming FFmpeg nativo sem bibliotecas pesadas de visão.
+- [x] **Integração no Grafo de Conhecimento**: Conexão de objetos detectados (ex: `Cachorro`, `Documento`) ao remetente com arestas `TRANSMITTED_PHOTO`.
+- [x] **Notificações Push Limpas via ntfy**: Supressão de duplicações de remetente, tags limpas e exibição de confiança percentual.
+- [x] **Validação Live em Produção**: Detecção de cachorro (88% de confiança) em 362ms e consumo estável de 178 MB de RAM.
+
 ---
 
 ## 📌 Prioridades para a Próxima Sessão

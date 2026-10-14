@@ -1,10 +1,10 @@
 # ==============================================================================
-# Caddyfile — Reverse Proxy com HTTPS Automático para Hermes Voice Memory
+# Caddyfile — Reverse Proxy Multi-Serviços com HTTPS Automático
 # ==============================================================================
 
 {
-    # Configuração de e-mail opcional para Let's Encrypt (definido via .env)
-    email {$ACME_EMAIL:admin@homelab.local}
+    # Configuração de e-mail para Let's Encrypt / ZeroSSL (definido via .env ou padrão)
+    email {$ACME_EMAIL:bconter@outlook.com}
     # Modo de administração desabilitado para maior segurança
     admin off
 }
@@ -16,30 +16,54 @@
 
     # Cabeçalhos de Segurança
     header {
-        # Previne clickjacking
-        X-Frame-Options "DENY"
-        # Previne MIME-type sniffing
+        X-Frame-Options "SAMEORIGIN"
         X-Content-Type-Options "nosniff"
-        # Previne vazamento de referer
         Referrer-Policy "strict-origin-when-cross-origin"
-        # HSTS (Strict-Transport-Security) para HTTPS
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-        # Remove assinatura do servidor
         -Server
     }
 
-    # Redirecionamento e proxy reverso para o backend FastAPI
-    reverse_proxy hermes-api:8000 {
-        header_up Host {host}
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
+    # Redirecionamento da raiz para /mnemosine/
+    redir / /mnemosine/ 308
+    redir /mnemosine /mnemosine/ 308
 
-        # Health check ativo para failover
-        health_uri /health
-        health_interval 15s
-        health_timeout 5s
+    # Serviço 1: Mnemosine Voice Intelligence & Control Hub
+    handle /mnemosine* {
+        reverse_proxy hermes-api:8000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
     }
+
+    # Assets estáticos do Mnemosine
+    handle /static/* {
+        reverse_proxy hermes-api:8000
+    }
+
+    # Webhook nativo do WhatsApp (Evolution API -> Hermes)
+    handle /api/v1/whatsapp/* {
+        reverse_proxy hermes-api:8000
+    }
+
+    # Rota de health check pública
+    handle /health {
+        reverse_proxy hermes-api:8000
+    }
+
+    # --------------------------------------------------------------------------
+    # Espaço reservado para futuros serviços (Exemplos):
+    # --------------------------------------------------------------------------
+    # handle /evolution* {
+    #     reverse_proxy hermes-evolution-api:8080
+    # }
+    # handle /n8n* {
+    #     reverse_proxy n8n:5678
+    # }
+    # handle /grafana* {
+    #     reverse_proxy grafana:3000
+    # }
 
     # Logs de acesso estruturados em JSON
     log {

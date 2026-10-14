@@ -5,6 +5,7 @@ import logging
 import os
 import re
 from datetime import datetime, timezone
+from typing import Optional, Dict, Any, List
 from uuid import uuid4
 
 from src.config import settings
@@ -236,13 +237,40 @@ class DictionaryService:
                 keywords.append(t.expansion)
         return ", ".join(keywords)
 
-    def get_prompt_context_hint(self) -> str:
-        """Gera bloco de texto formatado com o glossário de domínio para os prompts LLM."""
+    def get_prompt_context_hint(self, text: Optional[str] = None) -> str:
+        """Gera bloco de texto formatado com o glossário de domínio para os prompts LLM.
+        
+        Se 'text' for fornecido, realiza pré-filtragem léxica para injetar APENAS
+        os termos e variações fonéticas presentes no texto, economizando centenas de tokens.
+        """
         if not self.terms:
             return ""
 
-        lines = ["### Glossário de Termos e Jargões do Domínio:"]
-        for t in self.terms.values():
+        terms_to_include = []
+        if text and text.strip():
+            text_lower = text.lower()
+            for t in self.terms.values():
+                # Checa se o termo canônico, expansão ou qualquer variação fonética aparece no texto
+                matches = False
+                if t.term.lower() in text_lower:
+                    matches = True
+                elif t.expansion and t.expansion.lower() in text_lower:
+                    matches = True
+                else:
+                    for var in t.phonetic_variations:
+                        if len(var) >= 3 and var.lower() in text_lower:
+                            matches = True
+                            break
+                if matches:
+                    terms_to_include.append(t)
+        else:
+            terms_to_include = list(self.terms.values())
+
+        if not terms_to_include:
+            return ""
+
+        lines = ["### Glossário de Termos e Jargões do Domínio (Relevantes para a Mensagem):"]
+        for t in terms_to_include:
             variations = f" (variações comuns de áudio: {', '.join(t.phonetic_variations)})" if t.phonetic_variations else ""
             expansion = f" = {t.expansion}" if t.expansion else ""
             desc = f" — {t.description}" if t.description else ""

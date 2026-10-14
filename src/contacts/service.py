@@ -546,6 +546,107 @@ class ContactService:
             if should_close:
                 db.close()
 
+    def resolve_family_status(
+        self,
+        contact: Optional[ContactRecord] = None,
+        speaker: Optional[str] = None,
+        phone: Optional[str] = None,
+        db: Optional[Session] = None,
+    ) -> Tuple[bool, bool, str]:
+        """Determina se o contato pertence à Família pelo Papel / Role Hierárquico (FAMILY_CORE / FAMILY_EXTENDED),
+        verificando especialmente se é a esposa do proprietário.
+
+        Retorna:
+            (is_family: bool, is_wife: bool, relationship_desc: str)
+        """
+        # 1. Ignora o próprio proprietário do sistema
+        if speaker and is_owner_interaction(speaker):
+            return False, False, "Proprietário"
+        if phone and is_owner_interaction(phone):
+            return False, False, "Proprietário"
+
+        # 2. Se o contato não foi fornecido, tenta localizá-lo por telefone ou nome
+        if contact is None:
+            if phone:
+                contact = self.get_contact_by_phone(phone, db=db)
+            if not contact and speaker:
+                contact = self.get_contact_by_name(speaker, db=db)
+
+        # 3. Análise via ContactRecord registrado no banco
+        if contact is not None:
+            if is_owner_interaction(contact.name) or is_owner_interaction(contact.phone_number):
+                return False, False, "Proprietário"
+
+            from src.contacts.schemas import ROLE_SYNONYMS, ContactRole
+
+            role_str = (contact.role or "UNKNOWN").upper().strip()
+            role_enum = ROLE_SYNONYMS.get(role_str)
+            if not role_enum:
+                try:
+                    role_enum = ContactRole(role_str)
+                except ValueError:
+                    role_enum = None
+
+            comb_text = f"{contact.name or ''} {contact.nickname or ''} {contact.notes or ''}".lower()
+            phone_digits = re.sub(r"\D", "", contact.phone_number or "")
+
+            # Detecção prioritária da Esposa (Débora Patel Conter)
+            is_wife = (
+                phone_digits.endswith("999214934")
+                or phone_digits.endswith("99214934")
+                or any(w in comb_text for w in ["esposa", "débora", "debora", "patel conter", "amor"])
+            )
+            if is_wife and (role_enum in (ContactRole.FAMILY_CORE, ContactRole.FAMILY_EXTENDED) or "esposa" in comb_text or phone_digits.endswith("999214934")):
+                return True, True, "Esposa"
+
+            # Detecção de demais membros da família pelo papel hierárquico
+            is_family_role = (
+                role_enum in (ContactRole.FAMILY_CORE, ContactRole.FAMILY_EXTENDED)
+                or role_str in ("FAMILY", "FAMILY_CORE", "FAMILY_EXTENDED", "FAMILIA", "FAMÍLIA")
+            )
+
+            if is_family_role:
+                rel = "Família"
+                if any(w in comb_text for w in ["mãe", "mae"]):
+                    rel = "Mãe"
+                elif any(w in comb_text for w in ["pai"]):
+                    rel = "Pai"
+                elif any(w in comb_text for w in ["sogra"]):
+                    rel = "Sogra"
+                elif any(w in comb_text for w in ["sogro"]):
+                    rel = "Sogro"
+                elif any(w in comb_text for w in ["filho", "filha"]):
+                    rel = "Filho(a)"
+                elif any(w in comb_text for w in ["irmã", "irma", "irmão", "irmao"]):
+                    rel = "Irmão/Irmã"
+                elif role_enum == ContactRole.FAMILY_CORE:
+                    rel = "Família Direta"
+                elif role_enum == ContactRole.FAMILY_EXTENDED:
+                    rel = "Família"
+                return True, False, rel
+
+        # 4. Fallback heurístico caso o contato ainda não esteja cadastrado na tabela de contatos
+        digits = re.sub(r"\D", "", phone or "")
+        speaker_lower = (speaker or "").lower()
+
+        # Esposa
+        if digits.endswith("999214934") or digits.endswith("99214934") or any(w in speaker_lower for w in ["débora", "debora", "amor"]):
+            return True, True, "Esposa"
+
+        # Mãe
+        if digits.endswith("999909260") or "jussara conter" in speaker_lower or speaker_lower in ("mãe", "mae"):
+            return True, False, "Mãe"
+
+        # Sogra
+        if digits.endswith("99440454") or "joceli" in speaker_lower:
+            return True, False, "Sogra"
+
+        # Sogro
+        if digits.endswith("99927188") or digits.endswith("99047476") or "dirceu" in speaker_lower:
+            return True, False, "Sogro"
+
+        return False, False, ""
+
     def create_or_update_contact(self, data: ContactCreate, db: Session | None = None) -> ContactResponse:
         """Cria ou atualiza um contato deduplicando por telefone ou nome."""
         phone_clean = (data.phone_number or "").strip()
@@ -779,8 +880,11 @@ class ContactService:
         if not contact:
             contact = self.get_contact_by_name(sender_phone_or_name, db=db)
 
-        # Peso do contato (0.40 a 1.00)
-        contact_weight = calculate_effective_weight(contact) if contact else 0.40
+        # Peso do contato (0.40 a 1.00) - Proprietário possui peso executivo máximo (1.00)
+        if is_owner_interaction(sender_phone_or_name):
+            contact_weight = 1.00
+        else:
+            contact_weight = calculate_effective_weight(contact) if contact else 0.40
 
         # Peso base da urgência inferida pela IA
         raw_urgency_weights = {
