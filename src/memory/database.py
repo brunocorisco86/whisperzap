@@ -64,6 +64,7 @@ def set_database_url(new_url: str):
 def init_db() -> None:
     """Inicializa as tabelas do banco de dados se não existirem e adiciona novas colunas."""
     from sqlalchemy import text
+    import src.contacts.models  # noqa: F401 - Registra tabela contacts no Base.metadata antes do create_all
 
     is_sqlite = DATABASE_URL.startswith("sqlite")
 

@@ -275,6 +275,22 @@ class JEVService:
                 rationale="Comando acionável direto e conciso, elegível para resolução local.",
             )
 
+        # 3.1 Tier 1: Zero-Token Notes para avisos factuais e confirmações curtas (< 140 chars e áudio <= 15s)
+        # Ex: "Cheguei no escritório", "O silo 3 descarregou", "Vou sair agora", "Confirmado a reunião"
+        is_short_note = len(clean) < 140 and (duration_s <= 15.0)
+        if is_short_note and not has_task_actionables and not is_idea:
+            return JEVJudgement(
+                action=JEVAction.DIRECT_RESOLVE,
+                intent=JEVIntent.MEMO,
+                urgency=urgency,
+                confidence=0.92,
+                suggested_route="local",
+                tier_used="tier1_heuristic",
+                direct_task_title=None,
+                direct_due_date=None,
+                rationale="Nota informativa ou confirmação concisa resolvida localmente (Zero-Token).",
+            )
+
         # 4. Caso geral com volume de texto expressivo: Despacha para Análise Profunda
         return JEVJudgement(
             action=JEVAction.DEEP_ANALYSIS,

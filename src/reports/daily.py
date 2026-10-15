@@ -103,6 +103,24 @@ def format_daily_whatsapp_message(
     return "\n".join(lines)
 
 
+SERENITY_REFLECTIONS = [
+    "A serenidade vem de saber que o essencial está organizado e o restante seguro no Baú.",
+    "Não busque que os acontecimentos aconteçam como você quer; aceite-os como acontecem e terá paz. — Epicteto",
+    "A tranquilidade nada mais é do que a boa ordenação e quietude da mente. — Marco Aurélio",
+    "A mente ansiosa com o futuro é miserável. Descanse e habite o momento presente. — Sêneca",
+    "Cada noite em que nos deitamos conscientes do dever cumprido encerra um dia vivido plenamente.",
+    "O silêncio da noite é o santuário onde a mente se desfaz dos excessos e renova as energias.",
+    "Não há pressa. O mundo continua girando perfeitamente enquanto você repousa e recarrega.",
+    "Concentre sua atenção no que está sob seu controle; entregue o restante ao descanso sereno.",
+    "O sábio desfruta do presente com gratidão, sem depender ansiosamente do amanhã. — Sêneca",
+    "Desacelere o passo. O descanso profundo não é uma pausa na vida, é parte vital dela.",
+    "Tudo o que você precisava fazer hoje foi feito. Deixe a noite cuidar do repouso.",
+    "A calmaria de agora é o combustível da lucidez e da clareza de amanhã.",
+    "Solte as rédeas do dia. Amanhã nascerá com suas próprias oportunidades e soluções.",
+    "A mente serena e o coração leve são as maiores conquistas de um dia de trabalho.",
+]
+
+
 class DailyReportService:
     """Serviço de geração e consulta do Resumo Diário."""
 
@@ -179,7 +197,7 @@ class DailyReportService:
         target_date: Optional[str] = None,
         db: Optional[Session] = None,
     ) -> str:
-        """Gera a mensagem de Fechamento Sereno das 21:00 BRT com foco em descompressão e calma."""
+        """Gera a mensagem de Fechamento Sereno das 21:00 BRT com foco em descompressão, calma e consciência dos fatos de hoje (100% Local)."""
         should_close = False
         if db is None:
             db = SessionLocal()
@@ -189,39 +207,136 @@ class DailyReportService:
             target_date = get_now_brt().strftime("%Y-%m-%d")
 
         try:
+            from datetime import timedelta
             from src.memory.repository import memory_repository
+            from src.memory.task_sentiment_analyzer import get_spacy_nlp
+
             try:
                 dt = datetime.strptime(target_date, "%Y-%m-%d")
                 friendly_date = dt.strftime("%d/%m/%Y")
             except Exception:
+                dt = get_now_brt()
                 friendly_date = target_date
 
+            tomorrow_date_str = (dt + timedelta(days=1)).strftime("%Y-%m-%d")
+
+            # 1. Busca mensagens de hoje no fuso BRT
+            all_messages = db.query(MessageRecord).all()
+            today_msgs = [
+                m for m in all_messages
+                if m.created_at and to_local_tz(m.created_at) and to_local_tz(m.created_at).strftime("%Y-%m-%d") == target_date
+            ]
+
+            # 2. Busca tarefas no banco
             all_tasks = db.query(TaskRecord).all()
             today_completed = [
                 t for t in all_tasks
                 if t.status == "DONE" and t.completed_at and to_local_tz(t.completed_at) and to_local_tz(t.completed_at).strftime("%Y-%m-%d") == target_date
             ]
+            today_created_tasks = [
+                t for t in all_tasks
+                if t.created_at and to_local_tz(t.created_at) and to_local_tz(t.created_at).strftime("%Y-%m-%d") == target_date and t.status == "PENDING"
+            ]
 
             active_tasks = memory_repository.list_tasks(view_mode="active", status="PENDING", db=db)
             vault_tasks = memory_repository.list_tasks(view_mode="vault", status="PENDING", db=db)
 
-            # Seleciona no máximo 3 prioridades para amanhã
-            top_tomorrow = active_tasks[:3]
+            # 3. Extração dos Assuntos e Interações de Hoje (100% Local com spaCy)
+            nlp = get_spacy_nlp()
+            raw_topics_today: list[str] = []
+            external_speakers: set[str] = set()
+            audio_count = 0
 
+            for m in today_msgs:
+                spk = (m.speaker or "").strip()
+                if spk and spk.lower() not in ("bruno", "user", "eu", "me", "admin", "554497604925", "5544979604925"):
+                    external_speakers.add(spk)
+
+                meta = m.meta_info if isinstance(m.meta_info, dict) else {}
+                if m.audio_filename or meta.get("message_type") == "audio":
+                    audio_count += 1
+
+                # Tópicos salvos previamente
+                if meta.get("topics") and isinstance(meta["topics"], list):
+                    raw_topics_today.extend([str(tp).strip() for tp in meta["topics"] if str(tp).strip()])
+
+            # Se não houver tópicos estruturados salvos, extrai substantivos principais via spaCy
+            if not raw_topics_today and today_msgs and nlp:
+                combined_text = " ".join([m.revised_text or m.raw_text or "" for m in today_msgs[:8]])
+                if len(combined_text) > 20:
+                    doc = nlp(combined_text[:1200])
+                    candidate_nouns = [
+                        token.lemma_.capitalize()
+                        for token in doc
+                        if token.pos_ in ("NOUN", "PROPN") and len(token.text) > 3 and not token.is_stop
+                    ]
+                    from collections import Counter
+                    freq = Counter(candidate_nouns).most_common(4)
+                    raw_topics_today = [word for word, count in freq if count >= 1]
+
+            clean_topics = deduplicate_list(raw_topics_today)[:4]
+
+            # 4. Seleção Inteligente de Prioridades para Amanhã (Rotatividade + Prazos Reais)
+            # Critério 1: Tarefas com prazo explícito para amanhã
+            due_tomorrow = [t for t in active_tasks if t.due_date and t.due_date.startswith(tomorrow_date_str)]
+            # Critério 2: Tarefas urgentes ou críticas
+            urgent_tasks = [t for t in active_tasks if t.priority in ("HIGH", "URGENT") and t not in due_tomorrow]
+            # Critério 3: Tarefas favoritas
+            fav_tasks = [t for t in active_tasks if t.is_favorite and t not in due_tomorrow and t not in urgent_tasks]
+            # Critério 4: Outras tarefas ativas com rotação baseada no dia do ano
+            residual_tasks = [t for t in active_tasks if t not in due_tomorrow and t not in urgent_tasks and t not in fav_tasks]
+            
+            rotated_residuals = []
+            if residual_tasks:
+                rotation_idx = dt.timetuple().tm_yday % len(residual_tasks)
+                rotated_residuals = residual_tasks[rotation_idx:] + residual_tasks[:rotation_idx]
+
+            candidate_pool = due_tomorrow + urgent_tasks + fav_tasks + rotated_residuals
+            top_tomorrow = candidate_pool[:3]
+
+            # 5. Montagem da Mensagem do Fechamento Sereno
             lines = [
                 f"🌙 *FECHAMENTO SERENO — {friendly_date} (21:00)*",
                 f"_Descanse com a certeza de que seu dia foi produtivo e sua mente está livre de pendências soltas._\n",
             ]
 
+            # Bloco A: Atividades e Assuntos de Hoje
+            if today_msgs:
+                lines.append(f"🎙️ *Conversas & Registros de Hoje ({len(today_msgs)}):*")
+                summary_details = []
+                if audio_count > 0:
+                    summary_details.append(f"{audio_count} áudio(s)")
+                text_count = len(today_msgs) - audio_count
+                if text_count > 0:
+                    summary_details.append(f"{text_count} texto(s)")
+                if external_speakers:
+                    summary_details.append(f"contatos: {', '.join(sorted(external_speakers)[:6])}")
+                
+                details_str = f" ({', '.join(summary_details)})" if summary_details else ""
+                lines.append(f"• Fluxo do dia registrado{details_str}.")
+
+                if clean_topics:
+                    lines.append(f"• 🏷️ *Temas abordados:* {', '.join(clean_topics)}")
+                lines.append("")
+            elif not today_completed and not today_created_tasks:
+                lines.append("🌿 *Dia de quietude e foco interno: nenhum ruído ou mensagem pendente hoje.*\n")
+
+            # Bloco B: Conquistas e Novas Capturas de Hoje
             if today_completed:
-                lines.append(f"✨ *Conquistas de Hoje ({len(today_completed)}):*")
+                lines.append(f"✨ *Conquistas Concluídas Hoje ({len(today_completed)}):*")
                 for t in today_completed[:4]:
                     is_idea_badge = " 💡" if t.is_idea else ""
                     lines.append(f"• ✅ {t.title}{is_idea_badge}")
                 lines.append("")
-            else:
-                lines.append("✨ *O dia de hoje foi de reflexão, alinhamentos e planejamento.*\n")
 
+            if today_created_tasks:
+                lines.append(f"📥 *Capturado Hoje ({len(today_created_tasks)}):*")
+                for t in today_created_tasks[:3]:
+                    badge = "💡 Ideia:" if t.is_idea else "📌"
+                    lines.append(f"• {badge} {t.title}")
+                lines.append("")
+
+            # Bloco C: Foco Essencial para Amanhã
             lines.append("🎯 *FOCO ESSENCIAL PARA AMANHÃ (Apenas o Vital):*")
             if top_tomorrow:
                 for idx, t in enumerate(top_tomorrow, start=1):
@@ -229,11 +344,14 @@ class DailyReportService:
                     assignee_str = f" ({t.assignee})" if t.assignee else ""
                     fav_icon = " ⭐" if t.is_favorite else ""
                     epic_icon = " 🏛️" if t.is_epic else ""
-                    lines.append(f"{idx}. {p_icon} *{t.title}*{fav_icon}{epic_icon}{assignee_str}")
+                    due_badge = " ⏰ [Para Amanhã]" if (t.due_date and t.due_date.startswith(tomorrow_date_str)) else ""
+                    lines.append(f"{idx}. {p_icon} *{t.title}*{due_badge}{fav_icon}{epic_icon}{assignee_str}")
             else:
                 lines.append("• Nenhuma tarefa urgente. O fluxo está calmo e livre para novos projetos.")
 
             lines.append("")
+
+            # Bloco D: Baú de Espera (Vault)
             vault_count = len(vault_tasks)
             if vault_count > 0:
                 lines.append(
@@ -244,7 +362,11 @@ class DailyReportService:
             else:
                 lines.append("🗝️ *Baú de Espera (Vault):* Todas as suas ideias e tarefas estão sincronizadas.")
 
-            lines.append("\n🌿 _\"A serenidade vem de saber que o essencial está organizado e o restante seguro no Baú.\"_")
+            # Bloco E: Citação Serena Rotativa
+            quote_index = (dt.timetuple().tm_yday + int(dt.strftime("%d"))) % len(SERENITY_REFLECTIONS)
+            serene_quote = SERENITY_REFLECTIONS[quote_index]
+
+            lines.append(f"\n🌿 _{serene_quote}_")
             lines.append("_Tenha uma ótima noite de descanso e serenidade!_ 😴✨")
 
             return "\n".join(lines)

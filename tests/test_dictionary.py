@@ -57,7 +57,7 @@ def test_hints_generation(temp_dict_service):
     assert "C.Vale" in initial_prompt
 
     context_hint = temp_dict_service.get_prompt_context_hint()
-    assert "### Glossário de Termos e Jargões do Domínio:" in context_hint
+    assert "### Glossário de Termos e Jargões do Domínio" in context_hint
     assert "Ficha de Acompanhamento de Lote" in context_hint
 
 

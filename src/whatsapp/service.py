@@ -733,15 +733,26 @@ class WhatsAppService:
                 )
                 logger.info(f"⚖️ [JEV Judge] Ação: {jev_verdict.action} | Intenção: {jev_verdict.intent} | Confiança: {jev_verdict.confidence:.2f}")
 
-                # 2.1 Revisão Contextual Inteligente (Zero-Token Routing)
+                # 2.1 Revisão Contextual Inteligente (Zero-Token Routing & RPD Governance)
+                from src.dictionary.service import dictionary_service
+                audio_bypass_chars = getattr(settings, "AUDIO_REVISE_BYPASS_CHARS", 160)
+                single_pass_enabled = getattr(settings, "AI_SINGLE_PASS_EXTRACTION", True)
+
                 revised_text = raw_text_audio
-                if jev_verdict.action == JEVAction.DIRECT_RESOLVE and jev_verdict.direct_task_title:
-                    revised_text = jev_verdict.direct_task_title
-                elif len(raw_text_audio.strip()) < 120 and jev_verdict.action != JEVAction.DEEP_ANALYSIS:
-                    # Economia de Tokens: Áudios curtos usam transcrição direta do Whisper com correção léxica local
-                    from src.dictionary.service import dictionary_service
+                if jev_verdict.action == JEVAction.DIRECT_RESOLVE:
+                    if jev_verdict.direct_task_title:
+                        revised_text = jev_verdict.direct_task_title
+                    else:
+                        revised_text = dictionary_service.apply_lexical_corrections(raw_text_audio.strip())
+                    logger.info(f"⚡ [JEV Zero-Token] Áudio resolvido localmente sem chamadas de API ({len(raw_text_audio)} chars).")
+                elif len(raw_text_audio.strip()) < audio_bypass_chars:
+                    # Economia de RPD & Tokens: Áudios diretos usam transcrição do Whisper calibrada com dicionário léxico local
                     revised_text = dictionary_service.apply_lexical_corrections(raw_text_audio.strip())
-                    logger.info(f"⚡ [AI Revise Short-Circuit] Áudio curto ({len(raw_text_audio)} chars): Revisão LLM dispensada (0 tokens poupados).")
+                    logger.info(f"⚡ [AI Revise Short-Circuit] Áudio ({len(raw_text_audio)} chars < {audio_bypass_chars}): Request de revisão dispensado (1 RPD poupado).")
+                elif single_pass_enabled:
+                    # Modo Single-Pass: Transfere a revisão para a chamada unificada de extração semântica, evitando 2 requests por áudio
+                    revised_text = dictionary_service.apply_lexical_corrections(raw_text_audio.strip())
+                    logger.info(f"⚡ [Single-Pass Fusion] Revisão isolada dispensada. Executará revisão + extração em request único à LLM (1 RPD poupado).")
                 else:
                     try:
                         provider = get_ai_provider(task="revise")

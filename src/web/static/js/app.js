@@ -2665,7 +2665,12 @@ function renderMessages() {
         </div>
 
         <!-- Resumo -->
-        ${m.summary ? `<div class="message-summary">💡 <b>Resumo Executivo:</b> ${m.summary}</div>` : ''}
+        ${(() => {
+          const sum = (m.summary || '').trim();
+          const rev = (m.revised_text || m.raw_text || '').trim();
+          if (!sum || sum === rev || (sum.length < 50 && rev.startsWith(sum))) return '';
+          return `<div class="message-summary">💡 <b>Resumo Executivo:</b> ${sum}</div>`;
+        })()}
 
         <!-- Transcription Box (Abas Revisado vs Bruto) -->
         <div class="message-transcription-box">

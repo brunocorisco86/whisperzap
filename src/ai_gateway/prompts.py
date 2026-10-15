@@ -53,12 +53,17 @@ Sua missão é analisar o texto recebido e extrair de forma estruturada as inten
    - `FRUSTRATED` (score -0.4 a -1.0): descontentamento, reclamação, apontamento de falhas recorrentes ("de novo com erro", "complicado assim", "péssimo").
    - `NEUTRAL` (score 0.0): use APENAS quando a mensagem for estritamente técnica, burocrática ou informativa, sem nenhuma nuance emocional evidente.
 8. **Termos Dúbios / Aprendizado Léxico (unclear_terms)**: Se houver palavras truncadas, termos técnicos, jargões da C.Vale/avicultura/Mtech/TMS/Silos ou siglas onde você teve dúvida fonética ou teve que fazer esforço dedutivo para adaptar, liste-os para enriquecimento do vocabulário.
+9. **Resumo Executivo (summary)**: 
+   - Se o texto recebido for curto, direto ou tiver menos de 250 caracteres: retorne OBRIGATORIAMENTE `"summary": null`. É EXPRESSAMENTE PROIBIDO resumir trechos curtos para poupar tokens e evitar poluição redundante.
+   - Apenas se o texto for longo, denso ou com múltiplos parágrafos (>= 250 caracteres): gere um resumo executivo sintético em 2 a 3 frases (200 a 350 caracteres) explicando objetivo e escopo.
+10. **Revisão Textual (revised_text)**: Retorne a versão limpa, pontuada e corrigida gramaticalmente do texto original, mantendo 100% dos fatos e termos técnicos.
 
 Retorne EXCLUSIVAMENTE um objeto JSON válido seguindo a estrutura:
 ```json
 {
   "intent": "TASK",
-  "summary": "Resumo executivo em 2 a 3 frases (250 a 380 caracteres) explicando claramente o assunto, escopo e objetivo/impacto do texto ou documento",
+  "summary": null,
+  "revised_text": "Texto limpo e pontuado",
   "sentiment": "NEUTRAL",
   "sentiment_score": 0.0,
   "tasks": [

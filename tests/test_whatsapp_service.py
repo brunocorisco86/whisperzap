@@ -375,8 +375,10 @@ async def test_process_webhook_self_memo_voice_with_verbose_signaled_tasks():
         processing_time_ms=10.0,
     )
 
+    from src.ai_gateway.jev.service import jev_service, JEVJudgement, JEVAction, JEVIntent, JEVUrgency
     with patch.object(whatsapp_service, "get_media_base64", new_callable=AsyncMock) as mock_media, \
          patch.object(whatsapp_service, "send_text_message", new_callable=AsyncMock) as mock_send, \
+         patch.object(jev_service, "judge", return_value=JEVJudgement(action=JEVAction.DEEP_ANALYSIS, intent=JEVIntent.TASK, urgency=JEVUrgency.URGENT, confidence=0.9, suggested_route="gemini")), \
          patch("src.transcriber.service.whisper_service.transcribe_audio", new_callable=AsyncMock) as mock_transcribe, \
          patch("src.ai_gateway.extractor.semantic_extractor.extract", new_callable=AsyncMock) as mock_extract:
 

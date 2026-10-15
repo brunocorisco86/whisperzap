@@ -105,29 +105,34 @@ class MemoryRepository:
                 from src.ai_gateway.schemas import SemanticExtractionResponse, ExtractedTask
                 from src.ai_gateway.sentiment_analyzer import fast_sentiment_analyzer
                 
-                # Se o bypass veio de uma resolução direta do JEV (Zero-Token Task)
+                # Se o bypass veio de uma resolução direta do JEV (Zero-Token Task ou Zero-Token Note)
                 jev_tasks = []
                 jev_intent = "NOTE"
                 jev_urgency = "LOW"
                 meta_jev = (data.meta_info or {}).get("jev_verdict") if isinstance(data.meta_info, dict) else None
                 if isinstance(meta_jev, dict) and meta_jev.get("action") == "DIRECT_RESOLVE":
-                    jev_task_title = meta_jev.get("direct_task_title") or text_to_check
-                    jev_intent = "TASK"
                     jev_urgency = meta_jev.get("urgency", "MEDIUM")
-                    jev_tasks.append(
-                        ExtractedTask(
-                            title=jev_task_title,
-                            due_date=meta_jev.get("direct_due_date"),
-                            priority=jev_urgency,
-                            assignee=None,
+                    direct_title = meta_jev.get("direct_task_title")
+                    if direct_title:
+                        jev_intent = "TASK" if meta_jev.get("intent") != "IDEA" else "IDEA"
+                        jev_tasks.append(
+                            ExtractedTask(
+                                title=direct_title,
+                                due_date=meta_jev.get("direct_due_date"),
+                                priority=jev_urgency,
+                                assignee=None,
+                            )
                         )
-                    )
-                    logger.info(f"🎯 [JEV Zero-Token] Tarefa direta registrada sem custo de tokens: '{jev_task_title}' (prazo={meta_jev.get('direct_due_date')})")
+                        logger.info(f"🎯 [JEV Zero-Token] Tarefa/ideia direta registrada sem custo de tokens: '{direct_title}' (prazo={meta_jev.get('direct_due_date')})")
+                    else:
+                        jev_intent = "NOTE"
+                        logger.info(f"📝 [JEV Zero-Token] Nota informativa concisa registrada localmente (Zero-Token).")
 
+                summary_threshold = getattr(settings, "CALIOPE_SUMMARY_MIN_CHARS", 250)
                 bypass_sent = fast_sentiment_analyzer.analyze(text=text_to_check, urgency=jev_urgency)
                 extracted = SemanticExtractionResponse(
                     intent=jev_intent,
-                    summary=text_to_check[:120] if text_to_check else "",
+                    summary=None if len(text_to_check) < summary_threshold else text_to_check[:120],
                     sentiment=bypass_sent.sentiment,
                     sentiment_score=bypass_sent.sentiment_score,
                     tasks=jev_tasks,
@@ -137,8 +142,8 @@ class MemoryRepository:
                     ideas=[],
                     topics=[],
                     urgency=jev_urgency,
-                    provider="jev_local" if jev_tasks else "bypass",
-                    model="jev_direct_resolve" if jev_tasks else "bypass",
+                    provider="jev_local" if (jev_tasks or meta_jev) else "bypass",
+                    model="jev_direct_resolve" if meta_jev else "bypass",
                     processing_time_ms=0.0,
                 )
             else:
@@ -152,17 +157,22 @@ class MemoryRepository:
                 try:
                     from src.ai_gateway.extractor import semantic_extractor
                     extracted = await semantic_extractor.extract(extraction_req)
+                    # Se a IA retornou versão revisada no modo Single-Pass, adota para enriquecer
+                    if getattr(extracted, "revised_text", None):
+                        data.revised_text = extracted.revised_text
                 except Exception as extract_err:
                     logger.warning(f"Extração semântica com IA falhou ({extract_err}). Usando fallback heurístico.")
                     from src.ai_gateway.schemas import SemanticExtractionResponse
                     from src.ai_gateway.sentiment_analyzer import fast_sentiment_analyzer
+                    fallback_text = data.revised_text or data.raw_text or ""
+                    summary_threshold = getattr(settings, "CALIOPE_SUMMARY_MIN_CHARS", 250)
                     fallback_sent = fast_sentiment_analyzer.analyze(
-                        text=data.revised_text or data.raw_text or "",
+                        text=fallback_text,
                         urgency="MEDIUM",
                     )
                     extracted = SemanticExtractionResponse(
                         intent="NOTE",
-                        summary=data.revised_text[:120] if data.revised_text else "",
+                        summary=None if len(fallback_text) < summary_threshold else fallback_text[:120],
                         sentiment=fallback_sent.sentiment,
                         sentiment_score=fallback_sent.sentiment_score,
                         tasks=[],

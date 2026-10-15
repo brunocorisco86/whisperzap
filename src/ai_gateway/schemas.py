@@ -96,7 +96,8 @@ class SemanticExtractionResponse(BaseModel):
     intent: Literal["TASK", "IDEA", "DECISION", "EVENT", "PROBLEM", "NOTE", "QUESTION"] = Field(
         ..., description="Intenção principal da mensagem"
     )
-    summary: str = Field(..., description="Resumo em 1 frase do conteúdo principal")
+    summary: Optional[str] = Field(default=None, description="Resumo executivo do conteúdo (None se o texto for curto)")
+    revised_text: Optional[str] = Field(default=None, description="Texto limpo e pontuado gerado em modo Single-Pass")
     sentiment: Optional[str] = Field(default="NEUTRAL", description="Sentimento/tom emocional do locutor (POSITIVE, NEUTRAL, URGENT, ANXIOUS, FRUSTRATED, CONFIDENT)")
     sentiment_score: Optional[float] = Field(default=0.0, description="Score numérico de -1.0 a 1.0")
     tasks: list[ExtractedTask] = Field(default_factory=list, description="Lista de tarefas acionáveis extraídas")

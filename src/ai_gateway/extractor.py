@@ -75,6 +75,15 @@ class SemanticExtractor:
         if pruning_hint:
             context_parts.append(pruning_hint)
 
+        from src.config import settings
+        summary_threshold = getattr(settings, "CALIOPE_SUMMARY_MIN_CHARS", 250)
+        is_short_text = len(cleaned_text.strip()) < summary_threshold
+
+        if is_short_text:
+            context_parts.append(
+                f"[Economia de Tokens: O texto possui menos de {summary_threshold} caracteres. O campo 'summary' DEVE ser retornado obrigatoriamente como null]"
+            )
+
         context_block = "\n\n".join(context_parts)
         if context_block:
             context_block = f"Contexto de Apoio & Regras:\n{context_block}\n"
@@ -94,10 +103,10 @@ class SemanticExtractor:
             parsed_data = self._extract_json_from_text(raw_llm_response)
         except Exception as e:
             logger.error(f"Erro ao analisar extração da LLM: {e}")
-            # Fallback seguro estruturado
+            # Fallback seguro estruturado sem forçar resumo prolixo em textos curtos
             parsed_data = {
                 "intent": "NOTE",
-                "summary": request.text[:100] + ("..." if len(request.text) > 100 else ""),
+                "summary": None if is_short_text else (request.text[:100] + ("..." if len(request.text) > 100 else "")),
                 "tasks": [],
                 "entities": [],
                 "decisions": [],
@@ -105,6 +114,10 @@ class SemanticExtractor:
                 "topics": [],
                 "urgency": "MEDIUM",
             }
+
+        # Pós-validação: se o texto for menor que o threshold, anula summary para garantir economia e evitar poluição em Calíope
+        if is_short_text:
+            parsed_data["summary"] = None
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
 
@@ -164,7 +177,8 @@ class SemanticExtractor:
 
         return SemanticExtractionResponse(
             intent=parsed_data.get("intent", "NOTE"),
-            summary=parsed_data.get("summary", request.text[:100]),
+            summary=parsed_data.get("summary"),
+            revised_text=parsed_data.get("revised_text"),
             sentiment=extracted_sentiment,
             sentiment_score=extracted_sentiment_score,
             tasks=tasks,

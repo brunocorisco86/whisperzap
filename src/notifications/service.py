@@ -385,6 +385,13 @@ class NtfyNotificationService:
         level_upper = level.upper()
         prio = 5 if level_upper in ["ERROR", "CRITICAL"] else (4 if level_upper == "WARNING" else 2)
         default_tags = ["warning", "robot"] if prio >= 4 else ["white_check_mark", "gear"]
+        return await self.send_notification(
+            message=details,
+            title=title,
+            priority=prio,
+            tags=tags or default_tags,
+        )
+
     async def notify_image_processed(
         self,
         speaker: str,
