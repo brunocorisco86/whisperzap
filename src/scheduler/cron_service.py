@@ -164,6 +164,9 @@ async def _background_scheduler_loop():
                                 f"✅ [Cron 21:00] Racionalização Terpsícore concluída: {res_rat.get('merged_count', 0)} duplicatas "
                                 f"fundidas de {res_rat.get('total_scanned', 0)} analisadas. {res_rat.get('remaining_pending', 0)} ativas restantes."
                             )
+                            from src.memory.repository import memory_repository
+                            aged = memory_repository.auto_age_pending_tasks(db=db)
+                            logger.info(f"🗝️ [Cron 21:00] Envelhecimento Terpsícore: {aged} tarefas antigas sem prazo movidas para o Baú.")
                     except Exception as e:
                         logger.error(f"❌ [Cron 21:00] Erro na racionalização de tarefas Terpsícore: {e}")
 

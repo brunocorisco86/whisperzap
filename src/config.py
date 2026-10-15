@@ -83,6 +83,10 @@ class Settings(BaseSettings):
     # Threshold de Resumo Executivo em Calíope (Voz & Transcrições)
     CALIOPE_SUMMARY_MIN_CHARS: int = 250
 
+    # Terpsícore: visibilidade de tarefas novas e envelhecimento automático do backlog (0 tokens)
+    TASK_RECENT_WINDOW_HOURS: int = 48
+    TASK_AUTO_VAULT_DAYS: int = 21
+
     # Governança de RPD (Requests Per Day) & Revisão de Voz
     AUDIO_REVISE_BYPASS_CHARS: int = 160
     AI_SINGLE_PASS_EXTRACTION: bool = True

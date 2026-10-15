@@ -1303,6 +1303,16 @@ function filterTasksByTag(tag) {
 }
 window.filterTasksByTag = filterTasksByTag;
 
+const TASK_RECENT_WINDOW_MS = 48 * 60 * 60 * 1000;
+
+function isTaskRecent(t) {
+  if (!t || !t.created_at) return false;
+  let raw = String(t.created_at);
+  if (!/(Z|[+-]\d{2}:?\d{2})$/.test(raw)) raw += 'Z';
+  const ts = Date.parse(raw);
+  return !Number.isNaN(ts) && (Date.now() - ts) <= TASK_RECENT_WINDOW_MS;
+}
+
 function renderTasks() {
   if (!tasksContainer) return;
 
@@ -1456,6 +1466,8 @@ function renderTasks() {
     };
     const roleBadge = t.sender_role ? (roleLabels[t.sender_role] || t.sender_role) : null;
 
+    const isNew = isTaskRecent(t);
+
     let cardClass = 'task-card';
     if (isDone) cardClass += ' task-done';
     if (isCancelled) cardClass += ' task-cancelled';
@@ -1512,6 +1524,7 @@ function renderTasks() {
             </div>
 
             <div class="task-title">
+              ${isNew && !isDone && !isCancelled && !isMerged ? '<span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.7rem; margin-right: 0.4rem;" title="Criada nas últimas 48 horas">✨ NOVA</span>' : ''}
               ${isMerged ? '<span class="badge" style="background: rgba(139, 92, 246, 0.2); color: #c084fc; font-size: 0.75rem; margin-right: 0.4rem;">🔗 UNIFICADA</span>' : ''}
               ${isCancelled ? '<span style="color: #ef4444; font-size: 0.85rem; margin-right: 0.4rem;">[IGNORADA]</span>' : ''}
               ${t.title}

@@ -54,6 +54,18 @@ class TaskSentimentAnalyzer:
         "programar", "publicar", "realizar", "receber", "recolher", "reestruturar",
         "registrar", "regular", "reivindicar", "reparar", "repassar", "responder",
         "revisar", "solicitar", "testar", "transferir", "validar", "verificar", "visitar",
+        # Verbos frequentes em tarefas reais que o filtro descartava por engano
+        "integrar", "utilizar", "usar", "ajustar", "evitar", "adicionar", "alterar", "anotar",
+        "avisar", "checar", "concluir", "copiar", "cuidar", "divulgar", "exibir", "incluir",
+        "orientar", "remover", "resolver", "retornar", "trocar", "tratar", "cadastrar", "pensar",
+    }
+
+    # Títulos gerados pelo LLM começam com verbo no infinitivo ("Enviar...", "Ajustar...").
+    # O spaCy às vezes erra o ROOT em frases longas; o 1º termo no infinitivo é um sinal robusto e barato.
+    INFINITIVE_FIRST_WORD_RE = re.compile(r"^[a-záàâãéêíóôõúç]{3,}(ar|er|ir|or)$")
+    NON_VERB_INFINITIVE_LOOKALIKES = {
+        "celular", "lugar", "pomar", "açúcar", "acucar", "mulher", "colher", "qualquer",
+        "calendar", "militar", "exemplar", "ar", "par", "mar", "dor", "valor", "motor",
     }
 
     # Marcadores de atualização de status / espera passiva
@@ -130,6 +142,15 @@ class TaskSentimentAnalyzer:
         has_action_verb = any(t.lemma_.lower() in self.ACTION_VERB_LEMMAS for t in verb_tokens_title)
         if not has_action_verb and root_lemma_title in self.ACTION_VERB_LEMMAS:
             has_action_verb = True
+
+        # Fallback robusto: 1º termo do título no infinitivo (padrão dos títulos de tarefa do extrator)
+        if not has_action_verb and clean_title:
+            first_word = clean_title.split()[0].lower().strip(".,;:!?\"'")
+            if (
+                self.INFINITIVE_FIRST_WORD_RE.match(first_word)
+                and first_word not in self.NON_VERB_INFINITIVE_LOOKALIKES
+            ):
+                has_action_verb = True
 
         has_action_verb_source = any(t.lemma_.lower() in self.ACTION_VERB_LEMMAS for t in verb_tokens_source)
 

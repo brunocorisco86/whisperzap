@@ -217,6 +217,14 @@ class ModelRegistry:
             logger.info(f"✨ [ModelRegistry] Modelos ativos atualizados: {self.data.active_models}")
             return dict(self.data.active_models)
 
+    NON_TEXT_MODEL_MARKERS = ("tts", "image", "audio", "live", "robotics", "imagen", "veo", "native-audio")
+
+    @classmethod
+    def is_text_generation_model(cls, name: str) -> bool:
+        """False para modelos de áudio/imagem/vídeo/live que não retornam texto/JSON estruturado."""
+        lowered = (name or "").lower()
+        return not any(marker in lowered for marker in cls.NON_TEXT_MODEL_MARKERS)
+
     def get_viable_fallback_chain(self, current_model: str, task: str = "revise") -> List[str]:
         """Retorna dinamicamente candidatos saudáveis do pool descoberto, excluindo modelos com circuito aberto."""
         with self._lock:
@@ -224,6 +232,7 @@ class ModelRegistry:
             discovered = [
                 m.name for m in self.data.discovered_models
                 if "generateContent" in m.supported_methods and m.tier in ("LITE", "FLASH") and m.cost_efficiency_score > 0
+                and self.is_text_generation_model(m.name)
             ]
             viable = [
                 m for m in discovered
@@ -324,6 +333,10 @@ class ModelRegistry:
             has_gen = "generateContent" in methods
             has_embed = "embedContent" in methods
             if not has_gen and not has_embed:
+                continue
+
+            # Ignora modelos de áudio/imagem/live que não servem para texto/JSON (evita 429 inúteis no fallback)
+            if not has_embed and not self.is_text_generation_model(short_name):
                 continue
 
             # Classifica o Tier e Geração

@@ -12,6 +12,9 @@ logging.basicConfig(
     level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
+# Evita vazar a chave da API (?key=...) nas URLs registradas pelo httpx em nível INFO
+for _noisy_logger in ("httpx", "httpcore"):
+    logging.getLogger(_noisy_logger).setLevel(logging.WARNING)
 
 from src.ai_gateway.router import router as ai_router
 from src.transcriber.router import router as transcriber_router

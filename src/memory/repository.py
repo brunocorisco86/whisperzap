@@ -4,7 +4,7 @@ import json
 import logging
 import math
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, List
 from uuid import uuid4
 
@@ -288,7 +288,15 @@ class MemoryRepository:
                         source_text=source_msg_text,
                     )
                     if not is_actionable:
-                        logger.info(f"🚫 [Tarefas] Candidata a tarefa '{t.title}' descartada pelo filtro spaCy NLP anti-ruído.")
+                        try:
+                            why = task_sentiment_analyzer.analyze_task_text(t.title, source_msg_text)
+                            reason = (
+                                f"score={why['actionability_score']} ruído={why['noise_category']} "
+                                f"verbo_acao={why['has_action_verb']} fragmento={why['is_pure_noun_phrase']}"
+                            )
+                        except Exception:
+                            reason = "motivo indisponível"
+                        logger.info(f"🚫 [Tarefas] Candidata a tarefa '{t.title}' descartada pelo filtro spaCy NLP anti-ruído ({reason}).")
                         continue
 
                     # Deduplicação Semântica com spaCy NLP e Polímnia contra tarefas pendentes existentes
@@ -1044,12 +1052,24 @@ class MemoryRepository:
 
                 filtered_records.append((r, in_v))
 
-            # Ordenação com prioridade: Favoritos > Épicos > Urgência > Data
+            # Ordenação com prioridade: Favoritos > Épicos > Novas (janela recente) > Urgência > Data
+            # A camada "Novas" impede que um backlog grande de HIGH/URGENT soterre tarefas recém-geradas.
             priority_weight = {"URGENT": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
+            recent_cutoff = now_dt - timedelta(hours=settings.TASK_RECENT_WINDOW_HOURS)
+
+            def _is_recent(rec: Any) -> bool:
+                created = rec.created_at
+                if created is None:
+                    return False
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                return created >= recent_cutoff
+
             filtered_records.sort(
                 key=lambda item: (
                     1 if item[0].is_favorite else 0,
                     1 if item[0].is_epic else 0,
+                    1 if _is_recent(item[0]) else 0,
                     priority_weight.get(item[0].priority, 1),
                     item[0].created_at or now_dt,
                 ),
@@ -1225,9 +1245,54 @@ class MemoryRepository:
             task.in_vault = False
             task.postponed_until = None
             task.vault_reason = None
+            # Registra a reavaliação para que o envelhecimento automático não devolva a tarefa ao Baú
+            if not (task.reassessment_notes or "").strip():
+                task.reassessment_notes = f"Restaurada do Baú em {datetime.now(timezone.utc).strftime('%d/%m/%Y')}"
             db.commit()
             db.refresh(task)
             return self.get_task_response(task, db)
+        finally:
+            if should_close:
+                db.close()
+
+    AUTO_AGE_VAULT_REASON = "Envelhecimento automático (pendente sem prazo há muito tempo)"
+
+    def auto_age_pending_tasks(self, db: Session | None = None, days: int | None = None) -> int:
+        """Move para o Baú tarefas PENDING antigas e sem prazo (0 tokens, reversível).
+
+        Poupa: favoritas, épicas, com prazo definido, já reavaliadas/restauradas e ideias.
+        Nada é apagado; o motivo fica registrado em vault_reason.
+        """
+        should_close = False
+        if db is None:
+            db = SessionLocal()
+            should_close = True
+        try:
+            limit_days = days if days is not None else settings.TASK_AUTO_VAULT_DAYS
+            cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=limit_days)
+            candidates = (
+                db.query(TaskRecord)
+                .filter(
+                    TaskRecord.status == "PENDING",
+                    TaskRecord.in_vault.is_(False),
+                    TaskRecord.created_at < cutoff,
+                )
+                .all()
+            )
+            moved = 0
+            for t in candidates:
+                if (t.due_date or "").strip():
+                    continue
+                if t.is_favorite or t.is_epic or t.is_idea or t.postponed_until:
+                    continue
+                if (t.reassessment_notes or "").strip():
+                    continue
+                t.in_vault = True
+                t.vault_reason = self.AUTO_AGE_VAULT_REASON
+                moved += 1
+            if moved:
+                db.commit()
+            return moved
         finally:
             if should_close:
                 db.close()
